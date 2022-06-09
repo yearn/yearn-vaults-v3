@@ -1,0 +1,129 @@
+Metadata-Version: 2.1
+Name: ethpm-types
+Version: 0.3.2
+Summary: ethpm_types: Implementation of EIP-2678
+Home-page: https://github.com/ApeWorX/ethpm-types
+Author: ApeWorX Ltd.
+Author-email: admin@apeworx.io
+License: Apache-2.0
+Keywords: ethereum
+Platform: UNKNOWN
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Natural Language :: English
+Classifier: Operating System :: MacOS
+Classifier: Operating System :: POSIX
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Requires-Python: >=3.7.2,<3.11
+Description-Content-Type: text/markdown
+Requires-Dist: hexbytes (<0.3,>=0.2.2)
+Requires-Dist: pydantic (<2.0.0,>=1.8.2)
+Requires-Dist: eth-utils (<3.0,>=1.10.0)
+Requires-Dist: py-cid (<0.4.0,>=0.3.0)
+Requires-Dist: importlib-metadata ; python_version < "3.8"
+Requires-Dist: typing-extensions ; python_version < "3.8"
+Provides-Extra: dev
+Requires-Dist: pytest (<7.0,>=6.0) ; extra == 'dev'
+Requires-Dist: pytest-xdist ; extra == 'dev'
+Requires-Dist: pytest-cov ; extra == 'dev'
+Requires-Dist: hypothesis (<7.0,>=6.2.0) ; extra == 'dev'
+Requires-Dist: PyGithub (<2.0,>=1.54) ; extra == 'dev'
+Requires-Dist: hypothesis-jsonschema (==0.19.0) ; extra == 'dev'
+Requires-Dist: pysha3 (<2.0.0,>=1.0.2) ; extra == 'dev'
+Requires-Dist: black (<23.0,>=22.3.0) ; extra == 'dev'
+Requires-Dist: mypy (<1.0,>=0.950) ; extra == 'dev'
+Requires-Dist: types-PyYAML ; extra == 'dev'
+Requires-Dist: types-requests ; extra == 'dev'
+Requires-Dist: flake8 (<4.0,>=3.9.2) ; extra == 'dev'
+Requires-Dist: flake8-breakpoint (<2.0.0,>=1.1.0) ; extra == 'dev'
+Requires-Dist: flake8-print (<5.0.0,>=4.0.0) ; extra == 'dev'
+Requires-Dist: isort (<6.0,>=5.10.1) ; extra == 'dev'
+Requires-Dist: setuptools ; extra == 'dev'
+Requires-Dist: wheel ; extra == 'dev'
+Requires-Dist: twine ; extra == 'dev'
+Requires-Dist: commitizen (<2.20,>=2.19) ; extra == 'dev'
+Requires-Dist: pre-commit ; extra == 'dev'
+Requires-Dist: pytest-watch ; extra == 'dev'
+Requires-Dist: IPython ; extra == 'dev'
+Requires-Dist: ipdb ; extra == 'dev'
+Provides-Extra: lint
+Requires-Dist: black (<23.0,>=22.3.0) ; extra == 'lint'
+Requires-Dist: mypy (<1.0,>=0.950) ; extra == 'lint'
+Requires-Dist: types-PyYAML ; extra == 'lint'
+Requires-Dist: types-requests ; extra == 'lint'
+Requires-Dist: flake8 (<4.0,>=3.9.2) ; extra == 'lint'
+Requires-Dist: flake8-breakpoint (<2.0.0,>=1.1.0) ; extra == 'lint'
+Requires-Dist: flake8-print (<5.0.0,>=4.0.0) ; extra == 'lint'
+Requires-Dist: isort (<6.0,>=5.10.1) ; extra == 'lint'
+Provides-Extra: release
+Requires-Dist: setuptools ; extra == 'release'
+Requires-Dist: wheel ; extra == 'release'
+Requires-Dist: twine ; extra == 'release'
+Provides-Extra: test
+Requires-Dist: pytest (<7.0,>=6.0) ; extra == 'test'
+Requires-Dist: pytest-xdist ; extra == 'test'
+Requires-Dist: pytest-cov ; extra == 'test'
+Requires-Dist: hypothesis (<7.0,>=6.2.0) ; extra == 'test'
+Requires-Dist: PyGithub (<2.0,>=1.54) ; extra == 'test'
+Requires-Dist: hypothesis-jsonschema (==0.19.0) ; extra == 'test'
+Requires-Dist: pysha3 (<2.0.0,>=1.0.2) ; extra == 'test'
+
+# EthPM v3 Implementation
+
+EthPM is an Ethereum package manifest containing data types for contracts, deployments,
+and source code using [EIP-2678](https://eips.ethereum.org/EIPS/eip-2678).
+The library validates and serializes contract related data and provides JSON schemas.
+
+## Dependencies
+
+* [python3](https://www.python.org/downloads) version 3.7 or greater, python3-dev
+
+## Installation
+
+### via `pip`
+
+You can install the latest release via [`pip`](https://pypi.org/project/pip/):
+
+```bash
+pip install ethpm-types
+```
+
+### via `setuptools`
+
+You can clone the repository and use [`setuptools`](https://github.com/pypa/setuptools) for the most up-to-date version:
+
+```bash
+git clone https://github.com/ApeWorX/ethpm-types.git
+cd ethpm-types
+python3 setup.py install
+```
+
+## Quick Usage
+
+Starting with a dictionary of attribute data, such as a contract instance, you can
+build an EthPM typed object.
+
+```python
+from ethpm_types import ContractInstance
+
+# contract_dict assumes a pre-defined dictionary containing all required keywords/args
+# contract_dict = {"keyword": "value",...}
+contract = ContractInstance(**contract_dict)
+
+print(contract.name)
+```
+
+## Development
+
+Please see the [contributing guide](CONTRIBUTING.md) to learn more how to contribute to this project.
+Comments, questions, criticisms and pull requests are welcomed.
+
+## License
+
+This project is licensed under the [Apache 2.0](LICENSE).
+
+

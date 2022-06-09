@@ -1,0 +1,11 @@
+LICENSE
+MANIFEST.in
+README.rst
+baseconv.py
+setup.cfg
+setup.py
+python_baseconv.egg-info/PKG-INFO
+python_baseconv.egg-info/SOURCES.txt
+python_baseconv.egg-info/dependency_links.txt
+python_baseconv.egg-info/not-zip-safe
+python_baseconv.egg-info/top_level.txt

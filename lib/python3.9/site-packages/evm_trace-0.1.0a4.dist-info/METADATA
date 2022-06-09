@@ -1,0 +1,149 @@
+Metadata-Version: 2.1
+Name: evm-trace
+Version: 0.1.0a4
+Summary: evm-trace: Ethereum Virtual Machine transaction tracing tool
+Home-page: https://github.com/ApeWorX/evm-trace
+Author: ApeWorX Ltd.
+Author-email: admin@apeworx.io
+License: Apache-2.0
+Keywords: ethereum
+Platform: UNKNOWN
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Natural Language :: English
+Classifier: Operating System :: MacOS
+Classifier: Operating System :: POSIX
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Requires-Python: >=3.7.2,<4
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic (<2.0,>=1.9.0)
+Requires-Dist: hexbytes (<1.0.0,>=0.2.2)
+Requires-Dist: eth-utils (>=1.10.0)
+Requires-Dist: importlib-metadata ; python_version < "3.8"
+Provides-Extra: dev
+Requires-Dist: pytest (<7.0,>=6.0) ; extra == 'dev'
+Requires-Dist: pytest-xdist ; extra == 'dev'
+Requires-Dist: pytest-cov ; extra == 'dev'
+Requires-Dist: hypothesis (<7.0,>=6.2.0) ; extra == 'dev'
+Requires-Dist: eth-hash[pysha3] ; extra == 'dev'
+Requires-Dist: black (<23.0,>=22.3.0) ; extra == 'dev'
+Requires-Dist: mypy (<1.0,>=0.960) ; extra == 'dev'
+Requires-Dist: flake8 (<5.0,>=4.0.1) ; extra == 'dev'
+Requires-Dist: isort (<6.0,>=5.10.1) ; extra == 'dev'
+Requires-Dist: setuptools ; extra == 'dev'
+Requires-Dist: wheel ; extra == 'dev'
+Requires-Dist: twine ; extra == 'dev'
+Requires-Dist: commitizen ; extra == 'dev'
+Requires-Dist: pre-commit ; extra == 'dev'
+Requires-Dist: pytest-watch ; extra == 'dev'
+Requires-Dist: IPython ; extra == 'dev'
+Requires-Dist: ipdb ; extra == 'dev'
+Provides-Extra: lint
+Requires-Dist: black (<23.0,>=22.3.0) ; extra == 'lint'
+Requires-Dist: mypy (<1.0,>=0.960) ; extra == 'lint'
+Requires-Dist: flake8 (<5.0,>=4.0.1) ; extra == 'lint'
+Requires-Dist: isort (<6.0,>=5.10.1) ; extra == 'lint'
+Provides-Extra: release
+Requires-Dist: setuptools ; extra == 'release'
+Requires-Dist: wheel ; extra == 'release'
+Requires-Dist: twine ; extra == 'release'
+Provides-Extra: test
+Requires-Dist: pytest (<7.0,>=6.0) ; extra == 'test'
+Requires-Dist: pytest-xdist ; extra == 'test'
+Requires-Dist: pytest-cov ; extra == 'test'
+Requires-Dist: hypothesis (<7.0,>=6.2.0) ; extra == 'test'
+Requires-Dist: eth-hash[pysha3] ; extra == 'test'
+
+# evm-trace
+
+Ethereum Virtual Machine transaction tracing tool
+
+## Dependencies
+
+* [python3](https://www.python.org/downloads) version 3.7.2 or greater, python3-dev
+
+## Installation
+
+### via `pip`
+
+You can install the latest release via [`pip`](https://pypi.org/project/pip/):
+
+```bash
+pip install evm-trace
+```
+
+### via `setuptools`
+
+You can clone the repository and use [`setuptools`](https://github.com/pypa/setuptools) for the most up-to-date version:
+
+```bash
+git clone https://github.com/ApeWorX/evm-trace.git
+cd evm-trace
+python3 setup.py install
+```
+
+## Quick Usage
+
+If you are using a node that supports the `debug_traceTransaction` RPC, you can use `web3.py` to get trace frames:
+
+```python
+from web3 import HTTPProvider, Web3
+from evm_trace import TraceFrame
+
+web3 = Web3(HTTPProvider("https://path.to.my.node"))
+struct_logs = web3.manager.request_blocking("debug_traceTransaction", [txn_hash]).structLogs
+for item in struct_logs:
+    yield TraceFrame(**item)
+```
+
+If you want to get the call-tree node, you can do:
+
+```python
+from evm_trace import CallType, get_calltree_from_trace
+
+root_node_kwargs = {
+    "gas_cost": 10000000,
+    "gas_limit": 10000000000,
+    "address": "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045",
+    "calldata": "0x00",
+    "value": 1000,
+    "call_type": CallType.MUTABLE,
+}
+
+# Where `trace` is a `TraceFrame` (see example above)
+calltree = get_calltree_from_trace(trace, **root_node_kwargs)
+```
+
+You can also customize the output by making your own display class:
+
+```python
+from evm_trace.display import DisplayableCallTreeNode, get_calltree_from_trace
+
+
+class CustomDisplay(DisplayableCallTreeNode):
+    def title(self) -> str:
+        call_type = self.call.call_type.value.lower().capitalize()
+        address = self.call.address.hex()
+        cost = self.call.gas_cost
+        return f"{call_type} call @ {address} gas_cost={cost}"
+
+
+calltree = get_calltree_from_trace(trace, display_cls=CustomDisplay)
+```
+
+## Development
+
+This project is in development and should be considered a beta.
+Things might not be in their final state and breaking changes may occur.
+Comments, questions, criticisms and pull requests are welcomed.
+
+## License
+
+This project is licensed under the [Apache 2.0](LICENSE).
+
+

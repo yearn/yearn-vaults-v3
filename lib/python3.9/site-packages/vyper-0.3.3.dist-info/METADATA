@@ -1,0 +1,131 @@
+Metadata-Version: 2.1
+Name: vyper
+Version: 0.3.3
+Summary: Vyper: the Pythonic Programming Language for the EVM
+Home-page: https://github.com/vyperlang/vyper
+Author: Vyper Team
+Author-email: 
+License: Apache License 2.0
+Keywords: ethereum evm smart contract language
+Platform: UNKNOWN
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: Apache Software License
+Classifier: Programming Language :: Python :: 3.7
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Requires-Python: >=3.7,<3.11
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: asttokens (==2.0.5)
+Requires-Dist: pycryptodome (<4,>=3.5.1)
+Requires-Dist: semantic-version (==2.8.5)
+Requires-Dist: wheel
+Requires-Dist: cached-property (==1.5.2) ; python_version < "3.8"
+Requires-Dist: importlib-metadata ; python_version < "3.8"
+Provides-Extra: dev
+Requires-Dist: pytest (<7.0,>=6.2.5) ; extra == 'dev'
+Requires-Dist: pytest-cov (<3.0,>=2.10) ; extra == 'dev'
+Requires-Dist: pytest-instafail (<1.0,>=0.4) ; extra == 'dev'
+Requires-Dist: pytest-xdist (<3.0,>=2.5) ; extra == 'dev'
+Requires-Dist: pytest-split (<1.0,>=0.7.0) ; extra == 'dev'
+Requires-Dist: pytest-rerunfailures (<11,>=10.2) ; extra == 'dev'
+Requires-Dist: eth-tester[py-evm] (<0.7,>=0.6.0b6) ; extra == 'dev'
+Requires-Dist: py-evm (<0.6,>=0.5.0a3) ; extra == 'dev'
+Requires-Dist: web3 (==5.27.0) ; extra == 'dev'
+Requires-Dist: tox (<4.0,>=3.15) ; extra == 'dev'
+Requires-Dist: lark-parser (==0.10.0) ; extra == 'dev'
+Requires-Dist: hypothesis[lark] (<6.0,>=5.37.1) ; extra == 'dev'
+Requires-Dist: black (==21.9b0) ; extra == 'dev'
+Requires-Dist: click (<8.1.0) ; extra == 'dev'
+Requires-Dist: flake8 (==3.9.2) ; extra == 'dev'
+Requires-Dist: flake8-bugbear (==20.1.4) ; extra == 'dev'
+Requires-Dist: flake8-use-fstring (==1.1) ; extra == 'dev'
+Requires-Dist: isort (==5.9.3) ; extra == 'dev'
+Requires-Dist: mypy (==0.910) ; extra == 'dev'
+Requires-Dist: recommonmark ; extra == 'dev'
+Requires-Dist: sphinx (<4.0,>=3.0) ; extra == 'dev'
+Requires-Dist: sphinx-rtd-theme (<0.6,>=0.5) ; extra == 'dev'
+Requires-Dist: ipython ; extra == 'dev'
+Requires-Dist: pre-commit ; extra == 'dev'
+Requires-Dist: pyinstaller ; extra == 'dev'
+Requires-Dist: twine ; extra == 'dev'
+Provides-Extra: docs
+Requires-Dist: recommonmark ; extra == 'docs'
+Requires-Dist: sphinx (<4.0,>=3.0) ; extra == 'docs'
+Requires-Dist: sphinx-rtd-theme (<0.6,>=0.5) ; extra == 'docs'
+Provides-Extra: lint
+Requires-Dist: black (==21.9b0) ; extra == 'lint'
+Requires-Dist: click (<8.1.0) ; extra == 'lint'
+Requires-Dist: flake8 (==3.9.2) ; extra == 'lint'
+Requires-Dist: flake8-bugbear (==20.1.4) ; extra == 'lint'
+Requires-Dist: flake8-use-fstring (==1.1) ; extra == 'lint'
+Requires-Dist: isort (==5.9.3) ; extra == 'lint'
+Requires-Dist: mypy (==0.910) ; extra == 'lint'
+Provides-Extra: test
+Requires-Dist: pytest (<7.0,>=6.2.5) ; extra == 'test'
+Requires-Dist: pytest-cov (<3.0,>=2.10) ; extra == 'test'
+Requires-Dist: pytest-instafail (<1.0,>=0.4) ; extra == 'test'
+Requires-Dist: pytest-xdist (<3.0,>=2.5) ; extra == 'test'
+Requires-Dist: pytest-split (<1.0,>=0.7.0) ; extra == 'test'
+Requires-Dist: pytest-rerunfailures (<11,>=10.2) ; extra == 'test'
+Requires-Dist: eth-tester[py-evm] (<0.7,>=0.6.0b6) ; extra == 'test'
+Requires-Dist: py-evm (<0.6,>=0.5.0a3) ; extra == 'test'
+Requires-Dist: web3 (==5.27.0) ; extra == 'test'
+Requires-Dist: tox (<4.0,>=3.15) ; extra == 'test'
+Requires-Dist: lark-parser (==0.10.0) ; extra == 'test'
+Requires-Dist: hypothesis[lark] (<6.0,>=5.37.1) ; extra == 'test'
+
+
+<img src="https://raw.githubusercontent.com/vyperlang/vyper/master/logo/vyper-logo-transparent.svg?sanitize=true" alt="" width="110">
+
+[![Build Status](https://github.com/vyperlang/vyper/workflows/Test/badge.svg)](https://github.com/vyperlang/vyper/actions)
+[![Documentation Status](https://readthedocs.org/projects/vyper/badge/?version=latest)](http://vyper.readthedocs.io/en/latest/?badge=latest "ReadTheDocs")
+[![Discord](https://img.shields.io/discord/591914197219016707.svg?label=%23vyper)](https://discord.gg/abJEARdx3Q)
+
+[![PyPI](https://badge.fury.io/py/vyper.svg)](https://pypi.org/project/vyper "PyPI")
+[![Docker](https://images.microbadger.com/badges/version/vyperlang/vyper.svg)](https://hub.docker.com/r/vyperlang/vyper "DockerHub")
+
+[![Coverage Status](https://codecov.io/gh/vyperlang/vyper/branch/master/graph/badge.svg)](https://codecov.io/gh/vyperlang/vyper "Codecov")
+[![Language grade: Python](https://img.shields.io/lgtm/grade/python/g/vyperlang/vyper.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/vyperlang/vyper/context:python)
+
+# Getting Started
+See [Installing Vyper](http://vyper.readthedocs.io/en/latest/installing-vyper.html) to install vyper.
+See [Tools and Resources](https://github.com/vyperlang/vyper/wiki/Vyper-tools-and-resources) for an additional list of framework and tools with vyper support.
+See [Documentation](http://vyper.readthedocs.io/en/latest/index.html) for the documentation and overall design goals of the Vyper language.
+
+See [Learn.Vyperlang.org](https://learn.vyperlang.org/) for **learning Vyper by building a Pokémon game**. 
+
+**Note: Vyper is beta software, use with care**
+
+# Installation
+See the [Vyper documentation](https://vyper.readthedocs.io/en/latest/installing-vyper.html)
+for build instructions.
+
+# Compiling a contract
+To compile a contract, use:
+```bash
+vyper your_file_name.vy
+```
+
+There is also an [online compiler](https://vyper.online/) available you can use to experiment with
+the language and compile to ``bytecode`` and/or ``IR``.
+
+**Note: While the vyper version of the online compiler is updated on a regular basis it might
+be a bit behind the latest version found in the master branch of this repository.**
+
+## Testing (using pytest)
+
+(Complete [installation steps](https://vyper.readthedocs.io/en/latest/installing-vyper.html) first.)
+
+```bash
+python setup.py test
+```
+
+# Contributing
+* See Issues tab, and feel free to submit your own issues
+* Add PRs if you discover a solution to an existing issue
+* For further discussions and questions, post in [Discussions](https://github.com/vyperlang/vyper/discussions) or talk to us on [Discord](https://discord.gg/abJEARdx3Q)
+* For more information, see [Contributing](http://vyper.readthedocs.io/en/latest/contributing.html)
+
+
