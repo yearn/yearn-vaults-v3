@@ -29,6 +29,9 @@ MAX_BPS: constant(uint256) = 10_000
 asset: public(ERC20)
 totalIdle: public(uint256)
 strategies: public(HashMap[address, StrategyParams])
+balanceOf: public(HashMap[address, uint256])
+totalSupply: public(uint256)
+totalDebt: public(uint256)
 
 @external
 def __init__():
@@ -37,10 +40,35 @@ def __init__():
 
 # SUPPORT FUNCTIONS #
 @internal
+def _totalAssets() -> uint256: 
+   return self.totalIdle + self.totalDebt
+
+@internal
 def _issueSharesForAmount(amount: uint256, recipient: address) -> uint256:
-    # TODO: implement
-    return 0
+    _totalSupply: uint256 = self.totalSupply
+    newShares: uint256 = amount
+
+    if _totalSupply > 0:
+    	newShares= amount * _totalSupply / self._totalAssets()
+
+    assert newShares > 0
+
+    self.balanceOf[recipient] += newShares
+    self.totalSupply += newShares 
+
+    # TODO: emit event
+    return newShares
  
+@internal
+def _burnShares(shares: uint256, owner: address):
+    # TODO: do we need to check? 
+    self.balanceOf[owner] -= shares
+    self.totalSupply -= shares
+
+@internal
+def _amountForShares(shares: uint256) -> uint256:
+   return shares * self._totalAssets() / self.totalSupply
+
 @internal
 def erc20_safe_transferFrom(token: address, sender: address, receiver: address, amount: uint256):
      # Used only to send tokens that are not the type managed by this Vault.
@@ -93,21 +121,32 @@ def deposit(_amount: uint256, _recipient: address) -> uint256:
 
    return shares
 
-# @external
-# def withdraw(shares: uint256, owner: address, strategies: DynArray[address, 10]):
-#    # TODO: implement withdrawal
-#    #    - checks that the msg.sender is approved by owner
-#    #    - checks the owner has enough shares
-#    #    - checks the vault has enough tokens
-#    #    - if not enough tokens: withdraw from the strategies in from_strategies list
-#    #    - burn shares
-#    #    - transfer tokens
-#     return
-# 
-#    
-# 
-# 
-# 
+@external
+def withdraw(_shares: uint256, _owner: address, _strategies: DynArray[address, 10]) -> uint256:
+   # TODO: allow withdrawals by approved ? 
+   # NOTE: currently _owner is unused
+   owner: address = msg.sender
+   shares: uint256 = _shares
+   sharesBalance: uint256 = self.balanceOf[owner]  
+
+   if _shares == MAX_UINT256: 
+      shares = sharesBalance
+
+   assert sharesBalance >= shares
+   assert shares > 0
+
+   amount: uint256 = self._amountForShares(shares)
+
+   # TODO: withdraw from strategies 
+
+   assert self.totalIdle >= amount
+
+   self._burnShares(shares, owner)
+
+   self.erc20_safe_transfer(self.asset.address, owner, amount)
+
+   return amount
+   
 # # SHARE MANAGEMENT FUNCTIONS #
 # def pricePerShare():
 #    # TODO: returns the value of 1 share in 1 token (amountForShares(1e(decimals)))
