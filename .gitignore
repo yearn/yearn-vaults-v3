@@ -5,3 +5,6 @@ lib/
 share/
 build/
 include/
+
+# python virtual environment
+venv
