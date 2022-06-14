@@ -1,0 +1,7 @@
+name: yearn-v3
+default_ecosystem: ethereum
+dependencies: 
+  - name: OpenZeppelin
+    github: OpenZeppelin/openzeppelin-contracts
+    version: 4.4.2
+
