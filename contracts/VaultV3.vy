@@ -27,11 +27,12 @@ MAX_BPS: constant(uint256) = 10_000
 
 # STORAGE #
 asset: public(ERC20)
-totalIdle: public(uint256)
 strategies: public(HashMap[address, StrategyParams])
 balanceOf: public(HashMap[address, uint256])
+decimals: public(uint256)
 totalSupply: public(uint256)
 totalDebt: public(uint256)
+totalIdle: public(uint256)
 
 @external
 def __init__():
@@ -44,12 +45,30 @@ def _totalAssets() -> uint256:
    return self.totalIdle + self.totalDebt
 
 @internal
-def _issueSharesForAmount(amount: uint256, recipient: address) -> uint256:
-    _totalSupply: uint256 = self.totalSupply
-    newShares: uint256 = amount
+def _burnShares(shares: uint256, owner: address):
+    # TODO: do we need to check? 
+    self.balanceOf[owner] -= shares
+    self.totalSupply -= shares
 
+@internal
+def _amountForShares(shares: uint256) -> uint256:
+    _totalSupply: uint256 = self.totalSupply
+    amount: uint256 = shares
+    if _totalSupply > 0: 
+       amount = shares * self._totalAssets() / self.totalSupply
+    return amount
+
+@internal
+def _sharesForAmount(amount: uint256) -> uint256: 
+    _totalSupply: uint256 = self.totalSupply
+    shares: uint256 = amount
     if _totalSupply > 0:
-    	newShares= amount * _totalSupply / self._totalAssets()
+    	 shares = amount * _totalSupply / self._totalAssets()
+    return shares
+
+@internal
+def _issueSharesForAmount(amount: uint256, recipient: address) -> uint256:
+    newShares: uint256 = self._sharesForAmount(amount)
 
     assert newShares > 0
 
@@ -59,15 +78,6 @@ def _issueSharesForAmount(amount: uint256, recipient: address) -> uint256:
     # TODO: emit event
     return newShares
  
-@internal
-def _burnShares(shares: uint256, owner: address):
-    # TODO: do we need to check? 
-    self.balanceOf[owner] -= shares
-    self.totalSupply -= shares
-
-@internal
-def _amountForShares(shares: uint256) -> uint256:
-   return shares * self._totalAssets() / self.totalSupply
 
 @internal
 def erc20_safe_transferFrom(token: address, sender: address, receiver: address, amount: uint256):
@@ -147,20 +157,20 @@ def withdraw(_shares: uint256, _owner: address, _strategies: DynArray[address, 1
 
    return amount
    
-# # SHARE MANAGEMENT FUNCTIONS #
-# def pricePerShare():
-#    # TODO: returns the value of 1 share in 1 token (amountForShares(1e(decimals)))
-#     return
-# 
-# def sharesForAmount(amount: uint256):
-#    # TODO: convert the input amount of tokens into shares
-#     return
-# 
-# def amountForShares(shares: uint256):
-#    # TODO: conver the input amount of shares into tokens
-#     return
-# 
-# # STRATEGY MANAGEMENT FUNCTIONS #
+# SHARE MANAGEMENT FUNCTIONS #
+@external
+def pricePerShare() -> uint256:
+   return self._amountForShares(10 ** self.decimals)
+
+@external
+def sharesForAmount(amount: uint256) -> uint256:
+   return self._sharesForAmount(amount)
+
+@external
+def amountForShares(shares: uint256) -> uint256:
+   return self._amountForShares(shares)  
+    
+# STRATEGY MANAGEMENT FUNCTIONS #
 # def addStrategy(new_strategy: address):
 #    # permissioned: STRATEGY_MANAGER
 #    # TODO: implement adding a strategy
