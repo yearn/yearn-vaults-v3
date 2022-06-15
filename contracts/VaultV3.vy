@@ -172,6 +172,11 @@ def withdraw(_shares: uint256, _owner: address, _strategies: DynArray[address, 1
 # SHARE MANAGEMENT FUNCTIONS #
 @view
 @external
+def totalAssets() -> uint256:
+   return self._totalAssets()
+
+@view
+@external
 def pricePerShare() -> uint256:
    return self._amountForShares(10 ** self.decimals)
 

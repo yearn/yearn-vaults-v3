@@ -1,5 +1,5 @@
 import ape
-from utils import actions
+from utils import actions, checks
 from utils.constants import MAX_INT, ZERO_ADDRESS
 
 
@@ -81,10 +81,8 @@ def test_withdraw(user, asset, create_vault):
 
     vault.withdraw(half_balance, user, strategies, sender=user)
 
-    assert vault.totalSupply() == 0
+    checks.check_vault_empty(vault)
     assert asset.balanceOf(vault) == 0
-    assert vault.totalIdle() == 0
-    assert vault.totalDebt() == 0
     assert vault.pricePerShare(sender=user) == 10 ** asset.decimals()  # 1:1 price
 
 
@@ -106,10 +104,9 @@ def test_withdraw_all(user, asset, create_vault):
 
     vault.withdraw(MAX_INT, user, strategies, sender=user)
 
-    assert vault.totalSupply() == 0
+    checks.check_vault_empty(vault)
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(user) == balance
-    assert vault.totalIdle() == 0
 
 
 def test_deposit_limit():
