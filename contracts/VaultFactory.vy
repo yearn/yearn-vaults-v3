@@ -4,6 +4,7 @@
 
 # FUNCTIONS #
 @external 
-def deployNewVault(asset: address):
+def deployNewVault(asset: address) -> address:
+   return asset
    # TODO: deploy new vault
    # TODO: come up with the seed / id of each vault

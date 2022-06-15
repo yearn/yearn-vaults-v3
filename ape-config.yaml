@@ -1,7 +1,10 @@
 name: yearn-v3
 default_ecosystem: ethereum
-dependencies: 
-  - name: OpenZeppelin
-    github: OpenZeppelin/openzeppelin-contracts
-    version: 4.4.2
+plugins:
+  - name: solidity
+  - name: vyper
+  - name: hardhat
 
+ethereum:
+  local:
+    default_provider: hardhat
