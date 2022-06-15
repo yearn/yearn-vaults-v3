@@ -5,3 +5,8 @@ lib/
 share/
 build/
 include/
+.build
+node_modules
+.env
+tests/__pycache__
+.pytest_cache

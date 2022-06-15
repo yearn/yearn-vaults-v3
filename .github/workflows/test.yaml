@@ -1,0 +1,35 @@
+name: Test
+
+on:
+  push:
+    branches:
+    - master
+  pull_request:
+
+concurrency: 
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - uses: ApeWorX/github-action@v1
+    - name: Compile contracts
+      # TODO: Force recompiles until ape compile caching is fixed
+      run: ape compile --force --size
+
+    # Needed to use hardhat
+    - name: Setup node.js
+      uses: actions/setup-node@v1
+      with:
+        node-version: '12.x'
+
+    - name: Install hardhat
+      run: npm install hardhat
+
+    - name: Run tests
+      run: ape test -s
+      timeout-minutes: 10
