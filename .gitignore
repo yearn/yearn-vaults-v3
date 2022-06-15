@@ -6,5 +6,11 @@ share/
 build/
 include/
 
-# python virtual environment
+# python
 venv
+**/__pycache__
+
+# ape cache
+contracts/.cache
+.build
+
