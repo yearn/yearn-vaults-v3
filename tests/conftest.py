@@ -39,23 +39,54 @@ def rewards(accounts):
 
 
 @pytest.fixture(scope="session")
-def user(accounts):
-    yield accounts[7]
+def fish_amount():
+    yield 10**18
+
+
+@pytest.fixture(scope="session")
+def fish(accounts, asset, gov, fish_amount):
+    fish = accounts[7]
+    asset.mint(fish, fish_amount, sender=gov)
+    yield fish
+
+
+@pytest.fixture(scope="session")
+def shark_amount():
+    yield 10**20
+
+
+@pytest.fixture(scope="session")
+def shark(accounts, asset, gov, shark_amount):
+    shark = accounts[8]
+    asset.mint(shark, shark_amount, sender=gov)
+    yield shark
+
+
+@pytest.fixture(scope="session")
+def whale_amount():
+    yield 10**22
+
+
+@pytest.fixture(scope="session")
+def whale(accounts):
+    whale = accounts[9]
+    asset.mint(whale, whale_amount, sender=gov)
+    yield whale
 
 
 @pytest.fixture(scope="session")
 def bunny(accounts):
-    yield accounts[8]
+    yield accounts[10]
 
 
 @pytest.fixture(scope="session")
 def doggie(accounts):
-    yield accounts[8]
+    yield accounts[11]
 
 
 @pytest.fixture(scope="session")
 def panda(accounts):
-    yield accounts[8]
+    yield accounts[12]
 
 
 # use this for general asset mock
@@ -79,9 +110,3 @@ def create_vault(project, gov):
         return gov.deploy(project.VaultV3, asset)
 
     yield create_vault
-
-
-@pytest.fixture(autouse=True)
-def mint_asset(asset, gov, user):
-    amount = 1_000_000 * 10**18
-    asset.mint(user, amount, sender=gov)
