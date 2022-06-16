@@ -11,16 +11,10 @@ from vyper.interfaces import ERC20
 interface ERC20Metadata:
     def decimals() -> uint8: view
 
-<<<<<<< HEAD
 interface IStrategy:
    def asset() -> address: view
    def vault() -> address: view
    
-=======
-interface Strategy:
-    def asset() -> address: view
-
->>>>>>> 79792ec6d265dc63c227b7fe746c78830e72a353
 # EVENTS #
 event Transfer:
     sender: indexed(address)
@@ -37,27 +31,18 @@ event Withdraw:
     shares: uint256
     amount: uint256
 
-<<<<<<< HEAD
 event StrategyAdded: 
    strategy: indexed(address)
 
 event StrategyRevoked: 
    strategy: indexed(address)
-=======
-event UpdateDepositLimit:
-    limit: uint256
->>>>>>> 79792ec6d265dc63c227b7fe746c78830e72a353
 
 # STRUCTS #
 # TODO: strategy params
 struct StrategyParams:
-<<<<<<< HEAD
    activation: uint256
    currentDebt: uint256
    maxDebt: uint256
-=======
-    activation: uint256
->>>>>>> 79792ec6d265dc63c227b7fe746c78830e72a353
 
 # CONSTANTS #
 MAX_BPS: constant(uint256) = 10_000
