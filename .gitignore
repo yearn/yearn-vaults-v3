@@ -5,12 +5,10 @@ lib/
 share/
 build/
 include/
-
-# python
-venv
-**/__pycache__
-
-# ape cache
-contracts/.cache
 .build
-
+node_modules
+.env
+**/__pycache__
+.pytest_cache
+**/.cache
+venv/
