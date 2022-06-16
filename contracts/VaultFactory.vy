@@ -3,8 +3,8 @@
 # STORAGE #
 
 # FUNCTIONS #
-@external 
+@external
 def deployNewVault(asset: address) -> address:
-   return asset
-   # TODO: deploy new vault
-   # TODO: come up with the seed / id of each vault
+    # TODO: deploy new vault
+    # TODO: come up with the seed / id of each vault
+    return asset

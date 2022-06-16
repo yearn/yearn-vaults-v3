@@ -1,10 +1,26 @@
 # yearn-vaults-v3
 
-## Setup
+## Installation
 
-Using a virtual env you must install the requirements using `pip install`
+Set up your python virtual environment and activate it.
 
-Once installed install the ape plugins with `ape plugins install .`
+```
+python3 -m venv venv
+source venv/bin/activate
+```
+
+Install requirements.
+
+`python3 -m pip install -r requirements-dev.txt`
+
+Compile smart contracts with:
+
+`ape compile`
+
+and test smart contracts with:
+
+`ape test`
+
+See the ApeWorx [documentation](https://docs.apeworx.io/ape/stable/) and [github](https://github.com/ApeWorX/ape) for more information.
 
 You will need hardhat to run the test `yarn`
-
