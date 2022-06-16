@@ -43,6 +43,21 @@ def user(accounts):
     yield accounts[7]
 
 
+@pytest.fixture(scope="session")
+def bunny(accounts):
+    yield accounts[8]
+
+
+@pytest.fixture(scope="session")
+def doggie(accounts):
+    yield accounts[8]
+
+
+@pytest.fixture(scope="session")
+def panda(accounts):
+    yield accounts[8]
+
+
 # use this for general asset mock
 @pytest.fixture(scope="session")
 def asset(project, gov):

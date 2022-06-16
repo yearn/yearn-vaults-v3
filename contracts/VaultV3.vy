@@ -153,8 +153,8 @@ def withdraw(_shares: uint256, _owner: address, _strategies: DynArray[address, 1
    if _shares == MAX_UINT256:
       shares = sharesBalance
 
-   assert sharesBalance >= shares, "no shares"
-   assert shares > 0, "no shares"
+   assert sharesBalance >= shares, "insufficient shares to withdraw"
+   assert shares > 0, "no shares to withdraw"
 
    amount: uint256 = self._amountForShares(shares)
 

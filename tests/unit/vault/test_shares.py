@@ -61,12 +61,24 @@ def test_withdraw(user, asset, create_vault):
     assert asset.balanceOf(user) == balance
 
 
+def test_withdraw_with_insufficient_shares(user, asset, create_vault):
+    vault = create_vault(asset)
+    amount = 10**18
+    strategies = []
+    shares = amount + 1
+
+    actions.user_deposit(user, vault, asset, amount)
+
+    with ape.reverts("insufficient shares to withdraw"):
+        vault.withdraw(shares, user, strategies, sender=user)
+
+
 def test_withdraw_with_no_shares(user, asset, create_vault):
     vault = create_vault(asset)
     shares = 0
     strategies = []
 
-    with ape.reverts("no shares"):
+    with ape.reverts("no shares to withdraw"):
         vault.withdraw(shares, user, strategies, sender=user)
 
 
