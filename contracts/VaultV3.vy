@@ -11,22 +11,28 @@ from vyper.interfaces import ERC20
 interface ERC20Metadata:
    def decimals() -> uint8: view
 
-interface Strategy:
+interface IStrategy:
    def asset() -> address: view
-
+   def vault() -> address: view
+   
 # EVENTS #
 event Transfer:
    sender: indexed(address)
    receiver: indexed(address)
    value: uint256
 
-event UpdateDepositLimit:
-   limit: uint256
+event StrategyAdded: 
+   strategy: indexed(address)
+
+event StrategyRevoked: 
+   strategy: indexed(address)
 
 # STRUCTS #
 # TODO: strategy params
 struct StrategyParams:
    activation: uint256
+   currentDebt: uint256
+   maxDebt: uint256
 
 # CONSTANTS #
 MAX_BPS: constant(uint256) = 10_000
@@ -39,7 +45,6 @@ decimals: public(uint256)
 totalSupply: public(uint256)
 totalDebt: public(uint256)
 totalIdle: public(uint256)
-depositLimit: public(uint256)
 
 @external
 def __init__(asset: ERC20):
@@ -188,35 +193,76 @@ def sharesForAmount(amount: uint256) -> uint256:
 def amountForShares(shares: uint256) -> uint256:
    return self._amountForShares(shares)
 
-@external
-def setDepositLimit(_limit: uint256):
-   # TODO: requires authentication
-   self.depositLimit = _limit
-   log UpdateDepositLimit(_limit)
-
 # STRATEGY MANAGEMENT FUNCTIONS #
-# def addStrategy(new_strategy: address):
-#    # permissioned: STRATEGY_MANAGER
-#    # TODO: implement adding a strategy
-#    #     - verify validity
-#    #     - add the strategy to the hashmap
-#    #     -
-#     return
-#
-# def revokeStrategy(old_strategy: address):
-#    # permissioned: STRATEGY_MANAGER
-#    # TODO: implement removing a strategy from the list
-#    #     - verify strategy exists
-#    #     - handle current status (does it have debt? is it locked?)
-#    #     - remove strategy from the hashmap
-#     return
-#
-# def migrateStrategy(new_strategy: address, old_strategy: address)):
-#    # permissioned: STRATEGY_MANAGER
-#    # TODO: implement migration of a strategy. this means that the old strategy will be revoked and the new one will be added
-#    # the new one will inherit all the parameters from the old one, excluding the activation date
-#     return
-#
+@external
+def addStrategy(new_strategy: address):
+   # TODO: permissioned: STRATEGY_MANAGER
+   assert new_strategy != ZERO_ADDRESS
+   assert self == IStrategy(new_strategy).vault()
+   assert self.strategies[new_strategy].activation == 0
+   assert IStrategy(new_strategy).asset() != self.asset.address
+   
+   self.strategies[new_strategy] = StrategyParams({
+      activation: block.timestamp,
+      currentDebt: 0,
+      maxDebt: 0
+   })
+
+   log StrategyAdded(new_strategy)
+
+   return
+
+@internal
+def _revokeStrategy(old_strategy: address):
+   # TODO: permissioned: STRATEGY_MANAGER
+   assert self.strategies[old_strategy].activation != 0
+   # NOTE: strategy needs to have 0 debt to be revoked
+   assert self.strategies[old_strategy].currentDebt == 0
+
+   # NOTE: strategy params are set to 0 (warning: it can be readded)
+   self.strategies[old_strategy] = StrategyParams({
+       activation: 0,
+       currentDebt: 0,
+       maxDebt: 0
+   })
+
+   log StrategyRevoked(old_strategy)
+
+   return
+
+@external
+def revokeStrategy(old_strategy: address):
+    self._revokeStrategy(old_strategy)
+
+@external
+def migrateStrategy(new_strategy: address, old_strategy: address):
+   # TODO: permissioned: STRATEGY_MANAGER
+
+    # TODO: add strategy migrated event? 
+    assert self.strategies[old_strategy].activation != 0
+    assert self.strategies[old_strategy].currentDebt == 0
+
+    migrated_strategy: StrategyParams = self.strategies[old_strategy]
+
+    # NOTE: we add strategy with same params than the strategy being migrated
+    self.strategies[new_strategy] = StrategyParams({
+       activation: block.timestamp,
+       currentDebt: migrated_strategy.currentDebt,
+       maxDebt: migrated_strategy.maxDebt
+    })
+
+    self._revokeStrategy(old_strategy)
+
+    return
+ 
+@external
+def updateMaxDebtForStrategy(strategy: address, new_maxDebt: uint256): 
+   # TODO: permissioned: DEBT_MANAGER 
+   assert self.strategies[strategy].activation != 0
+   # TODO: should we check that totalMaxDebt is not over 100% of assets? 
+   self.strategies[strategy].maxDebt = new_maxDebt
+   return
+
 # # P&L MANAGEMENT FUNCTIONS #
 # def processReport(strategy: address):
 #    # permissioned: ACCOUNTING_MANAGER (open?)
