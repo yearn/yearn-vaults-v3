@@ -143,9 +143,8 @@ def deposit(_amount: uint256, _recipient: address) -> uint256:
    return shares
 
 @external
-def withdraw(_shares: uint256, _owner: address, _strategies: DynArray[address, 10]) -> uint256:
+def withdraw(_shares: uint256, _recipient: address, _strategies: DynArray[address, 10]) -> uint256:
    # TODO: allow withdrawals by approved ?
-   # NOTE: currently _owner is unused
    owner: address = msg.sender
    shares: uint256 = _shares
    sharesBalance: uint256 = self.balanceOf[owner]
@@ -165,7 +164,7 @@ def withdraw(_shares: uint256, _owner: address, _strategies: DynArray[address, 1
    self._burnShares(shares, owner)
    self.totalIdle -= amount
 
-   self.erc20_safe_transfer(self.asset.address, owner, amount)
+   self.erc20_safe_transfer(self.asset.address, _recipient, amount)
 
    return amount
 

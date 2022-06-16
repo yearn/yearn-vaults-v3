@@ -96,6 +96,47 @@ def test_withdraw_all(fish, asset, create_vault):
     assert asset.balanceOf(fish) == balance
 
 
+def test_delegated_deposit(fish, bunny, asset, create_vault):
+    vault = create_vault(asset)
+    balance = asset.balanceOf(fish)
+
+    # check balance is non-zero
+    assert balance > 0
+
+    # delegate deposit to bunny
+    asset.approve(vault, balance, sender=fish)
+    vault.deposit(balance, bunny, sender=fish)
+
+    # fish has no more assets
+    assert asset.balanceOf(fish) == 0
+    # fish has no shares
+    assert vault.balanceOf(fish) == 0
+    # bunny has been issued vault shares
+    assert vault.balanceOf(bunny) == balance
+
+
+def test_delegated_withdrawal(fish, bunny, asset, create_vault):
+    vault = create_vault(asset)
+    balance = asset.balanceOf(fish)
+    strategies = []
+
+    # check balance is non-zero
+    assert balance > 0
+
+    # deposit balance
+    actions.user_deposit(fish, vault, asset, balance)
+
+    # withdraw to bunny
+    vault.withdraw(vault.balanceOf(fish), bunny, strategies, sender=fish)
+
+    # fish no longer has shares
+    assert vault.balanceOf(fish) == 0
+    # fish did not receive tokens
+    assert asset.balanceOf(fish) == 0
+    # bunny has tokens
+    assert asset.balanceOf(bunny) == balance
+
+
 def test_deposit_limit():
     # TODO: deposit limit tests
     pass

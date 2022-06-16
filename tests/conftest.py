@@ -9,43 +9,13 @@ def gov(accounts):
 
 
 @pytest.fixture(scope="session")
-def strat_ms(accounts):
-    yield accounts[1]
-
-
-@pytest.fixture(scope="session")
-def guardian(accounts):
-    yield accounts[2]
-
-
-@pytest.fixture(scope="session")
-def management(accounts):
-    yield accounts[3]
-
-
-@pytest.fixture(scope="session")
-def strategist(accounts):
-    yield accounts[4]
-
-
-@pytest.fixture(scope="session")
-def keeper(accounts):
-    yield accounts[5]
-
-
-@pytest.fixture(scope="session")
-def rewards(accounts):
-    yield accounts[6]
-
-
-@pytest.fixture(scope="session")
 def fish_amount():
     yield 10**18
 
 
 @pytest.fixture(scope="session")
 def fish(accounts, asset, gov, fish_amount):
-    fish = accounts[7]
+    fish = accounts[1]
     asset.mint(fish, fish_amount, sender=gov)
     yield fish
 
@@ -57,7 +27,7 @@ def shark_amount():
 
 @pytest.fixture(scope="session")
 def shark(accounts, asset, gov, shark_amount):
-    shark = accounts[8]
+    shark = accounts[2]
     asset.mint(shark, shark_amount, sender=gov)
     yield shark
 
@@ -69,23 +39,53 @@ def whale_amount():
 
 @pytest.fixture(scope="session")
 def whale(accounts):
-    whale = accounts[9]
+    whale = accounts[3]
     asset.mint(whale, whale_amount, sender=gov)
     yield whale
 
 
 @pytest.fixture(scope="session")
 def bunny(accounts):
-    yield accounts[10]
+    yield accounts[4]
 
 
 @pytest.fixture(scope="session")
 def doggie(accounts):
-    yield accounts[11]
+    yield accounts[5]
 
 
 @pytest.fixture(scope="session")
 def panda(accounts):
+    yield accounts[6]
+
+
+@pytest.fixture(scope="session")
+def woofy(accounts):
+    yield accounts[7]
+
+
+@pytest.fixture(scope="session")
+def guardian(accounts):
+    yield accounts[8]
+
+
+@pytest.fixture(scope="session")
+def management(accounts):
+    yield accounts[9]
+
+
+@pytest.fixture(scope="session")
+def strategist(accounts):
+    yield accounts[10]
+
+
+@pytest.fixture(scope="session")
+def keeper(accounts):
+    yield accounts[11]
+
+
+@pytest.fixture(scope="session")
+def rewards(accounts):
     yield accounts[12]
 
 
