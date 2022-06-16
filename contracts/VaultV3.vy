@@ -20,6 +20,16 @@ event Transfer:
     receiver: indexed(address)
     value: uint256
 
+event Deposit:
+    recipient: indexed(address)
+    shares: uint256
+    amount: uint256
+
+event Withdraw:
+    recipient: indexed(address)
+    shares: uint256
+    amount: uint256
+
 event UpdateDepositLimit:
     limit: uint256
 
@@ -140,6 +150,8 @@ def deposit(_amount: uint256, _recipient: address) -> uint256:
     self.erc20_safe_transferFrom(self.asset.address, msg.sender, self, amount)
     self.totalIdle += amount
 
+    log Deposit(_recipient, shares, amount)
+
     return shares
 
 @external
@@ -165,6 +177,8 @@ def withdraw(_shares: uint256, _recipient: address, _strategies: DynArray[addres
     self.totalIdle -= amount
 
     self.erc20_safe_transfer(self.asset.address, _recipient, amount)
+
+    log Withdraw(_recipient, shares, amount)
 
     return amount
 

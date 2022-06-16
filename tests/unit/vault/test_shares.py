@@ -24,9 +24,16 @@ def test_deposit_with_zero_funds(fish, asset, create_vault):
 def test_deposit(fish, asset, create_vault):
     vault = create_vault(asset)
     amount = 10**18
+    shares = amount
 
     balance = asset.balanceOf(fish)
-    actions.user_deposit(fish, vault, asset, amount)
+    tx = actions.user_deposit(fish, vault, asset, amount)
+    event = list(tx.decode_logs(vault.Deposit))
+
+    assert len(event) == 1
+    assert event[0].recipient == fish
+    assert event[0].shares == shares
+    assert event[0].amount == amount
 
     assert vault.totalIdle() == amount
     assert vault.balanceOf(fish) == amount
@@ -37,9 +44,17 @@ def test_deposit(fish, asset, create_vault):
 def test_deposit_all(fish, asset, create_vault):
     vault = create_vault(asset)
     balance = asset.balanceOf(fish)
+    amount = balance
+    shares = balance
 
     asset.approve(vault, balance, sender=fish)
-    vault.deposit(MAX_INT, fish, sender=fish)
+    tx = vault.deposit(MAX_INT, fish, sender=fish)
+    event = list(tx.decode_logs(vault.Deposit))
+
+    assert len(event) == 1
+    assert event[0].recipient == fish
+    assert event[0].shares == shares
+    assert event[0].amount == amount
 
     assert vault.totalIdle() == balance
     assert vault.balanceOf(fish) == balance
@@ -50,12 +65,20 @@ def test_deposit_all(fish, asset, create_vault):
 def test_withdraw(fish, asset, create_vault):
     vault = create_vault(asset)
     amount = 10**18
+    shares = amount
     strategies = []
 
     balance = asset.balanceOf(fish)
     actions.user_deposit(fish, vault, asset, amount)
 
-    vault.withdraw(amount, fish, strategies, sender=fish)
+    tx = vault.withdraw(shares, fish, strategies, sender=fish)
+    event = list(tx.decode_logs(vault.Withdraw))
+
+    assert len(event) == 1
+    assert event[0].recipient == fish
+    assert event[0].shares == shares
+    assert event[0].amount == amount
+
     checks.check_vault_empty(vault)
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(fish) == balance
@@ -84,12 +107,20 @@ def test_withdraw_with_no_shares(fish, asset, create_vault):
 
 def test_withdraw_all(fish, asset, create_vault):
     vault = create_vault(asset)
+    balance = asset.balanceOf(fish)
+    amount = balance
+    shares = amount
     strategies = []
 
-    balance = asset.balanceOf(fish)
-    actions.user_deposit(fish, vault, asset, balance)
+    actions.user_deposit(fish, vault, asset, amount)
 
-    vault.withdraw(MAX_INT, fish, strategies, sender=fish)
+    tx = vault.withdraw(MAX_INT, fish, strategies, sender=fish)
+    event = list(tx.decode_logs(vault.Withdraw))
+
+    assert len(event) == 1
+    assert event[0].recipient == fish
+    assert event[0].shares == shares
+    assert event[0].amount == amount
 
     checks.check_vault_empty(vault)
     assert asset.balanceOf(vault) == 0
@@ -99,13 +130,21 @@ def test_withdraw_all(fish, asset, create_vault):
 def test_delegated_deposit(fish, bunny, asset, create_vault):
     vault = create_vault(asset)
     balance = asset.balanceOf(fish)
+    amount = balance
+    shares = amount
 
     # check balance is non-zero
     assert balance > 0
 
     # delegate deposit to bunny
-    asset.approve(vault, balance, sender=fish)
-    vault.deposit(balance, bunny, sender=fish)
+    asset.approve(vault, amount, sender=fish)
+    tx = vault.deposit(amount, bunny, sender=fish)
+    event = list(tx.decode_logs(vault.Deposit))
+
+    assert len(event) == 1
+    assert event[0].recipient == bunny
+    assert event[0].shares == shares
+    assert event[0].amount == amount
 
     # fish has no more assets
     assert asset.balanceOf(fish) == 0
@@ -118,16 +157,24 @@ def test_delegated_deposit(fish, bunny, asset, create_vault):
 def test_delegated_withdrawal(fish, bunny, asset, create_vault):
     vault = create_vault(asset)
     balance = asset.balanceOf(fish)
+    amount = balance
+    shares = amount
     strategies = []
 
     # check balance is non-zero
     assert balance > 0
 
     # deposit balance
-    actions.user_deposit(fish, vault, asset, balance)
+    actions.user_deposit(fish, vault, asset, amount)
 
     # withdraw to bunny
-    vault.withdraw(vault.balanceOf(fish), bunny, strategies, sender=fish)
+    tx = vault.withdraw(vault.balanceOf(fish), bunny, strategies, sender=fish)
+    event = list(tx.decode_logs(vault.Withdraw))
+
+    assert len(event) == 1
+    assert event[0].recipient == bunny
+    assert event[0].shares == shares
+    assert event[0].amount == amount
 
     # fish no longer has shares
     assert vault.balanceOf(fish) == 0
