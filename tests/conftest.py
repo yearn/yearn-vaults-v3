@@ -65,17 +65,17 @@ def woofy(accounts):
 
 
 @pytest.fixture(scope="session")
-def guardian(accounts):
+def strategist(accounts):
     yield accounts[8]
 
 
 @pytest.fixture(scope="session")
-def management(accounts):
+def guardian(accounts):
     yield accounts[9]
 
 
 @pytest.fixture(scope="session")
-def strategist(accounts):
+def management(accounts):
     yield accounts[10]
 
 
@@ -95,6 +95,12 @@ def asset(project, gov):
     return gov.deploy(project.Token, "asset")
 
 
+# use this for token mock
+@pytest.fixture(scope="session")
+def mock_token(project, gov):
+    return gov.deploy(project.Token, "mock")
+
+
 # use this to create other tokens
 @pytest.fixture(scope="session")
 def create_token(project, gov):
@@ -110,3 +116,29 @@ def create_vault(project, gov):
         return gov.deploy(project.VaultV3, asset)
 
     yield create_vault
+
+
+@pytest.fixture(scope="session")
+def create_strategy(project, strategist):
+    def create_strategy(vault):
+        return strategist.deploy(project.BaseStrategyMock, vault)
+
+    yield create_strategy
+
+
+@pytest.fixture
+def vault(gov, asset, create_vault):
+    vault = create_vault(asset)
+
+    # Make it so vault has some AUM to start
+    asset.mint(gov.address, 10**18, sender=gov)
+    asset.approve(vault.address, asset.balanceOf(gov) // 2, sender=gov)
+    vault.deposit(asset.balanceOf(gov) // 2, gov.address, sender=gov)
+    yield vault
+
+
+@pytest.fixture
+def strategy(gov, vault, create_strategy):
+    strategy = create_strategy(vault)
+    vault.addStrategy(strategy.address, sender=gov)
+    yield strategy

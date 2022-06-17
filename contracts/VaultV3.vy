@@ -14,7 +14,7 @@ interface ERC20Metadata:
 interface IStrategy:
    def asset() -> address: view
    def vault() -> address: view
-   
+
 # EVENTS #
 event Transfer:
     sender: indexed(address)
@@ -31,18 +31,22 @@ event Withdraw:
     shares: uint256
     amount: uint256
 
-event StrategyAdded: 
-   strategy: indexed(address)
+event StrategyAdded:
+    strategy: indexed(address)
 
-event StrategyRevoked: 
-   strategy: indexed(address)
+event StrategyRevoked:
+    strategy: indexed(address)
+
+event StrategyMigrated:
+    old_strategy: indexed(address)
+    new_strategy: indexed(address)
 
 # STRUCTS #
 # TODO: strategy params
 struct StrategyParams:
-   activation: uint256
-   currentDebt: uint256
-   maxDebt: uint256
+    activation: uint256
+    currentDebt: uint256
+    maxDebt: uint256
 
 # CONSTANTS #
 MAX_BPS: constant(uint256) = 10_000
@@ -56,6 +60,7 @@ totalSupply: public(uint256)
 totalDebt: public(uint256)
 totalIdle: public(uint256)
 
+
 @external
 def __init__(asset: ERC20):
     self.asset = asset
@@ -63,17 +68,20 @@ def __init__(asset: ERC20):
     # TODO: implement
     return
 
+
 # SUPPORT FUNCTIONS #
 @view
 @internal
 def _totalAssets() -> uint256:
     return self.totalIdle + self.totalDebt
 
+
 @internal
 def _burnShares(shares: uint256, owner: address):
     # TODO: do we need to check?
     self.balanceOf[owner] -= shares
     self.totalSupply -= shares
+
 
 @view
 @internal
@@ -84,6 +92,7 @@ def _amountForShares(shares: uint256) -> uint256:
         amount = shares * self._totalAssets() / self.totalSupply
     return amount
 
+
 @internal
 def _sharesForAmount(amount: uint256) -> uint256:
     _totalSupply: uint256 = self.totalSupply
@@ -91,6 +100,7 @@ def _sharesForAmount(amount: uint256) -> uint256:
     if _totalSupply > 0:
             shares = amount * _totalSupply / self._totalAssets()
     return shares
+
 
 @internal
 def _issueSharesForAmount(amount: uint256, recipient: address) -> uint256:
@@ -122,6 +132,7 @@ def erc20_safe_transferFrom(token: address, sender: address, receiver: address, 
     if len(response) > 0:
         assert convert(response, bool), "Transfer failed!"
 
+
 @internal
 def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
     # Used only to send tokens that are not the type managed by this Vault.
@@ -137,6 +148,7 @@ def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
     )
     if len(response) > 0:
         assert convert(response, bool), "Transfer failed!"
+
 
 # USER FACING FUNCTIONS #
 @external
@@ -158,6 +170,7 @@ def deposit(_amount: uint256, _recipient: address) -> uint256:
     log Deposit(_recipient, shares, amount)
 
     return shares
+
 
 @external
 def withdraw(_shares: uint256, _recipient: address, _strategies: DynArray[address, 10]) -> uint256:
@@ -187,73 +200,80 @@ def withdraw(_shares: uint256, _recipient: address, _strategies: DynArray[addres
 
     return amount
 
+
 # SHARE MANAGEMENT FUNCTIONS #
 @view
 @external
 def totalAssets() -> uint256:
     return self._totalAssets()
 
+
 @view
 @external
 def pricePerShare() -> uint256:
     return self._amountForShares(10 ** self.decimals)
 
+
 @external
 def sharesForAmount(amount: uint256) -> uint256:
     return self._sharesForAmount(amount)
+
 
 @external
 def amountForShares(shares: uint256) -> uint256:
     return self._amountForShares(shares)
 
+
 # STRATEGY MANAGEMENT FUNCTIONS #
 @external
 def addStrategy(new_strategy: address):
-   # TODO: permissioned: STRATEGY_MANAGER
-   assert new_strategy != ZERO_ADDRESS
-   assert self == IStrategy(new_strategy).vault()
-   assert self.strategies[new_strategy].activation == 0
-   assert IStrategy(new_strategy).asset() != self.asset.address
-   
-   self.strategies[new_strategy] = StrategyParams({
-      activation: block.timestamp,
-      currentDebt: 0,
-      maxDebt: 0
-   })
+    # TODO: permissioned: STRATEGY_MANAGER
+    assert new_strategy != ZERO_ADDRESS, "strategy cannot be zero address"
+    assert IStrategy(new_strategy).asset() == self.asset.address, "invalid asset"
+    assert IStrategy(new_strategy).vault() == self, "invalid vault"
+    assert self.strategies[new_strategy].activation == 0, "strategy already active"
 
-   log StrategyAdded(new_strategy)
+    self.strategies[new_strategy] = StrategyParams({
+        activation: block.timestamp,
+        currentDebt: 0,
+        maxDebt: 0
+    })
 
-   return
+    log StrategyAdded(new_strategy)
+
 
 @internal
 def _revokeStrategy(old_strategy: address):
-   # TODO: permissioned: STRATEGY_MANAGER
-   assert self.strategies[old_strategy].activation != 0
-   # NOTE: strategy needs to have 0 debt to be revoked
-   assert self.strategies[old_strategy].currentDebt == 0
+    # TODO: permissioned: STRATEGY_MANAGER
+    assert self.strategies[old_strategy].activation != 0, "strategy not active"
+    # NOTE: strategy needs to have 0 debt to be revoked
+    assert self.strategies[old_strategy].currentDebt == 0, "strategy has debt"
 
-   # NOTE: strategy params are set to 0 (warning: it can be readded)
-   self.strategies[old_strategy] = StrategyParams({
-       activation: 0,
-       currentDebt: 0,
-       maxDebt: 0
-   })
+    # NOTE: strategy params are set to 0 (warning: it can be readded)
+    self.strategies[old_strategy] = StrategyParams({
+        activation: 0,
+        currentDebt: 0,
+        maxDebt: 0
+    })
 
-   log StrategyRevoked(old_strategy)
+    log StrategyRevoked(old_strategy)
 
-   return
 
 @external
 def revokeStrategy(old_strategy: address):
     self._revokeStrategy(old_strategy)
 
+
 @external
 def migrateStrategy(new_strategy: address, old_strategy: address):
-   # TODO: permissioned: STRATEGY_MANAGER
+    # TODO: permissioned: STRATEGY_MANAGER
 
-    # TODO: add strategy migrated event? 
-    assert self.strategies[old_strategy].activation != 0
-    assert self.strategies[old_strategy].currentDebt == 0
+    assert self.strategies[old_strategy].activation != 0, "old strategy not active"
+    assert self.strategies[old_strategy].currentDebt == 0, "old strategy has debt"
+    assert new_strategy != ZERO_ADDRESS, "strategy cannot be zero address"
+    assert IStrategy(new_strategy).asset() == self.asset.address, "invalid asset"
+    assert IStrategy(new_strategy).vault() == self, "invalid vault"
+    assert self.strategies[new_strategy].activation == 0, "strategy already active"
 
     migrated_strategy: StrategyParams = self.strategies[old_strategy]
 
@@ -266,15 +286,16 @@ def migrateStrategy(new_strategy: address, old_strategy: address):
 
     self._revokeStrategy(old_strategy)
 
-    return
- 
+    log StrategyMigrated(old_strategy, new_strategy)
+
+
 @external
-def updateMaxDebtForStrategy(strategy: address, new_maxDebt: uint256): 
-   # TODO: permissioned: DEBT_MANAGER 
-   assert self.strategies[strategy].activation != 0
-   # TODO: should we check that totalMaxDebt is not over 100% of assets? 
-   self.strategies[strategy].maxDebt = new_maxDebt
-   return
+def updateMaxDebtForStrategy(strategy: address, new_maxDebt: uint256):
+    # TODO: permissioned: DEBT_MANAGER
+    assert self.strategies[strategy].activation != 0
+    # TODO: should we check that totalMaxDebt is not over 100% of assets?
+    self.strategies[strategy].maxDebt = new_maxDebt
+    # TODO: should this emit an event?
 
 # # P&L MANAGEMENT FUNCTIONS #
 # def processReport(strategy: address):
