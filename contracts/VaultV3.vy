@@ -11,6 +11,9 @@ from vyper.interfaces import ERC20
 interface ERC20Metadata:
     def decimals() -> uint8: view
 
+interface IYVaultDepositCallback:
+   def yVaultDepositCallback(amount: uint256, depositor: address): nonpayable
+
 interface IStrategy:
    def asset() -> address: view
    def vault() -> address: view
@@ -48,7 +51,7 @@ struct StrategyParams:
 MAX_BPS: constant(uint256) = 10_000
 
 # STORAGE #
-asset: public(ERC20)
+ASSET: immutable(ERC20)
 strategies: public(HashMap[address, StrategyParams])
 balanceOf: public(HashMap[address, uint256])
 decimals: public(uint256)
@@ -58,7 +61,7 @@ totalIdle: public(uint256)
 
 @external
 def __init__(asset: ERC20):
-    self.asset = asset
+    ASSET = asset
     self.decimals = convert(ERC20Metadata(asset.address).decimals(), uint256)
     # TODO: implement
     return
@@ -84,6 +87,7 @@ def _amountForShares(shares: uint256) -> uint256:
         amount = shares * self._totalAssets() / self.totalSupply
     return amount
 
+@view
 @internal
 def _sharesForAmount(amount: uint256) -> uint256:
     _totalSupply: uint256 = self.totalSupply
@@ -101,7 +105,6 @@ def _issueSharesForAmount(amount: uint256, recipient: address) -> uint256:
     self.balanceOf[recipient] += newShares
     self.totalSupply += newShares
 
-    # TODO: emit event
     return newShares
 
 
@@ -140,19 +143,21 @@ def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
 
 # USER FACING FUNCTIONS #
 @external
-def deposit(_amount: uint256, _recipient: address) -> uint256:
+def deposit(_amount: uint256, _recipient: address, _depositor: address) -> uint256:
     assert _recipient not in [self, ZERO_ADDRESS], "invalid recipient"
-    amount: uint256 = _amount
-
-    if amount == MAX_UINT256:
-        amount = self.asset.balanceOf(msg.sender)
-
-    assert amount > 0, "cannot deposit zero"
     # TODO: should it check deposit limit?
 
-    shares: uint256 = self._issueSharesForAmount(amount, _recipient)
+    amount: uint256 = _amount
+    if amount == MAX_UINT256:
+        amount = ASSET.balanceOf(_depositor)
 
-    self.erc20_safe_transferFrom(self.asset.address, msg.sender, self, amount)
+    shares: uint256 = self._issueSharesForAmount(amount, _recipient)
+    
+    # NOTE: the caller contract is in charge of transfering funds during the callback
+    preBalance: uint256 = ASSET.balanceOf(self)
+    IYVaultDepositCallback(msg.sender).yVaultDepositCallback(amount, _depositor)
+    assert preBalance + amount <= ASSET.balanceOf(self)
+
     self.totalIdle += amount
 
     log Deposit(_recipient, shares, amount)
@@ -160,28 +165,27 @@ def deposit(_amount: uint256, _recipient: address) -> uint256:
     return shares
 
 @external
-def withdraw(_shares: uint256, _recipient: address, _strategies: DynArray[address, 10]) -> uint256:
-    # TODO: allow withdrawals by approved ?
+def redeem(_shares: uint256 = MAX_UINT256, _recipient: address = msg.sender, _strategies: DynArray[address, 10] = []) -> uint256:
     owner: address = msg.sender
     shares: uint256 = _shares
-    sharesBalance: uint256 = self.balanceOf[owner]
 
     if _shares == MAX_UINT256:
+        sharesBalance: uint256 = self.balanceOf[owner]
         shares = sharesBalance
 
-    assert sharesBalance >= shares, "insufficient shares to withdraw"
     assert shares > 0, "no shares to withdraw"
 
     amount: uint256 = self._amountForShares(shares)
 
     # TODO: withdraw from strategies
-
+    
+    # TODO: gas savings: totalIdle should be cached if used above
     assert self.totalIdle >= amount, "insufficient total idle"
 
     self._burnShares(shares, owner)
     self.totalIdle -= amount
 
-    self.erc20_safe_transfer(self.asset.address, _recipient, amount)
+    self.erc20_safe_transfer(ASSET.address, _recipient, amount)
 
     log Withdraw(_recipient, shares, amount)
 
@@ -213,7 +217,7 @@ def addStrategy(new_strategy: address):
    assert new_strategy != ZERO_ADDRESS
    assert self == IStrategy(new_strategy).vault()
    assert self.strategies[new_strategy].activation == 0
-   assert IStrategy(new_strategy).asset() != self.asset.address
+   assert IStrategy(new_strategy).asset() != ASSET.address
    
    self.strategies[new_strategy] = StrategyParams({
       activation: block.timestamp,
