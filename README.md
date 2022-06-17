@@ -13,13 +13,17 @@ Install requirements.
 
 `python3 -m pip install -r requirements-dev.txt`
 
+Install plugins with:
+
+`ape plugins install .`
+
 Compile smart contracts with:
 
 `ape compile`
 
 and test smart contracts with:
 
-`ape test`
+`ape test -s`
 
 See the ApeWorx [documentation](https://docs.apeworx.io/ape/stable/) and [github](https://github.com/ApeWorX/ape) for more information.
 

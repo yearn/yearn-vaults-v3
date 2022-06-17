@@ -8,7 +8,7 @@ def test_deposit_with_invalid_recipient(fish, asset, create_vault):
     amount = 0
 
     with ape.reverts("invalid recipient"):
-        vault.deposit(amount, vault, sender=fish)
+        vault.deposit(amount, vault.address, sender=fish)
     with ape.reverts("invalid recipient"):
         vault.deposit(amount, ZERO_ADDRESS, sender=fish)
 
@@ -18,7 +18,7 @@ def test_deposit_with_zero_funds(fish, asset, create_vault):
     amount = 0
 
     with ape.reverts("cannot deposit zero"):
-        vault.deposit(amount, fish, sender=fish)
+        vault.deposit(amount, fish.address, sender=fish)
 
 
 def test_deposit(fish, asset, create_vault):
@@ -47,8 +47,8 @@ def test_deposit_all(fish, asset, create_vault):
     amount = balance
     shares = balance
 
-    asset.approve(vault, balance, sender=fish)
-    tx = vault.deposit(MAX_INT, fish, sender=fish)
+    asset.approve(vault.address, balance, sender=fish)
+    tx = vault.deposit(MAX_INT, fish.address, sender=fish)
     event = list(tx.decode_logs(vault.Deposit))
 
     assert len(event) == 1
@@ -71,7 +71,7 @@ def test_withdraw(fish, asset, create_vault):
     balance = asset.balanceOf(fish)
     actions.user_deposit(fish, vault, asset, amount)
 
-    tx = vault.withdraw(shares, fish, strategies, sender=fish)
+    tx = vault.withdraw(shares, fish.address, strategies, sender=fish)
     event = list(tx.decode_logs(vault.Withdraw))
 
     assert len(event) == 1
@@ -93,7 +93,7 @@ def test_withdraw_with_insufficient_shares(fish, asset, create_vault):
     actions.user_deposit(fish, vault, asset, amount)
 
     with ape.reverts("insufficient shares to withdraw"):
-        vault.withdraw(shares, fish, strategies, sender=fish)
+        vault.withdraw(shares, fish.address, strategies, sender=fish)
 
 
 def test_withdraw_with_no_shares(fish, asset, create_vault):
@@ -102,7 +102,7 @@ def test_withdraw_with_no_shares(fish, asset, create_vault):
     strategies = []
 
     with ape.reverts("no shares to withdraw"):
-        vault.withdraw(shares, fish, strategies, sender=fish)
+        vault.withdraw(shares, fish.address, strategies, sender=fish)
 
 
 def test_withdraw_all(fish, asset, create_vault):
@@ -114,7 +114,7 @@ def test_withdraw_all(fish, asset, create_vault):
 
     actions.user_deposit(fish, vault, asset, amount)
 
-    tx = vault.withdraw(MAX_INT, fish, strategies, sender=fish)
+    tx = vault.withdraw(MAX_INT, fish.address, strategies, sender=fish)
     event = list(tx.decode_logs(vault.Withdraw))
 
     assert len(event) == 1
@@ -137,8 +137,8 @@ def test_delegated_deposit(fish, bunny, asset, create_vault):
     assert balance > 0
 
     # delegate deposit to bunny
-    asset.approve(vault, amount, sender=fish)
-    tx = vault.deposit(amount, bunny, sender=fish)
+    asset.approve(vault.address, amount, sender=fish)
+    tx = vault.deposit(amount, bunny.address, sender=fish)
     event = list(tx.decode_logs(vault.Deposit))
 
     assert len(event) == 1
@@ -168,7 +168,7 @@ def test_delegated_withdrawal(fish, bunny, asset, create_vault):
     actions.user_deposit(fish, vault, asset, amount)
 
     # withdraw to bunny
-    tx = vault.withdraw(vault.balanceOf(fish), bunny, strategies, sender=fish)
+    tx = vault.withdraw(vault.balanceOf(fish), bunny.address, strategies, sender=fish)
     event = list(tx.decode_logs(vault.Withdraw))
 
     assert len(event) == 1

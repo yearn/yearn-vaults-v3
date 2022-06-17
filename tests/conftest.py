@@ -16,7 +16,7 @@ def fish_amount():
 @pytest.fixture(scope="session")
 def fish(accounts, asset, gov, fish_amount):
     fish = accounts[1]
-    asset.mint(fish, fish_amount, sender=gov)
+    asset.mint(fish.address, fish_amount, sender=gov)
     yield fish
 
 
@@ -28,7 +28,7 @@ def shark_amount():
 @pytest.fixture(scope="session")
 def shark(accounts, asset, gov, shark_amount):
     shark = accounts[2]
-    asset.mint(shark, shark_amount, sender=gov)
+    asset.mint(shark.address, shark_amount, sender=gov)
     yield shark
 
 
@@ -40,7 +40,7 @@ def whale_amount():
 @pytest.fixture(scope="session")
 def whale(accounts):
     whale = accounts[3]
-    asset.mint(whale, whale_amount, sender=gov)
+    asset.mint(whale.address, whale_amount, sender=gov)
     yield whale
 
 
