@@ -11,7 +11,17 @@ source venv/bin/activate
 
 Install requirements.
 
-`python3 -m pip install -r requirements-dev.txt`
+```
+python3 -m pip install -r requirements-dev.txt
+yarn
+```
+
+
+Fetch the ape plugins:
+
+```
+ape plugins install .
+```
 
 Install plugins with:
 
@@ -19,11 +29,15 @@ Install plugins with:
 
 Compile smart contracts with:
 
-`ape compile`
+```
+ape compile
+```
 
 and test smart contracts with:
 
-`ape test -s`
+```
+ape test
+```
 
 See the ApeWorx [documentation](https://docs.apeworx.io/ape/stable/) and [github](https://github.com/ApeWorX/ape) for more information.
 
