@@ -3,7 +3,7 @@ pragma solidity 0.8.14;
 
 import {BaseStrategy, IERC20} from "../BaseStrategy.sol";
 
-contract BaseStrategyLiquid is BaseStrategy {
+contract LiquidStrategy is BaseStrategy {
 
   error InvalidFee();
 

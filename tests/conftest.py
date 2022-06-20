@@ -122,9 +122,27 @@ def create_vault(project, gov):
 @pytest.fixture(scope="session")
 def create_strategy(project, strategist):
     def create_strategy(vault):
-        return strategist.deploy(project.BaseStrategyLiquid, vault)
+        return strategist.deploy(project.LiquidStrategy, vault)
 
     yield create_strategy
+
+
+# create locked strategy with 0 fee
+@pytest.fixture(scope="session")
+def create_locked_strategy(project, strategist):
+    def create_locked_strategy(vault):
+        return strategist.deploy(project.LockedStrategy, vault)
+
+    yield create_locked_strategy
+
+
+# create locked strategy with 0 fee
+@pytest.fixture(scope="session")
+def create_lossy_strategy(project, strategist):
+    def create_lossy_strategy(vault):
+        return strategist.deploy(project.LossyStrategy, vault)
+
+    yield create_lossy_strategy
 
 
 @pytest.fixture

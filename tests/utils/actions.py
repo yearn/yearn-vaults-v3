@@ -8,3 +8,7 @@ def user_deposit(user, vault, token, amount) -> ContractLog:
     tx = vault.deposit(amount, user.address, sender=user)
     assert token.balanceOf(vault) == amount
     return tx
+
+
+def airdrop_asset(gov, asset, target, amount):
+    asset.mint(target.address, amount, sender=gov)
