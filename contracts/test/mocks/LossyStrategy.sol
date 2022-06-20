@@ -3,11 +3,16 @@ pragma solidity 0.8.14;
 
 import {BaseStrategy, IERC20} from "../BaseStrategy.sol";
 
-contract LiquidStrategy is BaseStrategy {
+contract LossyStrategy is BaseStrategy {
 
   constructor(address _vault) BaseStrategy(_vault) {}
 
   function name() external view override returns (string memory _name) {}
+
+  // used to generate losses, accepts single arg to send losses to
+  function setLoss(address _target, uint256 _loss) external {
+    IERC20(asset).transfer(_target, _loss);
+  }
 
   function _emergencyFreeFunds(uint256 _amountToWithdraw) internal override {}
 
