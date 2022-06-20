@@ -3,13 +3,22 @@ pragma solidity 0.8.14;
 
 import {BaseStrategy, IERC20} from "../BaseStrategy.sol";
 
-contract BaseStrategyMock is BaseStrategy {
+contract BaseStrategyLiquid is BaseStrategy {
+
+  error InvalidFee();
+
+  // fee implementation (can be used to represent slippage or asset withdrawal fee)
+  // 0 <= fee <= 10000
+  uint256 public fee;
+  uint256 constant MAX_FEE = 10_000;
+
   constructor(address _vault) BaseStrategy(_vault) {}
 
   function name() external view override returns (string memory _name) {}
 
-  function stealFunds(uint256 _amount) external {
-    IERC20(asset).transfer(msg.sender, _amount);
+  function setFee(uint256 _fee) external {
+    if (fee < 0 || fee > MAX_FEE) revert InvalidFee();
+    fee = _fee;
   }
 
   function _emergencyFreeFunds(uint256 _amountToWithdraw) internal override {}
@@ -18,7 +27,10 @@ contract BaseStrategyMock is BaseStrategy {
 
   function _harvest() internal override {}
 
-  function _freeFunds(uint256 _amount) internal override returns (uint256 _amountFreed) {}
+  function _freeFunds(uint256 _amount) internal override returns (uint256 _amountFreed) {
+    uint256 penalty = _amount * fee / MAX_FEE;
+    _amountFreed = (_amount - penalty);
+  }
 
   function _migrate(address _newStrategy) internal override {}
 

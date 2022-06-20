@@ -118,10 +118,11 @@ def create_vault(project, gov):
     yield create_vault
 
 
+# create default liquid strategy with 0 fee
 @pytest.fixture(scope="session")
 def create_strategy(project, strategist):
     def create_strategy(vault):
-        return strategist.deploy(project.BaseStrategyMock, vault)
+        return strategist.deploy(project.BaseStrategyLiquid, vault)
 
     yield create_strategy
 
@@ -137,6 +138,7 @@ def vault(gov, asset, create_vault):
     yield vault
 
 
+# create default liquid strategy with 0 fee
 @pytest.fixture
 def strategy(gov, vault, create_strategy):
     strategy = create_strategy(vault)
