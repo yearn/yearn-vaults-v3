@@ -13,7 +13,9 @@ def test_liquid_strategy__with_fee(gov, asset, vault, create_strategy):
     assert strategy.withdrawable() == amount
 
 
-def test_locked_strategy__with_locked_asset(gov, asset, chain, vault, create_locked_strategy):
+def test_locked_strategy__with_locked_asset(
+    gov, asset, chain, vault, create_locked_strategy
+):
     strategy = create_locked_strategy(vault)
     amount = 10 * 10**18
     locked_amount = 10**18
@@ -23,7 +25,6 @@ def test_locked_strategy__with_locked_asset(gov, asset, chain, vault, create_loc
     assert strategy.withdrawable() == amount
 
     # lock funds for one day
-    print(strategy.__dict__)
     strategy.setLockedFunds(locked_amount, 3600 * 24, sender=gov)
     unlocked = amount - locked_amount
     assert strategy.withdrawable() == unlocked
@@ -44,10 +45,12 @@ def test_locked_strategy__with_locked_asset(gov, asset, chain, vault, create_loc
     assert strategy.withdrawable() == unlocked
 
 
-def test_lossy_strategy__with_multiple_losses(gov, fish, asset, vault, create_lossy_strategy):
+def test_lossy_strategy__with_multiple_losses(
+    gov, fish, asset, vault, create_lossy_strategy
+):
     strategy = create_lossy_strategy(vault)
     amount = 10 * 10**18
-    loss = 10 ** 18
+    loss = 10**18
 
     actions.airdrop_asset(gov, asset, strategy, amount)
 
