@@ -1,6 +1,7 @@
 # @version 0.3.3
 
 from vyper.interfaces import ERC20
+from vyper.interfaces import ERC20Detailed
 
 # TODO: external contract: factory
 # TODO: external contract: access control
@@ -8,9 +9,6 @@ from vyper.interfaces import ERC20
 # TODO: external contract: healtcheck
 
 # INTERFACES #
-interface ERC20Metadata:
-    def decimals() -> uint8: view
-
 interface IStrategy:
    def asset() -> address: view
    def vault() -> address: view
@@ -64,7 +62,7 @@ totalIdle: public(uint256)
 @external
 def __init__(asset: ERC20):
     self.asset = asset
-    self.decimals = convert(ERC20Metadata(asset.address).decimals(), uint256)
+    self.decimals = convert(ERC20Detailed(asset.address).decimals(), uint256)
     # TODO: implement
     return
 
