@@ -166,6 +166,8 @@ def permit(owner: address, spender: address, amount: uint256, expiry: uint256, s
     log Approval(owner, spender, amount)
     return True
 
+
+# SUPPORT FUNCTIONS #
 @view
 @internal
 def _totalAssets() -> uint256:
@@ -180,7 +182,6 @@ def _amountForShares(shares: uint256) -> uint256:
         amount = shares * self._totalAssets() / self.totalSupply
     return amount
 
-
 @view
 @internal
 def _sharesForAmount(amount: uint256) -> uint256:
@@ -189,8 +190,6 @@ def _sharesForAmount(amount: uint256) -> uint256:
     if _totalSupply > 0:
             shares = amount * _totalSupply / self._totalAssets()
     return shares
-
-
 
 @internal
 def erc20_safe_transferFrom(token: address, sender: address, receiver: address, amount: uint256):
@@ -227,8 +226,6 @@ def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
         assert convert(response, bool), "Transfer failed!"
 
 
-# USER FACING FUNCTIONS #
-# SUPPORT FUNCTIONS #
 @internal
 def _burnShares(shares: uint256, owner: address):
     # TODO: do we need to check?
