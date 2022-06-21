@@ -1,4 +1,3 @@
-import pytest
 import ape
 from ape import chain
 from utils import checks
@@ -162,10 +161,3 @@ def test_migrate_strategy__with_zero_address_new_strategy__fails_with_error(
 
     with ape.reverts("strategy cannot be zero address"):
         vault.migrateStrategy(new_strategy, old_strategy.address, sender=gov)
-
-
-@pytest.mark.parametrize("max_debt", [0, 10**22])
-def test_update_max_debt__with_debt_value(gov, vault, strategy, max_debt):
-    vault.updateMaxDebtForStrategy(strategy.address, max_debt, sender=gov)
-
-    assert vault.strategies(strategy.address).maxDebt == max_debt

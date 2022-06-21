@@ -12,6 +12,9 @@ from vyper.interfaces import ERC20Detailed
 interface IStrategy:
    def asset() -> address: view
    def vault() -> address: view
+   def investable() -> (uint256, uint256): view
+   def withdrawable() -> uint256: view
+   def freeFunds(amount: uint256) -> uint256: nonpayable
 
 # EVENTS #
 event Transfer:
@@ -38,6 +41,11 @@ event StrategyRevoked:
 event StrategyMigrated:
     old_strategy: indexed(address)
     new_strategy: indexed(address)
+
+event DebtUpdated:
+    strategy: address
+    currentDebt: uint256
+    newDebt: uint256
 
 # STRUCTS #
 # TODO: strategy params
@@ -290,10 +298,64 @@ def migrateStrategy(new_strategy: address, old_strategy: address):
 @external
 def updateMaxDebtForStrategy(strategy: address, new_maxDebt: uint256):
     # TODO: permissioned: DEBT_MANAGER
-    assert self.strategies[strategy].activation != 0
+    assert self.strategies[strategy].activation != 0, "inactive strategy"
     # TODO: should we check that totalMaxDebt is not over 100% of assets?
     self.strategies[strategy].maxDebt = new_maxDebt
     # TODO: should this emit an event?
+
+
+@external
+def updateDebt(strategy: address) -> uint256:
+    # TODO: permissioned: DEBT_MANAGER (or maybe open?)
+    # TODO: rebalance debt. if the strategy is allowed to take more debt and the strategy wants that debt, the vault will send more. if the strategy has too much debt, the vault will have less
+    currentDebt: uint256 = self.strategies[strategy].currentDebt
+
+    minDesiredDebt: uint256 = 0
+    maxDesiredDebt: uint256 = 0
+    minDesiredDebt, maxDesiredDebt = IStrategy(strategy).investable()
+
+    newDebt: uint256 = self.strategies[strategy].maxDebt
+
+    if newDebt > currentDebt:
+        # only check if debt is increasing
+        # if debt is decreasing, we ignore strategy min debt
+        assert (newDebt >= minDesiredDebt), "new debt less than min debt"
+
+    if newDebt > maxDesiredDebt:
+        newDebt = maxDesiredDebt
+
+    assert newDebt != currentDebt, "new debt equals current debt"
+
+    if currentDebt > newDebt:
+        # reduce debt
+        amountToWithdraw: uint256 = currentDebt - newDebt
+        withdrawable: uint256 = IStrategy(strategy).withdrawable()
+        assert withdrawable != 0, "nothing to withdraw"
+
+        # if insufficient withdrawable, withdraw what we can
+        if (withdrawable < amountToWithdraw):
+            amountToWithdraw = withdrawable
+            newDebt = currentDebt - withdrawable
+
+        IStrategy(strategy).freeFunds(amountToWithdraw)
+        self.asset.transferFrom(strategy, self, amountToWithdraw)
+        self.totalIdle += amountToWithdraw
+        self.totalDebt -= amountToWithdraw
+    else:
+        # increase debt
+        amountToTransfer: uint256 = newDebt - currentDebt
+        # if insufficient funds to deposit, transfer only what is free
+        if amountToTransfer > self.totalIdle:
+            amountToTransfer = self.totalIdle
+            newDebt = currentDebt + amountToTransfer
+        self.asset.transfer(strategy, amountToTransfer)
+        self.totalIdle -= amountToTransfer
+        self.totalDebt += amountToTransfer
+
+    self.strategies[strategy].currentDebt = newDebt
+
+    log DebtUpdated(strategy, currentDebt, newDebt)
+    return newDebt
 
 # # P&L MANAGEMENT FUNCTIONS #
 # def processReport(strategy: address):
@@ -318,14 +380,6 @@ def updateMaxDebtForStrategy(strategy: address, new_maxDebt: uint256):
 #     # TODO: change maxDebt in strategy params for _strategy
 #     return
 
-# def updateDebt():
-#     # permissioned: DEBT_MANAGER (or maybe open?)
-#     # TODO: rebalance debt. if the strategy is allowed to take more debt and the strategy wants that debt, the vault will send more. if the strategy has too much debt, the vault will have less
-#     #    - retrieve current position
-#     #    - retrieve max debt allocated
-#     #    - check the strategy wants that debt
-#     #    -
-#     return
 
 # def updateDebtEmergency():
 #     # permissioned: EMERGENCY_DEBT_MANAGER
