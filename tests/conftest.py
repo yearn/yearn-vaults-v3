@@ -1,5 +1,7 @@
 import pytest
 
+from utils.constants import MAX_INT
+
 # Accounts
 
 
@@ -145,7 +147,7 @@ def create_lossy_strategy(project, strategist):
     yield create_lossy_strategy
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def vault(gov, asset, create_vault):
     vault = create_vault(asset)
 
@@ -157,8 +159,28 @@ def vault(gov, asset, create_vault):
 
 
 # create default liquid strategy with 0 fee
-@pytest.fixture
+@pytest.fixture(scope="session")
 def strategy(gov, vault, create_strategy):
     strategy = create_strategy(vault)
     vault.addStrategy(strategy.address, sender=gov)
+    strategy.setMinDebt(0, sender=gov)
+    strategy.setMaxDebt(MAX_INT, sender=gov)
+    yield strategy
+
+
+@pytest.fixture(scope="session")
+def locked_strategy(gov, vault, create_locked_strategy):
+    strategy = create_locked_strategy(vault)
+    vault.addStrategy(strategy.address, sender=gov)
+    strategy.setMinDebt(0, sender=gov)
+    strategy.setMaxDebt(MAX_INT, sender=gov)
+    yield strategy
+
+
+@pytest.fixture(scope="session")
+def lossy_strategy(gov, vault, create_lossy_strategy):
+    strategy = create_lossy_strategy(vault)
+    vault.addStrategy(strategy.address, sender=gov)
+    strategy.setMinDebt(0, sender=gov)
+    strategy.setMaxDebt(MAX_INT, sender=gov)
     yield strategy
