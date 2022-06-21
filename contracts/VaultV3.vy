@@ -1,4 +1,4 @@
-# @version 0.3.3
+# @version 0.3.4
 
 from vyper.interfaces import ERC20
 
@@ -51,11 +51,14 @@ struct StrategyParams:
 # CONSTANTS #
 MAX_BPS: constant(uint256) = 10_000
 
+
+# IMUTABLE #
+asset: immutable public(ERC20)
+decimals: immutable public(uint256)
+
 # STORAGE #
-asset: public(ERC20)
 strategies: public(HashMap[address, StrategyParams])
 balanceOf: public(HashMap[address, uint256])
-decimals: public(uint256)
 totalSupply: public(uint256)
 totalDebt: public(uint256)
 totalIdle: public(uint256)
