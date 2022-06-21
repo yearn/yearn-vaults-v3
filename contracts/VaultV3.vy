@@ -210,38 +210,38 @@ def amountForShares(shares: uint256) -> uint256:
 @external
 def addStrategy(new_strategy: address):
    # TODO: permissioned: STRATEGY_MANAGER
-   assert new_strategy != ZERO_ADDRESS
-   assert self == IStrategy(new_strategy).vault()
-   assert self.strategies[new_strategy].activation == 0
-   assert IStrategy(new_strategy).asset() != self.asset.address
-   
-   self.strategies[new_strategy] = StrategyParams({
-      activation: block.timestamp,
-      currentDebt: 0,
-      maxDebt: 0
-   })
+    assert new_strategy != ZERO_ADDRESS
+    assert self == IStrategy(new_strategy).vault()
+    assert self.strategies[new_strategy].activation == 0
+    assert IStrategy(new_strategy).asset() != self.asset.address
+    
+    self.strategies[new_strategy] = StrategyParams({
+       activation: block.timestamp,
+       currentDebt: 0,
+       maxDebt: 0
+    })
 
-   log StrategyAdded(new_strategy)
+    log StrategyAdded(new_strategy)
 
-   return
+    return
 
 @internal
 def _revokeStrategy(old_strategy: address):
-   # TODO: permissioned: STRATEGY_MANAGER
-   assert self.strategies[old_strategy].activation != 0
-   # NOTE: strategy needs to have 0 debt to be revoked
-   assert self.strategies[old_strategy].currentDebt == 0
+    # TODO: permissioned: STRATEGY_MANAGER
+    assert self.strategies[old_strategy].activation != 0
+    # NOTE: strategy needs to have 0 debt to be revoked
+    assert self.strategies[old_strategy].currentDebt == 0
 
-   # NOTE: strategy params are set to 0 (warning: it can be readded)
-   self.strategies[old_strategy] = StrategyParams({
-       activation: 0,
-       currentDebt: 0,
-       maxDebt: 0
-   })
+    # NOTE: strategy params are set to 0 (warning: it can be readded)
+    self.strategies[old_strategy] = StrategyParams({
+        activation: 0,
+        currentDebt: 0,
+        maxDebt: 0
+    })
 
-   log StrategyRevoked(old_strategy)
+    log StrategyRevoked(old_strategy)
 
-   return
+    return
 
 @external
 def revokeStrategy(old_strategy: address):
@@ -270,11 +270,11 @@ def migrateStrategy(new_strategy: address, old_strategy: address):
  
 @external
 def updateMaxDebtForStrategy(strategy: address, new_maxDebt: uint256): 
-   # TODO: permissioned: DEBT_MANAGER 
-   assert self.strategies[strategy].activation != 0
-   # TODO: should we check that totalMaxDebt is not over 100% of assets? 
-   self.strategies[strategy].maxDebt = new_maxDebt
-   return
+    # TODO: permissioned: DEBT_MANAGER 
+    assert self.strategies[strategy].activation != 0
+    # TODO: should we check that totalMaxDebt is not over 100% of assets? 
+    self.strategies[strategy].maxDebt = new_maxDebt
+    return
 
 # # P&L MANAGEMENT FUNCTIONS #
 # def processReport(strategy: address):
