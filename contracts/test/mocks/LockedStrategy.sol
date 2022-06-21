@@ -27,7 +27,6 @@ contract LockedStrategy is BaseStrategy {
   // only used during testing
   // free locked funds if duration has passed
   function freeLockedFunds() external {
-    uint256 balance = IERC20(asset).balanceOf(address(this));
     if (block.timestamp >= lockedUntil) {
       lockedBalance = 0;
       lockedUntil = 0;
