@@ -19,26 +19,35 @@ interface IStrategy:
    def vault() -> address: view
    
 # EVENTS #
-event Transfer:
-    sender: indexed(address)
-    receiver: indexed(address)
-    value: uint256
-
-event Deposit:
-    recipient: indexed(address)
-    shares: uint256
-    amount: uint256
-
-event Withdraw:
-    recipient: indexed(address)
-    shares: uint256
-    amount: uint256
-
 event StrategyAdded: 
    strategy: indexed(address)
 
 event StrategyRevoked: 
    strategy: indexed(address)
+
+event Deposit:
+    fnCaller: indexed(address)
+    owner: indexed(address)
+    assets: uint256 
+    shares: uint256
+
+event Withdraw:
+    fnCaller: indexed(address)
+    receiver: indexed(address)
+    owner: indexed(address)
+    assets: uint256
+    shares: uint256
+
+event Transfer:
+    sender: indexed(address)
+    receiver: indexed(address)
+    value: uint256
+
+event Approval:
+    owner: indexed(address)
+    spender: indexed(address)
+    value: uint256
+
 
 # STRUCTS #
 # TODO: strategy params
@@ -54,10 +63,21 @@ MAX_BPS: constant(uint256) = 10_000
 ASSET: immutable(ERC20)
 strategies: public(HashMap[address, StrategyParams])
 balanceOf: public(HashMap[address, uint256])
-decimals: public(uint256)
+allowance: public(HashMap[address, HashMap[address, uint256]])
+
 totalSupply: public(uint256)
 totalDebt: public(uint256)
 totalIdle: public(uint256)
+
+name: public(String[64])
+symbol: public(String[32])
+decimals: public(uint256)
+
+# `nonces` track `permit` approvals with signature.
+nonces: public(HashMap[address, uint256])
+DOMAIN_SEPARATOR: public(bytes32)
+DOMAIN_TYPE_HASH: constant(bytes32) = keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)')
+PERMIT_TYPE_HASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
 
 @external
 def __init__(asset: ERC20):
@@ -66,17 +86,90 @@ def __init__(asset: ERC20):
     # TODO: implement
     return
 
-# SUPPORT FUNCTIONS #
+## ERC20 ##
+@internal
+def _spendAllowance(owner: address, fnCaller: address, amount: uint256):
+   self.allowance[owner][fnCaller] -= amount
+
+@internal
+def _transfer(sender: address, receiver: address, amount: uint256):
+    # See note on `transfer()`.
+
+    # Protect people from accidentally sending their shares to bad places
+    assert receiver not in [self, ZERO_ADDRESS]
+    self.balanceOf[sender] -= amount
+    self.balanceOf[receiver] += amount
+    log Transfer(sender, receiver, amount)
+
+@external
+def transfer(receiver: address, amount: uint256) -> bool:
+    self._transfer(msg.sender, receiver, amount)
+    return True
+
+@external
+def transferFrom(sender: address, receiver: address, amount: uint256) -> bool:
+    # Unlimited approval (saves an SSTORE)
+    if (self.allowance[sender][msg.sender] < MAX_UINT256):
+        allowance: uint256 = self.allowance[sender][msg.sender] - amount
+        self.allowance[sender][msg.sender] = allowance
+        # NOTE: Allows log filters to have a full accounting of allowance changes
+        log Approval(sender, msg.sender, allowance)
+    self._transfer(sender, receiver, amount)
+    return True
+
+@external
+def approve(spender: address, amount: uint256) -> bool:
+    self.allowance[msg.sender][spender] = amount
+    log Approval(msg.sender, spender, amount)
+    return True
+
+@external
+def increaseAllowance(spender: address, amount: uint256) -> bool:
+    self.allowance[msg.sender][spender] += amount
+    log Approval(msg.sender, spender, self.allowance[msg.sender][spender])
+    return True
+
+@external
+def decreaseAllowance(spender: address, amount: uint256) -> bool:
+    self.allowance[msg.sender][spender] -= amount
+    log Approval(msg.sender, spender, self.allowance[msg.sender][spender])
+    return True
+
+@external
+def permit(owner: address, spender: address, amount: uint256, expiry: uint256, signature: Bytes[65]) -> bool:
+    assert owner != ZERO_ADDRESS  # dev: invalid owner
+    assert expiry == 0 or expiry >= block.timestamp  # dev: permit expired
+    nonce: uint256 = self.nonces[owner]
+    digest: bytes32 = keccak256(
+        concat(
+            b'\x19\x01',
+            self.DOMAIN_SEPARATOR,
+            keccak256(
+                concat(
+                    PERMIT_TYPE_HASH,
+                    convert(owner, bytes32),
+                    convert(spender, bytes32),
+                    convert(amount, bytes32),
+                    convert(nonce, bytes32),
+                    convert(expiry, bytes32),
+                )
+            )
+        )
+    )
+    # NOTE: signature is packed as r, s, v
+    r: uint256 = convert(slice(signature, 0, 32), uint256)
+    s: uint256 = convert(slice(signature, 32, 32), uint256)
+    v: uint256 = convert(slice(signature, 64, 1), uint256)
+    assert ecrecover(digest, v, r, s) == owner  # dev: invalid signature
+    self.allowance[owner][spender] = amount
+    self.nonces[owner] = nonce + 1
+    log Approval(owner, spender, amount)
+    return True
+
 @view
 @internal
 def _totalAssets() -> uint256:
     return self.totalIdle + self.totalDebt
-
-@internal
-def _burnShares(shares: uint256, owner: address):
-    # TODO: do we need to check?
-    self.balanceOf[owner] -= shares
-    self.totalSupply -= shares
 
 @view
 @internal
@@ -87,6 +180,7 @@ def _amountForShares(shares: uint256) -> uint256:
         amount = shares * self._totalAssets() / self.totalSupply
     return amount
 
+
 @view
 @internal
 def _sharesForAmount(amount: uint256) -> uint256:
@@ -96,16 +190,6 @@ def _sharesForAmount(amount: uint256) -> uint256:
             shares = amount * _totalSupply / self._totalAssets()
     return shares
 
-@internal
-def _issueSharesForAmount(amount: uint256, recipient: address) -> uint256:
-    newShares: uint256 = self._sharesForAmount(amount)
-
-    assert newShares > 0
-
-    self.balanceOf[recipient] += newShares
-    self.totalSupply += newShares
-
-    return newShares
 
 
 @internal
@@ -125,6 +209,7 @@ def erc20_safe_transferFrom(token: address, sender: address, receiver: address, 
     if len(response) > 0:
         assert convert(response, bool), "Transfer failed!"
 
+
 @internal
 def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
     # Used only to send tokens that are not the type managed by this Vault.
@@ -141,74 +226,132 @@ def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
     if len(response) > 0:
         assert convert(response, bool), "Transfer failed!"
 
+
 # USER FACING FUNCTIONS #
-@external
-def deposit(_amount: uint256, _recipient: address, _depositor: address) -> uint256:
+# SUPPORT FUNCTIONS #
+@internal
+def _burnShares(shares: uint256, owner: address):
+    # TODO: do we need to check?
+    self.balanceOf[owner] -= shares
+    self.totalSupply -= shares
+
+
+@internal
+def _issueSharesForAmount(amount: uint256, recipient: address) -> uint256:
+    newShares: uint256 = self._sharesForAmount(amount)
+    assert newShares > 0
+
+    self.balanceOf[recipient] += newShares
+    self.totalSupply += newShares
+
+    return newShares
+
+@internal
+def _deposit(_fnCaller: address, _recipient: address, amount: uint256) -> uint256:
     assert _recipient not in [self, ZERO_ADDRESS], "invalid recipient"
-    # TODO: should it check deposit limit?
-
-    amount: uint256 = _amount
-    if amount == MAX_UINT256:
-        amount = ASSET.balanceOf(_depositor)
-
-    shares: uint256 = self._issueSharesForAmount(amount, _recipient)
     
-    # NOTE: the caller contract is in charge of transfering funds during the callback
-    preBalance: uint256 = ASSET.balanceOf(self)
-    IYVaultDepositCallback(msg.sender).yVaultDepositCallback(amount, _depositor)
-    assert preBalance + amount <= ASSET.balanceOf(self)
+    shares: uint256 = self._issueSharesForAmount(amount, _recipient)
 
+    self.erc20_safe_transferFrom(ASSET.address, msg.sender, self, amount)
     self.totalIdle += amount
 
-    log Deposit(_recipient, shares, amount)
+    log Deposit(_fnCaller, _recipient, amount, shares)
 
     return shares
 
-@external
-def redeem(_shares: uint256 = MAX_UINT256, _recipient: address = msg.sender, _strategies: DynArray[address, 10] = []) -> uint256:
-    owner: address = msg.sender
-    shares: uint256 = _shares
+@internal
+def _redeem(fnCaller: address, _receiver: address, _owner: address, _shares: uint256, _strategies: DynArray[address, 10] = []) -> uint256:
+    if fnCaller != _owner: 
+      self._spendAllowance(_owner, msg.sender, _shares)
 
-    if _shares == MAX_UINT256:
-        sharesBalance: uint256 = self.balanceOf[owner]
-        shares = sharesBalance
-
-    assert shares > 0, "no shares to withdraw"
-
-    amount: uint256 = self._amountForShares(shares)
+    assets: uint256 = self._amountForShares(_shares)
 
     # TODO: withdraw from strategies
     
     # TODO: gas savings: totalIdle should be cached if used above
-    assert self.totalIdle >= amount, "insufficient total idle"
+    assert self.totalIdle >= assets, "insufficient total idle"
 
-    self._burnShares(shares, owner)
-    self.totalIdle -= amount
+    self._burnShares(_shares, _owner)
 
-    self.erc20_safe_transfer(ASSET.address, _recipient, amount)
+    self.totalIdle -= assets
+    self.erc20_safe_transfer(ASSET.address, _receiver, assets)
 
-    log Withdraw(_recipient, shares, amount)
+    log Withdraw(msg.sender, _receiver, _owner, _shares, assets)
 
-    return amount
+    return assets
 
-# SHARE MANAGEMENT FUNCTIONS #
+
+## ERC4626 ## 
+@external
+def asset() -> address:
+   return ASSET.address
+
 @view
 @external
 def totalAssets() -> uint256:
     return self._totalAssets()
 
+@external
+def convertToShares(assets: uint256) -> uint256:
+   return self._sharesForAmount(assets)
+
+@external
+def convertToAssets(shares: uint256) -> uint256:
+   return self._amountForShares(shares)
+
+@external
+def maxDeposit(owner: address) -> uint256:
+   return MAX_UINT256
+
+@external
+def maxMint(owner: address) -> uint256: 
+   maxDeposit: uint256 = MAX_UINT256
+   return self._sharesForAmount(maxDeposit)
+
+@external
+def maxWithdraw(owner: address) -> uint256:
+   # TODO: calculate max between liquidity and shares
+   return 0
+
+@external
+def maxRedeem(owner: address) -> uint256:
+   # TODO: add max liquidity calculation
+   return self.balanceOf[owner]
+
+@external
+def previewDeposit(assets: uint256) -> uint256:
+   return self._sharesForAmount(assets)
+
+@external
+def previewWithdraw(shares: uint256) -> uint256:
+    return self._amountForShares(shares)
+
+@external
+def deposit(assets: uint256, receiver: address) -> uint256:
+       return self._deposit(msg.sender, receiver, assets)
+
+@external
+def mint(shares: uint256, receiver: address) -> uint256:
+   assets: uint256 = self._amountForShares(shares)
+   self._deposit(msg.sender, receiver, assets)
+   return assets
+
+@external
+def withdraw(_assets: uint256, _receiver: address, _owner: address) -> uint256:
+   shares: uint256 = self._sharesForAmount(_assets)
+   self._redeem(msg.sender, _receiver, _owner, shares, [])
+   return shares
+
+@external
+def redeem(_shares: uint256, _receiver: address, _owner: address) -> uint256:
+   assets: uint256 = self._redeem(msg.sender, _receiver, _owner, _shares, [])
+   return assets
+
+# SHARE MANAGEMENT FUNCTIONS #
 @view
 @external
 def pricePerShare() -> uint256:
     return self._amountForShares(10 ** self.decimals)
-
-@external
-def sharesForAmount(amount: uint256) -> uint256:
-    return self._sharesForAmount(amount)
-
-@external
-def amountForShares(shares: uint256) -> uint256:
-    return self._amountForShares(shares)
 
 # STRATEGY MANAGEMENT FUNCTIONS #
 @external
