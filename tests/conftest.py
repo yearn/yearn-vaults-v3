@@ -1,5 +1,7 @@
 import pytest
 
+from utils.constants import MAX_INT
+
 # Accounts
 
 
@@ -118,15 +120,34 @@ def create_vault(project, gov):
     yield create_vault
 
 
+# create default liquid strategy with 0 fee
 @pytest.fixture(scope="session")
 def create_strategy(project, strategist):
     def create_strategy(vault):
-        return strategist.deploy(project.BaseStrategyMock, vault)
+        return strategist.deploy(project.LiquidStrategy, vault)
 
     yield create_strategy
 
 
-@pytest.fixture
+# create locked strategy with 0 fee
+@pytest.fixture(scope="session")
+def create_locked_strategy(project, strategist):
+    def create_locked_strategy(vault):
+        return strategist.deploy(project.LockedStrategy, vault)
+
+    yield create_locked_strategy
+
+
+# create locked strategy with 0 fee
+@pytest.fixture(scope="session")
+def create_lossy_strategy(project, strategist):
+    def create_lossy_strategy(vault):
+        return strategist.deploy(project.LossyStrategy, vault)
+
+    yield create_lossy_strategy
+
+
+@pytest.fixture(scope="session")
 def vault(gov, asset, create_vault):
     vault = create_vault(asset)
 
@@ -137,8 +158,29 @@ def vault(gov, asset, create_vault):
     yield vault
 
 
-@pytest.fixture
+# create default liquid strategy with 0 fee
+@pytest.fixture(scope="session")
 def strategy(gov, vault, create_strategy):
     strategy = create_strategy(vault)
     vault.addStrategy(strategy.address, sender=gov)
+    strategy.setMinDebt(0, sender=gov)
+    strategy.setMaxDebt(MAX_INT, sender=gov)
+    yield strategy
+
+
+@pytest.fixture(scope="session")
+def locked_strategy(gov, vault, create_locked_strategy):
+    strategy = create_locked_strategy(vault)
+    vault.addStrategy(strategy.address, sender=gov)
+    strategy.setMinDebt(0, sender=gov)
+    strategy.setMaxDebt(MAX_INT, sender=gov)
+    yield strategy
+
+
+@pytest.fixture(scope="session")
+def lossy_strategy(gov, vault, create_lossy_strategy):
+    strategy = create_lossy_strategy(vault)
+    vault.addStrategy(strategy.address, sender=gov)
+    strategy.setMinDebt(0, sender=gov)
+    strategy.setMaxDebt(MAX_INT, sender=gov)
     yield strategy

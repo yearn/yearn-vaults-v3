@@ -6,7 +6,7 @@ on:
     - master
   pull_request:
 
-concurrency: 
+concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
@@ -17,6 +17,8 @@ jobs:
     steps:
     - uses: actions/checkout@v1
     - uses: ApeWorX/github-action@v1
+    - name: install vyper
+      run: pip install git+https://github.com/vyperlang/vyper
     - name: Compile contracts
       # TODO: Force recompiles until ape compile caching is fixed
       run: ape compile --force --size

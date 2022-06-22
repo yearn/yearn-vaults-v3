@@ -3,14 +3,31 @@ pragma solidity 0.8.14;
 
 import {BaseStrategy, IERC20} from "../BaseStrategy.sol";
 
-contract BaseStrategyMock is BaseStrategy {
+abstract contract BaseStrategyMock is BaseStrategy {
+
+  uint256 public minDebt;
+  uint256 public maxDebt;
+
   constructor(address _vault) BaseStrategy(_vault) {}
 
-  function name() external view override returns (string memory _name) {}
-
-  function stealFunds(uint256 _amount) external {
-    IERC20(asset).transfer(msg.sender, _amount);
+  function setMinDebt(uint256 _minDebt) external {
+    minDebt = _minDebt;
   }
+
+  function setMaxDebt(uint256 _maxDebt) external {
+    maxDebt = _maxDebt;
+  }
+
+  function investable() external view override returns (uint256 _minDebt, uint256 _maxDebt) {
+    _minDebt = minDebt;
+    _maxDebt = maxDebt;
+  }
+
+  function totalAssets() external view override returns (uint256) {
+    return IERC20(asset).balanceOf(address(this));
+  }
+
+  function name() external view override returns (string memory _name) {}
 
   function _emergencyFreeFunds(uint256 _amountToWithdraw) internal override {}
 
@@ -18,26 +35,12 @@ contract BaseStrategyMock is BaseStrategy {
 
   function _harvest() internal override {}
 
-  function _freeFunds(uint256 _amount) internal override returns (uint256 _amountFreed) {}
 
   function _migrate(address _newStrategy) internal override {}
 
   function harvestTrigger() external view override returns (bool) {}
 
   function investTrigger() external view override returns (bool) {}
-
-  function investable() external view override returns (uint256 _minDebt, uint256 _maxDebt) {
-    _minDebt = 0;
-    _maxDebt = type(uint256).max;
-  }
-
-  function totalAssets() external view override returns (uint256) {
-    return IERC20(asset).balanceOf(address(this));
-  }
-
-  function withdrawable() external view override returns (uint256 _withdrawable) {
-    _withdrawable = IERC20(asset).balanceOf(address(this));
-  }
 
   function delegatedAssets() external view override returns (uint256 _delegatedAssets) {}
 

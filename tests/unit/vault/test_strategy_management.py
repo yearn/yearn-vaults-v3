@@ -1,4 +1,3 @@
-import pytest
 import ape
 from ape import chain
 from utils import checks
@@ -19,6 +18,9 @@ def test_add_strategy__with_valid_strategy(chain, gov, vault, create_strategy):
     assert strategy_params.activation == snapshot
     assert strategy_params.currentDebt == 0
     assert strategy_params.maxDebt == 0
+    assert strategy_params.totalGain == 0
+    assert strategy_params.totalLoss == 0
+    assert strategy_params.lastReport == snapshot
 
 
 def test_add_strategy__with_zero_address__fails_with_error(gov, vault):
@@ -98,6 +100,9 @@ def test_migrate_strategy__with_no_debt(chain, gov, vault, strategy, create_stra
     assert new_strategy_params.activation == snapshot
     assert new_strategy_params.currentDebt == old_current_debt
     assert new_strategy_params.maxDebt == old_max_debt
+    assert new_strategy_params.totalGain == 0
+    assert new_strategy_params.totalLoss == 0
+    assert new_strategy_params.lastReport == snapshot
 
     old_strategy_params = vault.strategies(old_strategy)
     checks.check_revoked_strategy(old_strategy_params)
@@ -162,10 +167,3 @@ def test_migrate_strategy__with_zero_address_new_strategy__fails_with_error(
 
     with ape.reverts("strategy cannot be zero address"):
         vault.migrateStrategy(new_strategy, old_strategy.address, sender=gov)
-
-
-@pytest.mark.parametrize("max_debt", [0, 10**22])
-def test_update_max_debt__with_debt_value(gov, vault, strategy, max_debt):
-    vault.updateMaxDebtForStrategy(strategy.address, max_debt, sender=gov)
-
-    assert vault.strategies(strategy.address).maxDebt == max_debt
