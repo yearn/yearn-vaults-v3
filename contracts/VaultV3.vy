@@ -71,9 +71,9 @@ struct StrategyParams:
 MAX_BPS: constant(uint256) = 10_000
 
 
-# IMUTABLE #
-asset: immutable public(ERC20)
-decimals: immutable public(uint256)
+# IMMUTABLE #
+ASSET: immutable(ERC20)
+DECIMALS: immutable(uint256)
 
 # STORAGE #
 strategies: public(HashMap[address, StrategyParams])
@@ -90,13 +90,23 @@ healthCheck: public(address)
 
 @external
 def __init__(asset: ERC20):
-    self.asset = asset
-    self.decimals = convert(ERC20Detailed(asset.address).decimals(), uint256)
+    ASSET = asset
+    DECIMALS = convert(ERC20Detailed(asset.address).decimals(), uint256)
     # TODO: implement
     return
 
 
 # SUPPORT FUNCTIONS #
+
+@view
+@external
+def asset() -> ERC20:
+    return ASSET
+@view
+@external
+def decimals() -> uint256:
+    return DECIMALS
+
 @view
 @internal
 def _totalAssets() -> uint256:
@@ -239,14 +249,14 @@ def deposit(_amount: uint256, _recipient: address) -> uint256:
     amount: uint256 = _amount
 
     if amount == MAX_UINT256:
-        amount = self.asset.balanceOf(msg.sender)
+        amount = ASSET.balanceOf(msg.sender)
 
     assert amount > 0, "cannot deposit zero"
     # TODO: should it check deposit limit?
 
     shares: uint256 = self._issueSharesForAmount(amount, _recipient)
 
-    self.erc20_safe_transferFrom(self.asset.address, msg.sender, self, amount)
+    self.erc20_safe_transferFrom(ASSET.address, msg.sender, self, amount)
     self.totalIdle += amount
 
     log Deposit(_recipient, shares, amount)
@@ -276,7 +286,7 @@ def withdraw(_shares: uint256, _recipient: address, _strategies: DynArray[addres
     self._burnShares(shares, owner)
     self.totalIdle -= amount
 
-    self.erc20_safe_transfer(self.asset.address, _recipient, amount)
+    self.erc20_safe_transfer(ASSET.address, _recipient, amount)
 
     log Withdraw(_recipient, shares, amount)
 
@@ -293,7 +303,7 @@ def totalAssets() -> uint256:
 @view
 @external
 def pricePerShare() -> uint256:
-    return self._amountForShares(10 ** self.decimals)
+    return self._amountForShares(10 ** DECIMALS)
 
 
 @external
@@ -311,7 +321,7 @@ def amountForShares(shares: uint256) -> uint256:
 def addStrategy(new_strategy: address):
     # TODO: permissioned: STRATEGY_MANAGER
     assert new_strategy != ZERO_ADDRESS, "strategy cannot be zero address"
-    assert IStrategy(new_strategy).asset() == self.asset.address, "invalid asset"
+    assert IStrategy(new_strategy).asset() == ASSET.address, "invalid asset"
     assert IStrategy(new_strategy).vault() == self, "invalid vault"
     assert self.strategies[new_strategy].activation == 0, "strategy already active"
 
@@ -359,7 +369,7 @@ def migrateStrategy(new_strategy: address, old_strategy: address):
     assert self.strategies[old_strategy].activation != 0, "old strategy not active"
     assert self.strategies[old_strategy].currentDebt == 0, "old strategy has debt"
     assert new_strategy != ZERO_ADDRESS, "strategy cannot be zero address"
-    assert IStrategy(new_strategy).asset() == self.asset.address, "invalid asset"
+    assert IStrategy(new_strategy).asset() == ASSET.address, "invalid asset"
     assert IStrategy(new_strategy).vault() == self, "invalid vault"
     assert self.strategies[new_strategy].activation == 0, "strategy already active"
 
@@ -423,7 +433,7 @@ def updateDebt(strategy: address) -> uint256:
             newDebt = currentDebt - withdrawable
 
         IStrategy(strategy).freeFunds(amountToWithdraw)
-        self.asset.transferFrom(strategy, self, amountToWithdraw)
+        ASSET.transferFrom(strategy, self, amountToWithdraw)
         self.totalIdle += amountToWithdraw
         self.totalDebt -= amountToWithdraw
     else:
@@ -433,7 +443,7 @@ def updateDebt(strategy: address) -> uint256:
         if amountToTransfer > self.totalIdle:
             amountToTransfer = self.totalIdle
             newDebt = currentDebt + amountToTransfer
-        self.asset.transfer(strategy, amountToTransfer)
+        ASSET.transfer(strategy, amountToTransfer)
         self.totalIdle -= amountToTransfer
         self.totalDebt += amountToTransfer
 
