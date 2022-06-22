@@ -15,6 +15,7 @@ interface IStrategy:
    def investable() -> (uint256, uint256): view
    def withdrawable() -> uint256: view
    def freeFunds(amount: uint256) -> uint256: nonpayable
+   def totalAssets() -> (uint256): view
 
 # EVENTS #
 event Transfer:
@@ -42,6 +43,15 @@ event StrategyMigrated:
     old_strategy: indexed(address)
     new_strategy: indexed(address)
 
+event StrategyReported:
+    strategy: indexed(address)
+    gain: uint256
+    loss: uint256
+    currentDebt: uint256
+    totalGain: uint256
+    totalLoss: uint256
+    totalFees: uint256
+
 event DebtUpdated:
     strategy: address
     currentDebt: uint256
@@ -51,8 +61,11 @@ event DebtUpdated:
 # TODO: strategy params
 struct StrategyParams:
     activation: uint256
+    lastReport: uint256
     currentDebt: uint256
     maxDebt: uint256
+    totalGain: uint256
+    totalLoss: uint256
 
 # CONSTANTS #
 MAX_BPS: constant(uint256) = 10_000
@@ -65,7 +78,12 @@ decimals: public(uint256)
 totalSupply: public(uint256)
 totalDebt: public(uint256)
 totalIdle: public(uint256)
+lastReport: public(uint256)
+lockedProfit: public(uint256)
+previousHarvestTimeDelta: public(uint256)
 
+feeManager: public(address)
+healthCheck: public(address)
 
 @external
 def __init__(asset: ERC20):
@@ -87,6 +105,61 @@ def _burnShares(shares: uint256, owner: address):
     # TODO: do we need to check?
     self.balanceOf[owner] -= shares
     self.totalSupply -= shares
+
+
+@internal
+def _calculateLockedProfit() -> uint256:
+    """
+    @notice
+        Returns time adjusted locked profits depending on the current time delta and
+        the previous harvest time delta.
+    @return The time adjusted locked profits due to pps increase spread
+    """
+    currentTimeDelta: uint256 = block.timestamp - self.lastReport
+
+    if currentTimeDelta < self.previousHarvestTimeDelta:
+        return self.lockedProfit - ((self.lockedProfit * currentTimeDelta) / self.previousHarvestTimeDelta)
+    return 0
+
+
+@internal
+def _updateReportTimestamps():
+    """
+    maintains longer (fairer) harvest periods on close timed harvests
+    NOTE: correctly adjust time delta to avoid reducing locked-until time
+          all following examples have previousHarvestTimeDelta = 10 set at h2 and used on h3
+          if new time delta reduces previous locked-until, keep locked-until and adjust remaining time
+          h1 = t0, h2 = t10 and h3 = t13 =>
+              currentTimeDelta = 3, (new)previousHarvestTimeDelta = 7 (10-3), locked until t20
+          h1 = t0, h2 = t10 and h3 = t14 =>
+              currentTimeDelta = 4, (new)previousHarvestTimeDelta = 6 (10-4), locked until t20
+          on 2nd example: h2 is getting carried into h3 (minus time delta 4) since it was previously trying to reach t20.
+          so it continues to spread the lock up to that point, and thus avoids reducing the previous distribution time.
+
+          if locked-until is unchanged, to avoid extra storage read and subtraction cost [behaves as examples below]
+          h1 = t0, h2 = t10 and h3 = t15 =>
+              currentTimeDelta = 5, (new)previousHarvestTimeDelta = 5 locked until t20
+
+          if next total time delta is higher than previous period remaining, locked-until will increase
+          h1 = t0, h2 = t10 and h3 = t16 =>
+              currentTimeDelta = 6, (new)previousHarvestTimeDelta = 6 locked until t22
+          h1 = t0, h2 = t10 and h3 = t17 =>
+              currentTimeDelta = 7, (new)previousHarvestTimeDelta = 7 locked until t24
+
+          currentTimeDelta is the time delta between now and lastReport.
+          previousHarvestTimeDelta is the time delta between lastReport and the previous lastReport
+          previousHarvestTimeDelta is assigned the higher value between currentTimeDelta and (previousHarvestTimeDelta - currentTimeDelta)
+    """
+
+    # TODO: check how to solve deposit sniping for very profitable and infrequent strategy reports
+    # when there are also other more frequent strategies reducing time delta.
+    # (need to add time delta per strategy + accumulator)
+    currentTimeDelta: uint256 = block.timestamp - self.lastReport
+    if self.previousHarvestTimeDelta > currentTimeDelta * 2:
+      self.previousHarvestTimeDelta = self.previousHarvestTimeDelta - currentTimeDelta
+    else:
+      self.previousHarvestTimeDelta = currentTimeDelta
+    self.lastReport = block.timestamp
 
 
 @view
@@ -241,8 +314,11 @@ def addStrategy(new_strategy: address):
 
     self.strategies[new_strategy] = StrategyParams({
         activation: block.timestamp,
+        lastReport: block.timestamp,
         currentDebt: 0,
-        maxDebt: 0
+        maxDebt: 0,
+        totalGain: 0,
+        totalLoss: 0
     })
 
     log StrategyAdded(new_strategy)
@@ -258,8 +334,11 @@ def _revokeStrategy(old_strategy: address):
     # NOTE: strategy params are set to 0 (warning: it can be readded)
     self.strategies[old_strategy] = StrategyParams({
         activation: 0,
+        lastReport: 0,
         currentDebt: 0,
-        maxDebt: 0
+        maxDebt: 0,
+        totalGain: 0,
+        totalLoss: 0
     })
 
     log StrategyRevoked(old_strategy)
@@ -286,8 +365,11 @@ def migrateStrategy(new_strategy: address, old_strategy: address):
     # NOTE: we add strategy with same params than the strategy being migrated
     self.strategies[new_strategy] = StrategyParams({
        activation: block.timestamp,
+       lastReport: block.timestamp,
        currentDebt: migrated_strategy.currentDebt,
-       maxDebt: migrated_strategy.maxDebt
+       maxDebt: migrated_strategy.maxDebt,
+       totalGain: 0,
+       totalLoss: 0
     })
 
     self._revokeStrategy(old_strategy)
@@ -358,14 +440,62 @@ def updateDebt(strategy: address) -> uint256:
     return newDebt
 
 # # P&L MANAGEMENT FUNCTIONS #
-# def processReport(strategy: address):
-#     # permissioned: ACCOUNTING_MANAGER (open?)
-#     # TODO: calculate the P&L of the strategy and save the new status
-#     # the way is to compare the strategy's assets with the debt with the vault
-#     # strategy_assets > strategy_debt? profit. else loss
-#     #    - lock the profit !
-#     #    - implement the healthcheck
-#     return
+@external
+def processReport(strategy: address) -> (uint256, uint256):
+    # TODO: permissioned: ACCOUNTING_MANAGER (open?)
+
+    assert self.strategies[strategy].activation != 0, "inactive strategy"
+    totalAssets: uint256 = IStrategy(strategy).totalAssets()
+    currentDebt: uint256 = self.strategies[strategy].currentDebt
+    assert totalAssets != currentDebt, "nothing to report"
+
+    gain: uint256 = 0
+    loss: uint256 = 0
+
+    # TODO: implement health check
+
+    if totalAssets > currentDebt:
+        gain = totalAssets - currentDebt
+    else:
+        loss = currentDebt - totalAssets
+
+    if loss > 0:
+        self.strategies[strategy].totalLoss += loss
+        self.strategies[strategy].currentDebt -= loss
+
+        lockedProfitBeforeLoss: uint256 = self._calculateLockedProfit()
+        if lockedProfitBeforeLoss > loss:
+            self.lockedProfit = lockedProfitBeforeLoss - loss
+        else:
+            self.lockedProfit = 0
+
+    totalFees: uint256 = 0
+    if gain > 0:
+        feeManager: address = self.feeManager
+        # if fee manager is not set, fees are zero
+        if feeManager != ZERO_ADDRESS:
+            # TODO: implement fee manager
+            pass
+
+        # gains are always realized pnl (i.e. not upnl)
+        self.strategies[strategy].totalGain += gain
+        self.strategies[strategy].currentDebt += gain
+        self.lockedProfit = self._calculateLockedProfit() + gain - totalFees
+
+    self.strategies[strategy].lastReport = block.timestamp
+    self._updateReportTimestamps()
+
+    strategyParams: StrategyParams = self.strategies[strategy]
+    log StrategyReported(
+        strategy,
+        gain,
+        loss,
+        strategyParams.currentDebt,
+        strategyParams.totalGain,
+        strategyParams.totalLoss,
+        totalFees
+    )
+    return (gain, loss)
 
 # def forceProcessReport(strategy: address):
 #     # permissioned: ACCOUNTING_MANAGER

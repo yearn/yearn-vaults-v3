@@ -18,6 +18,9 @@ def test_add_strategy__with_valid_strategy(chain, gov, vault, create_strategy):
     assert strategy_params.activation == snapshot
     assert strategy_params.currentDebt == 0
     assert strategy_params.maxDebt == 0
+    assert strategy_params.totalGain == 0
+    assert strategy_params.totalLoss == 0
+    assert strategy_params.lastReport == snapshot
 
 
 def test_add_strategy__with_zero_address__fails_with_error(gov, vault):
@@ -97,6 +100,9 @@ def test_migrate_strategy__with_no_debt(chain, gov, vault, strategy, create_stra
     assert new_strategy_params.activation == snapshot
     assert new_strategy_params.currentDebt == old_current_debt
     assert new_strategy_params.maxDebt == old_max_debt
+    assert new_strategy_params.totalGain == 0
+    assert new_strategy_params.totalLoss == 0
+    assert new_strategy_params.lastReport == snapshot
 
     old_strategy_params = vault.strategies(old_strategy)
     checks.check_revoked_strategy(old_strategy_params)
