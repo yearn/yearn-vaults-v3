@@ -517,6 +517,7 @@ def processReport(strategy: address) -> (uint256, uint256):
     )
     return (gain, loss)
 
+
 # SETTERS #
 @external
 def setFeeManager(newFeeManager: address):

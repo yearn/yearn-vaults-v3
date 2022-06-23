@@ -39,8 +39,6 @@ def test_process_report__with_gain_and_zero_fees(chain, gov, asset, vault, strat
     actions.airdrop_asset(gov, asset, strategy, gain)
 
     strategy_params = vault.strategies(strategy.address)
-    initial_gain = strategy_params.totalGain
-    initial_loss = strategy_params.totalLoss
     initial_debt = strategy_params.currentDebt
     locked_profit = vault.lockedProfit()
 
@@ -52,14 +50,14 @@ def test_process_report__with_gain_and_zero_fees(chain, gov, asset, vault, strat
     assert event[0].strategy == strategy.address
     assert event[0].gain == gain
     assert event[0].loss == 0
-    assert event[0].totalGain == initial_gain + gain
-    assert event[0].totalLoss == initial_loss
+    assert event[0].totalGain == gain
+    assert event[0].totalLoss == 0
     assert event[0].currentDebt == initial_debt + gain
     assert event[0].totalFees == 0
 
     strategy_params = vault.strategies(strategy.address)
-    assert strategy_params.totalGain == initial_gain + gain
-    assert strategy_params.totalLoss == initial_loss
+    assert strategy_params.totalGain == gain
+    assert strategy_params.totalLoss == 0
     assert strategy_params.currentDebt == initial_debt + gain
     assert vault.lockedProfit() == locked_profit + gain
     assert vault.strategies(strategy.address).lastReport == snapshot
@@ -205,7 +203,9 @@ def test_process_report__with_gain_and_both_fees(
     assert vault.lockedProfit() == pytest.approx(
         locked_profit + gain - total_fee, rel=1e-4
     )
-    assert vault.strategies(strategy.address).lastReport == snapshot
+    assert vault.strategies(strategy.address).lastReport == pytest.approx(
+        snapshot, abs=1
+    )
     assert vault.balanceOf(fee_manager) == pytest.approx(total_fee, rel=1e-4)
 
 
@@ -266,8 +266,6 @@ def test_process_report__with_loss(chain, gov, asset, vault, lossy_strategy):
     lossy_strategy.setLoss(gov.address, loss, sender=gov)
 
     strategy_params = vault.strategies(lossy_strategy.address)
-    initial_gain = strategy_params.totalGain
-    initial_loss = strategy_params.totalLoss
     initial_debt = strategy_params.currentDebt
     locked_profit = vault.lockedProfit()
 
@@ -279,14 +277,14 @@ def test_process_report__with_loss(chain, gov, asset, vault, lossy_strategy):
     assert event[0].strategy == lossy_strategy.address
     assert event[0].gain == 0
     assert event[0].loss == loss
-    assert event[0].totalGain == initial_gain
-    assert event[0].totalLoss == initial_loss + loss
+    assert event[0].totalGain == 0
+    assert event[0].totalLoss == loss
     assert event[0].currentDebt == initial_debt - loss
     assert event[0].totalFees == 0
 
     strategy_params = vault.strategies(lossy_strategy.address)
-    assert strategy_params.totalGain == initial_gain
-    assert strategy_params.totalLoss == initial_loss + loss
+    assert strategy_params.totalGain == 0
+    assert strategy_params.totalLoss == loss
     assert strategy_params.currentDebt == initial_debt - loss
     assert vault.lockedProfit() == locked_profit
     assert vault.strategies(lossy_strategy.address).lastReport == snapshot
