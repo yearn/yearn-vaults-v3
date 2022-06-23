@@ -1,7 +1,6 @@
 # @version 0.3.4
 
 from vyper.interfaces import ERC20
-from vyper.interfaces import ERC20Detailed
 
 # INTERFACES #
 struct StrategyParams:
@@ -30,6 +29,9 @@ event UpdatePerformanceFee:
 
 event UpdateManagementFee:
     management_fee: uint256
+
+event DistributeRewards:
+    rewards: uint256
 
 
 # STRUCTS #
@@ -88,6 +90,14 @@ def assess_fees(strategy: address, gain: uint256) -> uint256:
         total_fee = maximum_fee
 
     return total_fee
+
+
+@external
+def distribute(vault: ERC20):
+    assert msg.sender == self.fee_manager, "not fee manager"
+    rewards: uint256 = vault.balanceOf(self)
+    vault.transfer(msg.sender, rewards)
+    log DistributeRewards(rewards)
 
 
 @external

@@ -525,6 +525,23 @@ def setFeeManager(newFeeManager: address):
     log UpdateFeeManager(newFeeManager)
 
 
+@internal
+def _transfer(sender: address, receiver: address, amount: uint256):
+    # See note on `transfer()`.
+
+    # Protect people from accidentally sending their shares to bad places
+    assert receiver not in [self, ZERO_ADDRESS]
+    self.balanceOf[sender] -= amount
+    self.balanceOf[receiver] += amount
+    log Transfer(sender, receiver, amount)
+
+
+@external
+def transfer(receiver: address, amount: uint256) -> bool:
+    self._transfer(msg.sender, receiver, amount)
+    return True
+
+
 # def forceProcessReport(strategy: address):
 #     # permissioned: ACCOUNTING_MANAGER
 #     # TODO: allows processing the report with losses ! this should only be called in special situations

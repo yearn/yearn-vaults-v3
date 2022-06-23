@@ -9,6 +9,24 @@ def test_deploy_fee_manager(project, gov):
     assert fee_manager.fee_manager() == gov
 
 
+def test_distribute(gov, bunny, vault, fee_manager):
+    with ape.reverts("not fee manager"):
+        fee_manager.distribute(vault.address, sender=bunny)
+
+    rewards = vault.balanceOf(gov)
+    # give fee manager vault shares
+    vault.transfer(fee_manager.address, rewards, sender=gov)
+    assert vault.balanceOf(fee_manager) == rewards
+
+    tx = fee_manager.distribute(vault.address, sender=gov)
+    event = list(tx.decode_logs(fee_manager.DistributeRewards))
+
+    assert len(event) == 1
+    assert event[0].rewards == rewards
+
+    assert vault.balanceOf(gov) == rewards
+
+
 @pytest.mark.parametrize("performance_fee", [0, 2500, 5000])
 def test_set_performance_fee__with_valid_performance_fee(
     gov, vault, fee_manager, performance_fee
