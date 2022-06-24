@@ -10,12 +10,15 @@ from vyper.interfaces import ERC20Detailed
 
 # INTERFACES #
 interface IStrategy:
-   def asset() -> address: view
-   def vault() -> address: view
-   def investable() -> (uint256, uint256): view
-   def withdrawable() -> uint256: view
-   def freeFunds(amount: uint256) -> uint256: nonpayable
-   def totalAssets() -> (uint256): view
+    def asset() -> address: view
+    def vault() -> address: view
+    def investable() -> (uint256, uint256): view
+    def withdrawable() -> uint256: view
+    def freeFunds(amount: uint256) -> uint256: nonpayable
+    def totalAssets() -> (uint256): view
+
+interface IFeeManager:
+    def assess_fees(strategy: address, gain: uint256) -> uint256: view
 
 # EVENTS #
 event Transfer:
@@ -57,8 +60,10 @@ event DebtUpdated:
     currentDebt: uint256
     newDebt: uint256
 
+event UpdateFeeManager:
+    feeManager: address
+
 # STRUCTS #
-# TODO: strategy params
 struct StrategyParams:
     activation: uint256
     lastReport: uint256
@@ -88,12 +93,11 @@ previousHarvestTimeDelta: public(uint256)
 feeManager: public(address)
 healthCheck: public(address)
 
+
 @external
 def __init__(asset: ERC20):
     ASSET = asset
     DECIMALS = convert(ERC20Detailed(asset.address).decimals(), uint256)
-    # TODO: implement
-    return
 
 
 # SUPPORT FUNCTIONS #
@@ -190,7 +194,7 @@ def _sharesForAmount(amount: uint256) -> uint256:
     _totalSupply: uint256 = self.totalSupply
     shares: uint256 = amount
     if _totalSupply > 0:
-            shares = amount * _totalSupply / self._totalAssets()
+        shares = amount * _totalSupply / self._totalAssets()
     return shares
 
 
@@ -487,11 +491,14 @@ def processReport(strategy: address) -> (uint256, uint256):
         feeManager: address = self.feeManager
         # if fee manager is not set, fees are zero
         if feeManager != ZERO_ADDRESS:
-            # TODO: implement fee manager
-            pass
+            totalFees = IFeeManager(feeManager).assess_fees(strategy, gain)
+            # if fees are non-zero, issue shares
+            if totalFees > 0:
+                self._issueSharesForAmount(totalFees, feeManager)
 
         # gains are always realized pnl (i.e. not upnl)
         self.strategies[strategy].totalGain += gain
+        # update current debt after processing management fee
         self.strategies[strategy].currentDebt += gain
         self.lockedProfit = self._calculateLockedProfit() + gain - totalFees
 
@@ -509,6 +516,32 @@ def processReport(strategy: address) -> (uint256, uint256):
         totalFees
     )
     return (gain, loss)
+
+
+# SETTERS #
+@external
+def setFeeManager(newFeeManager: address):
+    # TODO: permissioning
+    self.feeManager = newFeeManager
+    log UpdateFeeManager(newFeeManager)
+
+
+@internal
+def _transfer(sender: address, receiver: address, amount: uint256):
+    # See note on `transfer()`.
+
+    # Protect people from accidentally sending their shares to bad places
+    assert receiver not in [self, ZERO_ADDRESS]
+    self.balanceOf[sender] -= amount
+    self.balanceOf[receiver] += amount
+    log Transfer(sender, receiver, amount)
+
+
+@external
+def transfer(receiver: address, amount: uint256) -> bool:
+    self._transfer(msg.sender, receiver, amount)
+    return True
+
 
 # def forceProcessReport(strategy: address):
 #     # permissioned: ACCOUNTING_MANAGER
@@ -542,10 +575,3 @@ def processReport(strategy: address) -> (uint256, uint256):
 #     # permissioned: SETTER
 #     # TODO: change healtcheck contract
 #     return
-
-# def setFeeManager(newFeeManager: address):
-#     # TODO: change feemanager contract
-#     return
-
-
-
