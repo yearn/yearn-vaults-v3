@@ -1,6 +1,6 @@
 import ape
 from ape import chain
-from utils import checks
+from utils import actions, checks
 from utils.constants import ZERO_ADDRESS
 
 
@@ -66,10 +66,16 @@ def test_revoke_strategy__with_existing_strategy(gov, vault, strategy):
     checks.check_revoked_strategy(strategy_params)
 
 
-def test_revoke_strategy__with_non_zero_debt__fails_with_error():
-    # TODO: try to remove a strategy with debt in it
-    # implement when we can add debt to strategy
-    return
+def test_revoke_strategy__with_non_zero_debt__fails_with_error(
+    gov, asset, vault, strategy
+):
+    vault_balance = asset.balanceOf(vault)
+    new_debt = vault_balance
+
+    actions.add_debt_to_strategy(gov, strategy, vault, new_debt)
+
+    with ape.reverts("strategy has debt"):
+        vault.revokeStrategy(strategy.address, sender=gov)
 
 
 def test_revoke_strategy__with_inactive_strategy__fails_with_error(
@@ -108,10 +114,18 @@ def test_migrate_strategy__with_no_debt(chain, gov, vault, strategy, create_stra
     checks.check_revoked_strategy(old_strategy_params)
 
 
-def test_migrate_strategy__with_existing_debt():
-    # TODO: successfully migrate strategy with funds
-    # implement when we can add debt to strategy
-    return
+def test_migrate_strategy__with_existing_debt(
+    gov, asset, vault, strategy, create_strategy
+):
+    vault_balance = asset.balanceOf(vault)
+    new_debt = vault_balance
+    old_strategy = strategy
+    new_strategy = create_strategy(vault)
+
+    actions.add_debt_to_strategy(gov, strategy, vault, new_debt)
+
+    with ape.reverts("old strategy has debt"):
+        vault.migrateStrategy(new_strategy.address, old_strategy.address, sender=gov)
 
 
 def test_migrate_strategy__with_inactive_old_strategy__fails_with_error(
