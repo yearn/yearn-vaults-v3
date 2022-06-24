@@ -1,3 +1,4 @@
+import pytest
 import ape
 from utils import actions, checks
 from utils.constants import MAX_INT, ZERO_ADDRESS
@@ -21,9 +22,9 @@ def test_deposit_with_zero_funds(fish, asset, create_vault):
         vault.deposit(amount, fish.address, sender=fish)
 
 
-def test_deposit(fish, asset, create_vault):
-    vault = create_vault(asset)
-    amount = 10**18
+def test_deposit__with_deposit_limit_within_deposit_limit(fish, fish_amount, asset, create_vault):
+    vault = create_vault(asset, fish_amount, initial_balance=False)
+    amount = fish_amount
     shares = amount
 
     balance = asset.balanceOf(fish)
@@ -41,11 +42,20 @@ def test_deposit(fish, asset, create_vault):
     assert asset.balanceOf(fish) == (balance - amount)
 
 
-def test_deposit_all(fish, asset, create_vault):
-    vault = create_vault(asset)
+def test_deposit__with_deposit_limit_exceed_deposit_limit__reverts(fish, fish_amount, gov, asset, create_vault):
+    amount = fish_amount
+    deposit_limit = amount - 1
+    vault = create_vault(asset, deposit_limit, initial_balance=False)
+
+    with ape.reverts("exceed deposit limit"):
+        vault.deposit(amount, fish.address, sender=fish)
+
+
+def test_deposit_all__with_deposit_limit_within_deposit_limit(fish, asset, create_vault):
     balance = asset.balanceOf(fish)
     amount = balance
     shares = balance
+    vault = create_vault(asset, initial_balance=False)
 
     asset.approve(vault.address, balance, sender=fish)
     tx = vault.deposit(MAX_INT, fish.address, sender=fish)
@@ -62,8 +72,29 @@ def test_deposit_all(fish, asset, create_vault):
     assert asset.balanceOf(fish) == 0
 
 
+def test_deposit_all__with_deposit_limit_exceed_deposit_limit__deposit_deposit_limit(fish, fish_amount, asset, create_vault):
+    amount = fish_amount
+    deposit_limit = amount // 2
+    shares = deposit_limit
+    vault = create_vault(asset, deposit_limit, initial_balance=False)
+
+    asset.approve(vault.address, amount, sender=fish)
+    tx = vault.deposit(MAX_INT, fish.address, sender=fish)
+    event = list(tx.decode_logs(vault.Deposit))
+
+    assert len(event) == 1
+    assert event[0].recipient == fish
+    assert event[0].shares == shares
+    assert event[0].amount == deposit_limit
+
+    assert vault.totalIdle() == deposit_limit
+    assert vault.balanceOf(fish) == deposit_limit
+    assert vault.totalSupply() == deposit_limit
+    assert asset.balanceOf(fish) == (amount - deposit_limit)
+
+
 def test_withdraw(fish, asset, create_vault):
-    vault = create_vault(asset)
+    vault = create_vault(asset, initial_balance=False)
     amount = 10**18
     shares = amount
     strategies = []
@@ -84,8 +115,8 @@ def test_withdraw(fish, asset, create_vault):
     assert asset.balanceOf(fish) == balance
 
 
-def test_withdraw_with_insufficient_shares(fish, asset, create_vault):
-    vault = create_vault(asset)
+def test_withdraw_with_insufficient_shares(fish, gov, asset, create_vault):
+    vault = create_vault(asset, initial_balance=False)
     amount = 10**18
     strategies = []
     shares = amount + 1
@@ -97,7 +128,7 @@ def test_withdraw_with_insufficient_shares(fish, asset, create_vault):
 
 
 def test_withdraw_with_no_shares(fish, asset, create_vault):
-    vault = create_vault(asset)
+    vault = create_vault(asset, initial_balance=False)
     shares = 0
     strategies = []
 
@@ -105,8 +136,8 @@ def test_withdraw_with_no_shares(fish, asset, create_vault):
         vault.withdraw(shares, fish.address, strategies, sender=fish)
 
 
-def test_withdraw_all(fish, asset, create_vault):
-    vault = create_vault(asset)
+def test_withdraw_all(fish, gov, asset, create_vault):
+    vault = create_vault(asset, initial_balance=False)
     balance = asset.balanceOf(fish)
     amount = balance
     shares = amount
@@ -128,10 +159,10 @@ def test_withdraw_all(fish, asset, create_vault):
 
 
 def test_delegated_deposit(fish, bunny, asset, create_vault):
-    vault = create_vault(asset)
     balance = asset.balanceOf(fish)
     amount = balance
     shares = amount
+    vault = create_vault(asset, initial_balance=False)
 
     # check balance is non-zero
     assert balance > 0
@@ -154,12 +185,12 @@ def test_delegated_deposit(fish, bunny, asset, create_vault):
     assert vault.balanceOf(bunny) == balance
 
 
-def test_delegated_withdrawal(fish, bunny, asset, create_vault):
-    vault = create_vault(asset)
+def test_delegated_withdrawal(fish, bunny, gov, asset, create_vault):
     balance = asset.balanceOf(fish)
     amount = balance
     shares = amount
     strategies = []
+    vault = create_vault(asset, initial_balance=False)
 
     # check balance is non-zero
     assert balance > 0
@@ -184,6 +215,14 @@ def test_delegated_withdrawal(fish, bunny, asset, create_vault):
     assert asset.balanceOf(bunny) == balance
 
 
-def test_deposit_limit():
-    # TODO: deposit limit tests
-    pass
+@pytest.mark.parametrize("deposit_limit", [0, 10**18, MAX_INT])
+def test_set_deposit_limit__with_deposit_limit(project, gov, asset, deposit_limit):
+    # TODO unpermissioned set deposit limit test
+    vault = gov.deploy(project.VaultV3, asset)
+
+    tx = vault.setDepositLimit(deposit_limit, sender=gov)
+    event = list(tx.decode_logs(vault.UpdateDepositLimit))
+
+    assert event[0].depositLimit == deposit_limit
+    assert vault.depositLimit() == deposit_limit
+

@@ -101,9 +101,19 @@ def create_token(project, gov):
 
 
 @pytest.fixture(scope="session")
-def create_vault(project, gov):
-    def create_vault(asset):
-        return gov.deploy(project.VaultV3, asset)
+def create_vault(project, gov, fee_manager):
+    def create_vault(asset, deposit_limit=MAX_INT, initial_balance=True):
+        vault = gov.deploy(project.VaultV3, asset)
+        # set vault deposit
+        vault.setDepositLimit(deposit_limit, sender=gov)
+        # set to true if you want initial AUM
+        if initial_balance:
+            asset.mint(gov.address, 10**18, sender=gov)
+            asset.approve(vault.address, asset.balanceOf(gov) // 2, sender=gov)
+            vault.deposit(asset.balanceOf(gov) // 2, gov.address, sender=gov)
+        # set up fee manager
+        vault.setFeeManager(fee_manager.address, sender=gov)
+        return vault
 
     yield create_vault
 
@@ -139,6 +149,8 @@ def create_lossy_strategy(project, strategist):
 def vault(gov, asset, create_vault, fee_manager):
     vault = create_vault(asset)
 
+    # set vault deposit
+    vault.setDepositLimit(MAX_INT, sender=gov)
     # make it so vault has some AUM to start
     asset.mint(gov.address, 10**18, sender=gov)
     asset.approve(vault.address, asset.balanceOf(gov) // 2, sender=gov)
