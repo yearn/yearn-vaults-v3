@@ -3,7 +3,7 @@ from utils.constants import MAX_INT
 
 
 def test_deposit_and_withdraw(asset, gov, fish, fish_amount, create_vault):
-    vault = create_vault(asset, initial_balance=False)
+    vault = create_vault(asset)
     amount = fish_amount
     half_amount = fish_amount // 2
     quarter_amount = half_amount // 2
@@ -58,7 +58,7 @@ def test_deposit_and_withdraw(asset, gov, fish, fish_amount, create_vault):
 def test_delegated_deposit_and_withdraw(
     asset, create_vault, fish, bunny, doggie, panda, woofy
 ):
-    vault = create_vault(asset, initial_balance=False)
+    vault = create_vault(asset)
     balance = asset.balanceOf(fish)
     strategies = []
 

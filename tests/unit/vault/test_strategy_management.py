@@ -1,3 +1,4 @@
+import pytest
 import ape
 from ape import chain
 from utils import checks
@@ -15,12 +16,12 @@ def test_add_strategy__with_valid_strategy(chain, gov, vault, create_strategy):
     assert event[0].strategy == new_strategy.address
 
     strategy_params = vault.strategies(new_strategy)
-    assert strategy_params.activation == snapshot
+    assert strategy_params.activation == pytest.approx(snapshot, abs=1)
     assert strategy_params.currentDebt == 0
     assert strategy_params.maxDebt == 0
     assert strategy_params.totalGain == 0
     assert strategy_params.totalLoss == 0
-    assert strategy_params.lastReport == snapshot
+    assert strategy_params.lastReport == pytest.approx(snapshot, abs=1)
 
 
 def test_add_strategy__with_zero_address__fails_with_error(gov, vault):
@@ -97,12 +98,12 @@ def test_migrate_strategy__with_no_debt(chain, gov, vault, strategy, create_stra
     assert event[0].new_strategy == new_strategy.address
 
     new_strategy_params = vault.strategies(new_strategy)
-    assert new_strategy_params.activation == snapshot
+    assert new_strategy_params.activation == pytest.approx(snapshot, abs=1)
     assert new_strategy_params.currentDebt == old_current_debt
     assert new_strategy_params.maxDebt == old_max_debt
     assert new_strategy_params.totalGain == 0
     assert new_strategy_params.totalLoss == 0
-    assert new_strategy_params.lastReport == snapshot
+    assert new_strategy_params.lastReport == pytest.approx(snapshot, abs=1)
 
     old_strategy_params = vault.strategies(old_strategy)
     checks.check_revoked_strategy(old_strategy_params)
