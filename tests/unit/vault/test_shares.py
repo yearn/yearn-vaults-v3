@@ -1,5 +1,5 @@
-import pytest
 import ape
+import pytest
 from utils import actions, checks
 from utils.constants import MAX_INT, ZERO_ADDRESS
 
@@ -83,22 +83,12 @@ def test_deposit_all__with_deposit_limit_exceed_deposit_limit__deposit_deposit_l
 ):
     amount = fish_amount
     deposit_limit = amount // 2
-    shares = deposit_limit
     vault = create_vault(asset, deposit_limit)
 
     asset.approve(vault.address, amount, sender=fish)
-    tx = vault.deposit(MAX_INT, fish.address, sender=fish)
-    event = list(tx.decode_logs(vault.Deposit))
 
-    assert len(event) == 1
-    assert event[0].recipient == fish
-    assert event[0].shares == shares
-    assert event[0].amount == deposit_limit
-
-    assert vault.totalIdle() == deposit_limit
-    assert vault.balanceOf(fish) == deposit_limit
-    assert vault.totalSupply() == deposit_limit
-    assert asset.balanceOf(fish) == (amount - deposit_limit)
+    with ape.reverts("exceed deposit limit"):
+        vault.deposit(MAX_INT, fish.address, sender=fish)
 
 
 def test_withdraw(fish, fish_amount, asset, create_vault):

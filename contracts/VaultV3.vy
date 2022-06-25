@@ -257,10 +257,9 @@ def deposit(_amount: uint256, _recipient: address) -> uint256:
     amount: uint256 = _amount
 
     if amount == MAX_UINT256:
-        amount = min(ASSET.balanceOf(msg.sender), self.depositLimit - self._totalAssets())
-    else:
-        assert self._totalAssets() + amount <= self.depositLimit, "exceed deposit limit"
+        amount = ASSET.balanceOf(msg.sender)
 
+    assert self._totalAssets() + amount <= self.depositLimit, "exceed deposit limit"
     assert amount > 0, "cannot deposit zero"
 
     shares: uint256 = self._issueSharesForAmount(amount, _recipient)

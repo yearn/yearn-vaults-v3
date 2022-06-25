@@ -1,3 +1,4 @@
+import ape
 from utils import checks
 from utils.constants import MAX_INT
 
@@ -19,7 +20,10 @@ def test_deposit_and_withdraw(asset, gov, fish, fish_amount, create_vault):
     # set deposit limit to half_amount and max deposit to test deposit limit
     vault.setDepositLimit(half_amount, sender=gov)
 
-    vault.deposit(MAX_INT, fish.address, sender=fish)
+    with ape.reverts("exceed deposit limit"):
+        vault.deposit(MAX_INT, fish.address, sender=fish)
+
+    vault.deposit(quarter_amount, fish.address, sender=fish)
 
     assert vault.totalSupply() == half_amount
     assert asset.balanceOf(vault) == half_amount

@@ -1,8 +1,8 @@
-import pytest
 import ape
+import pytest
 from ape import chain
-from utils.constants import YEAR
 from utils import actions
+from utils.constants import YEAR
 
 
 def test_process_report__with_inactive_strategy__reverts(gov, vault, create_strategy):
