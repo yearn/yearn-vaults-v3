@@ -1,7 +1,7 @@
 import ape
 from ape import chain
 from utils import actions, checks
-from utils.constants import DAY
+from utils.constants import DAY, ROLES
 
 
 def test_multiple_strategy_withdraw_flow(
@@ -31,6 +31,7 @@ def test_multiple_strategy_withdraw_flow(
     actions.user_deposit(whale, vault, asset, whale_amount)
 
     # set up strategies
+    vault.set_role(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
     for strategy in strategies:
         actions.add_strategy_to_vault(gov, strategy, vault)
 
