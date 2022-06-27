@@ -75,6 +75,10 @@ struct StrategyParams:
 # CONSTANTS #
 MAX_BPS: constant(uint256) = 10_000
 
+# ENUMS #
+enum Roles:
+    STRATEGY_MANAGER
+    DEBT_MANAGER
 
 # IMMUTABLE #
 ASSET: immutable(ERC20)
@@ -86,18 +90,20 @@ balanceOf: public(HashMap[address, uint256])
 totalSupply: public(uint256)
 totalDebt: public(uint256)
 totalIdle: public(uint256)
+roles: public(HashMap[address, Roles])
 lastReport: public(uint256)
 lockedProfit: public(uint256)
 previousHarvestTimeDelta: public(uint256)
-
 feeManager: public(address)
 healthCheck: public(address)
-
+role_manager: public(address)
+future_role_manager: public(address)
 
 @external
-def __init__(asset: ERC20):
+def __init__(asset: ERC20, role_manager: address):
     ASSET = asset
     DECIMALS = convert(ERC20Detailed(asset.address).decimals(), uint256)
+    self.role_manager = role_manager
 
 
 # SUPPORT FUNCTIONS #
@@ -323,7 +329,7 @@ def amountForShares(shares: uint256) -> uint256:
 # STRATEGY MANAGEMENT FUNCTIONS #
 @external
 def addStrategy(new_strategy: address):
-    # TODO: permissioned: STRATEGY_MANAGER
+    self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
     assert new_strategy != ZERO_ADDRESS, "strategy cannot be zero address"
     assert IStrategy(new_strategy).asset() == ASSET.address, "invalid asset"
     assert IStrategy(new_strategy).vault() == self, "invalid vault"
@@ -343,7 +349,7 @@ def addStrategy(new_strategy: address):
 
 @internal
 def _revokeStrategy(old_strategy: address):
-    # TODO: permissioned: STRATEGY_MANAGER
+    self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
     assert self.strategies[old_strategy].activation != 0, "strategy not active"
     # NOTE: strategy needs to have 0 debt to be revoked
     assert self.strategies[old_strategy].currentDebt == 0, "strategy has debt"
@@ -368,8 +374,7 @@ def revokeStrategy(old_strategy: address):
 
 @external
 def migrateStrategy(new_strategy: address, old_strategy: address):
-    # TODO: permissioned: STRATEGY_MANAGER
-
+    self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
     assert self.strategies[old_strategy].activation != 0, "old strategy not active"
     assert self.strategies[old_strategy].currentDebt == 0, "old strategy has debt"
     assert new_strategy != ZERO_ADDRESS, "strategy cannot be zero address"
@@ -396,7 +401,7 @@ def migrateStrategy(new_strategy: address, old_strategy: address):
 
 @external
 def updateMaxDebtForStrategy(strategy: address, new_maxDebt: uint256):
-    # TODO: permissioned: DEBT_MANAGER
+    self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
     assert self.strategies[strategy].activation != 0, "inactive strategy"
     # TODO: should we check that totalMaxDebt is not over 100% of assets?
     self.strategies[strategy].maxDebt = new_maxDebt
@@ -575,3 +580,28 @@ def transfer(receiver: address, amount: uint256) -> bool:
 #     # permissioned: SETTER
 #     # TODO: change healtcheck contract
 #     return
+
+# def setFeeManager(newFeeManager: address):
+#     # TODO: change feemanager contract
+#     return
+
+# Role management
+@external
+def set_role(account: address, role: Roles):
+    assert msg.sender == self.role_manager
+    self.roles[account] = role
+
+@internal
+def _enforce_role(account: address, role: Roles):
+    assert role in self.roles[account] # dev: not allowed
+
+@external
+def transfer_role_manager(role_manager: address):
+    assert msg.sender == self.role_manager
+    self.future_role_manager = role_manager
+
+@external
+def accept_role_manager():
+    assert msg.sender == self.future_role_manager
+    self.role_manager = msg.sender 
+    self.future_role_manager = ZERO_ADDRESS

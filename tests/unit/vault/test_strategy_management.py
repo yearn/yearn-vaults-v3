@@ -1,7 +1,7 @@
 import ape
 from ape import chain
 from utils import actions, checks
-from utils.constants import ZERO_ADDRESS
+from utils.constants import ROLES, ZERO_ADDRESS
 
 
 def test_add_strategy__with_valid_strategy(chain, gov, vault, create_strategy):
