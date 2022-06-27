@@ -1,5 +1,6 @@
 import pytest
-from utils.constants import MAX_INT
+
+from utils.constants import MAX_INT, ROLES
 
 # Accounts
 
@@ -101,8 +102,8 @@ def create_token(project, gov):
 
 @pytest.fixture(scope="session")
 def create_vault(project, gov, fee_manager):
-    def create_vault(asset, deposit_limit=MAX_INT):
-        vault = gov.deploy(project.VaultV3, asset)
+    def create_vault(asset, governance=gov, deposit_limit=MAX_INT):
+        vault = gov.deploy(project.VaultV3, asset, governance)
         # set vault deposit
         vault.setDepositLimit(deposit_limit, sender=gov)
         # set up fee manager
@@ -143,7 +144,8 @@ def create_lossy_strategy(project, strategist):
 def vault(gov, asset, create_vault):
     vault = create_vault(asset)
 
-    # make it so vault has some AUM to start
+    # Make it so vault has some AUM to start
+    vault.set_role(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
     asset.mint(gov.address, 10**18, sender=gov)
     asset.approve(vault.address, asset.balanceOf(gov) // 2, sender=gov)
     vault.deposit(asset.balanceOf(gov) // 2, gov.address, sender=gov)

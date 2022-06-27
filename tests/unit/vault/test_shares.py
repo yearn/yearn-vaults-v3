@@ -25,7 +25,7 @@ def test_deposit__with_zero_funds__reverts(fish, asset, create_vault):
 def test_deposit__with_deposit_limit_within_deposit_limit__deposit_balance(
     fish, fish_amount, asset, create_vault
 ):
-    vault = create_vault(asset, fish_amount)
+    vault = create_vault(asset, deposit_limit=fish_amount)
     amount = fish_amount
     shares = amount
 
@@ -49,7 +49,7 @@ def test_deposit__with_deposit_limit_exceed_deposit_limit__reverts(
 ):
     amount = fish_amount
     deposit_limit = amount - 1
-    vault = create_vault(asset, deposit_limit)
+    vault = create_vault(asset, deposit_limit=deposit_limit)
 
     with ape.reverts("exceed deposit limit"):
         vault.deposit(amount, fish.address, sender=fish)
@@ -83,7 +83,7 @@ def test_deposit_all__with_deposit_limit_exceed_deposit_limit__deposit_deposit_l
 ):
     amount = fish_amount
     deposit_limit = amount // 2
-    vault = create_vault(asset, deposit_limit)
+    vault = create_vault(asset, deposit_limit=deposit_limit)
 
     asset.approve(vault.address, amount, sender=fish)
 
@@ -222,7 +222,7 @@ def test_withdraw__with_delegation__withdraws_to_delegate(
 @pytest.mark.parametrize("deposit_limit", [0, 10**18, MAX_INT])
 def test_set_deposit_limit__with_deposit_limit(project, gov, asset, deposit_limit):
     # TODO unpermissioned set deposit limit test
-    vault = gov.deploy(project.VaultV3, asset)
+    vault = gov.deploy(project.VaultV3, asset, gov)
 
     tx = vault.setDepositLimit(deposit_limit, sender=gov)
     event = list(tx.decode_logs(vault.UpdateDepositLimit))

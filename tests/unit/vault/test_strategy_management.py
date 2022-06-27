@@ -1,8 +1,9 @@
 import ape
 import pytest
 from ape import chain
+import pytest
 from utils import checks
-from utils.constants import ZERO_ADDRESS
+from utils.constants import ZERO_ADDRESS, ROLES
 
 
 def test_add_strategy__with_valid_strategy(chain, gov, vault, create_strategy):
