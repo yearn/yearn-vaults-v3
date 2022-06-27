@@ -3,10 +3,11 @@ from utils.constants import MAX_INT
 
 
 def user_deposit(user, vault, token, amount) -> ContractLog:
+    initial_balance = token.balanceOf(vault)
     if token.allowance(user, vault) < amount:
         token.approve(vault.address, MAX_INT, sender=user)
     tx = vault.deposit(amount, user.address, sender=user)
-    assert token.balanceOf(vault) == amount
+    assert token.balanceOf(vault) == initial_balance + amount
     return tx
 
 
