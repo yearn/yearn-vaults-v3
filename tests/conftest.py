@@ -1,5 +1,4 @@
 import pytest
-
 from utils.constants import MAX_INT, ROLES
 
 # Accounts
