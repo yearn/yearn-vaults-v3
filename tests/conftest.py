@@ -1,5 +1,7 @@
 import pytest
 
+from utils.constants import MAX_INT, ROLES
+
 # Accounts
 
 
@@ -16,20 +18,8 @@ def fish_amount():
 @pytest.fixture(scope="session")
 def fish(accounts, asset, gov, fish_amount):
     fish = accounts[1]
-    asset.mint(fish, fish_amount, sender=gov)
+    asset.mint(fish.address, fish_amount, sender=gov)
     yield fish
-
-
-@pytest.fixture(scope="session")
-def shark_amount():
-    yield 10**20
-
-
-@pytest.fixture(scope="session")
-def shark(accounts, asset, gov, shark_amount):
-    shark = accounts[2]
-    asset.mint(shark, shark_amount, sender=gov)
-    yield shark
 
 
 @pytest.fixture(scope="session")
@@ -39,43 +29,48 @@ def whale_amount():
 
 @pytest.fixture(scope="session")
 def whale(accounts):
-    whale = accounts[3]
-    asset.mint(whale, whale_amount, sender=gov)
+    whale = accounts[2]
+    asset.mint(whale.address, whale_amount, sender=gov)
     yield whale
 
 
 @pytest.fixture(scope="session")
 def bunny(accounts):
-    yield accounts[4]
+    yield accounts[3]
 
 
 @pytest.fixture(scope="session")
 def doggie(accounts):
-    yield accounts[5]
+    yield accounts[4]
 
 
 @pytest.fixture(scope="session")
 def panda(accounts):
-    yield accounts[6]
+    yield accounts[5]
 
 
 @pytest.fixture(scope="session")
 def woofy(accounts):
+    yield accounts[6]
+
+
+@pytest.fixture(scope="session")
+def rewards(accounts):
     yield accounts[7]
 
 
 @pytest.fixture(scope="session")
-def guardian(accounts):
+def strategist(accounts):
     yield accounts[8]
 
 
 @pytest.fixture(scope="session")
-def management(accounts):
+def guardian(accounts):
     yield accounts[9]
 
 
 @pytest.fixture(scope="session")
-def strategist(accounts):
+def management(accounts):
     yield accounts[10]
 
 
@@ -84,15 +79,16 @@ def keeper(accounts):
     yield accounts[11]
 
 
-@pytest.fixture(scope="session")
-def rewards(accounts):
-    yield accounts[12]
-
-
 # use this for general asset mock
 @pytest.fixture(scope="session")
 def asset(project, gov):
     return gov.deploy(project.Token, "asset")
+
+
+# use this for token mock
+@pytest.fixture(scope="session")
+def mock_token(project, gov):
+    return gov.deploy(project.Token, "mock")
 
 
 # use this to create other tokens
@@ -106,7 +102,82 @@ def create_token(project, gov):
 
 @pytest.fixture(scope="session")
 def create_vault(project, gov):
-    def create_vault(asset):
-        return gov.deploy(project.VaultV3, asset)
+    def create_vault(asset, governance=gov):
+        return gov.deploy(project.VaultV3, asset, governance)
 
     yield create_vault
+
+
+# create default liquid strategy with 0 fee
+@pytest.fixture(scope="session")
+def create_strategy(project, strategist):
+    def create_strategy(vault):
+        return strategist.deploy(project.LiquidStrategy, vault)
+
+    yield create_strategy
+
+
+# create locked strategy with 0 fee
+@pytest.fixture(scope="session")
+def create_locked_strategy(project, strategist):
+    def create_locked_strategy(vault):
+        return strategist.deploy(project.LockedStrategy, vault)
+
+    yield create_locked_strategy
+
+
+# create locked strategy with 0 fee
+@pytest.fixture(scope="session")
+def create_lossy_strategy(project, strategist):
+    def create_lossy_strategy(vault):
+        return strategist.deploy(project.LossyStrategy, vault)
+
+    yield create_lossy_strategy
+
+
+@pytest.fixture(scope="session")
+def vault(gov, asset, create_vault, fee_manager):
+    vault = create_vault(asset)
+
+    # Make it so vault has some AUM to start
+    vault.set_role(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
+    asset.mint(gov.address, 10**18, sender=gov)
+    asset.approve(vault.address, asset.balanceOf(gov) // 2, sender=gov)
+    vault.deposit(asset.balanceOf(gov) // 2, gov.address, sender=gov)
+    # set up fee manager
+    vault.setFeeManager(fee_manager.address, sender=gov)
+    yield vault
+
+
+# create default liquid strategy with 0 fee
+@pytest.fixture(scope="session")
+def strategy(gov, vault, create_strategy):
+    strategy = create_strategy(vault)
+    vault.addStrategy(strategy.address, sender=gov)
+    strategy.setMinDebt(0, sender=gov)
+    strategy.setMaxDebt(MAX_INT, sender=gov)
+    yield strategy
+
+
+@pytest.fixture(scope="session")
+def locked_strategy(gov, vault, create_locked_strategy):
+    strategy = create_locked_strategy(vault)
+    vault.addStrategy(strategy.address, sender=gov)
+    strategy.setMinDebt(0, sender=gov)
+    strategy.setMaxDebt(MAX_INT, sender=gov)
+    yield strategy
+
+
+@pytest.fixture(scope="session")
+def lossy_strategy(gov, vault, create_lossy_strategy):
+    strategy = create_lossy_strategy(vault)
+    vault.addStrategy(strategy.address, sender=gov)
+    strategy.setMinDebt(0, sender=gov)
+    strategy.setMaxDebt(MAX_INT, sender=gov)
+    yield strategy
+
+
+@pytest.fixture(scope="session")
+def fee_manager(project, gov):
+    fee_manager = gov.deploy(project.FeeManager)
+    yield fee_manager
