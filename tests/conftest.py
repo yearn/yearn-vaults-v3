@@ -80,14 +80,14 @@ def keeper(accounts):
 
 # use this for general asset mock
 @pytest.fixture(scope="session")
-def asset(project, gov):
-    return gov.deploy(project.Token, "asset")
+def asset(create_token):
+    return create_token("asset")
 
 
 # use this for token mock
 @pytest.fixture(scope="session")
-def mock_token(project, gov):
-    return gov.deploy(project.Token, "mock")
+def mock_token(create_token):
+    return create_token("mock")
 
 
 # use this to create other tokens
@@ -100,9 +100,14 @@ def create_token(project, gov):
 
 
 @pytest.fixture(scope="session")
-def create_vault(project, gov):
-    def create_vault(asset, governance=gov):
-        return gov.deploy(project.VaultV3, asset, governance)
+def create_vault(project, gov, fee_manager):
+    def create_vault(asset, governance=gov, deposit_limit=MAX_INT):
+        vault = gov.deploy(project.VaultV3, asset, governance)
+        # set vault deposit
+        vault.setDepositLimit(deposit_limit, sender=gov)
+        # set up fee manager
+        vault.setFeeManager(fee_manager.address, sender=gov)
+        return vault
 
     yield create_vault
 
@@ -135,7 +140,7 @@ def create_lossy_strategy(project, strategist):
 
 
 @pytest.fixture(scope="session")
-def vault(gov, asset, create_vault, fee_manager):
+def vault(gov, asset, create_vault):
     vault = create_vault(asset)
 
     # Make it so vault has some AUM to start
@@ -143,8 +148,6 @@ def vault(gov, asset, create_vault, fee_manager):
     asset.mint(gov.address, 10**18, sender=gov)
     asset.approve(vault.address, asset.balanceOf(gov) // 2, sender=gov)
     vault.deposit(asset.balanceOf(gov) // 2, gov.address, sender=gov)
-    # set up fee manager
-    vault.setFeeManager(fee_manager.address, sender=gov)
     yield vault
 
 

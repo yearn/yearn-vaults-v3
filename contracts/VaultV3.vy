@@ -63,6 +63,9 @@ event DebtUpdated:
 event UpdateFeeManager:
     feeManager: address
 
+event UpdateDepositLimit:
+    depositLimit: uint256
+
 # STRUCTS #
 struct StrategyParams:
     activation: uint256
@@ -94,6 +97,8 @@ roles: public(HashMap[address, Roles])
 lastReport: public(uint256)
 lockedProfit: public(uint256)
 previousHarvestTimeDelta: public(uint256)
+depositLimit: public(uint256)
+
 feeManager: public(address)
 healthCheck: public(address)
 role_manager: public(address)
@@ -261,8 +266,8 @@ def deposit(_amount: uint256, _recipient: address) -> uint256:
     if amount == MAX_UINT256:
         amount = ASSET.balanceOf(msg.sender)
 
+    assert self._totalAssets() + amount <= self.depositLimit, "exceed deposit limit"
     assert amount > 0, "cannot deposit zero"
-    # TODO: should it check deposit limit?
 
     shares: uint256 = self._issueSharesForAmount(amount, _recipient)
 
@@ -324,6 +329,14 @@ def sharesForAmount(amount: uint256) -> uint256:
 @external
 def amountForShares(shares: uint256) -> uint256:
     return self._amountForShares(shares)
+
+
+@view
+@external
+def availableDepositLimit() -> uint256:
+    if self.depositLimit > self._totalAssets():
+        return self.depositLimit - self._totalAssets()
+    return 0
 
 
 # STRATEGY MANAGEMENT FUNCTIONS #
@@ -531,6 +544,13 @@ def setFeeManager(newFeeManager: address):
     log UpdateFeeManager(newFeeManager)
 
 
+@external
+def setDepositLimit(depositLimit: uint256):
+    # TODO: permissioning
+    self.depositLimit = depositLimit
+    log UpdateDepositLimit(depositLimit)
+
+
 @internal
 def _transfer(sender: address, receiver: address, amount: uint256):
     # See note on `transfer()`.
@@ -603,5 +623,5 @@ def transfer_role_manager(role_manager: address):
 @external
 def accept_role_manager():
     assert msg.sender == self.future_role_manager
-    self.role_manager = msg.sender 
+    self.role_manager = msg.sender
     self.future_role_manager = ZERO_ADDRESS

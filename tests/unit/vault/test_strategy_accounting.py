@@ -60,7 +60,9 @@ def test_process_report__with_gain_and_zero_fees(chain, gov, asset, vault, strat
     assert strategy_params.totalLoss == 0
     assert strategy_params.currentDebt == initial_debt + gain
     assert vault.lockedProfit() == locked_profit + gain
-    assert vault.strategies(strategy.address).lastReport == snapshot
+    assert vault.strategies(strategy.address).lastReport == pytest.approx(
+        snapshot, abs=1
+    )
 
 
 def test_process_report__with_gain_and_zero_management_fees(
@@ -252,7 +254,9 @@ def test_process_report__with_fees_exceeding_fee_cap(
     assert strategy_params.totalLoss == 0
     assert strategy_params.currentDebt == initial_debt + gain
     assert vault.lockedProfit() == locked_profit + gain - max_fee
-    assert vault.strategies(strategy.address).lastReport == snapshot
+    assert vault.strategies(strategy.address).lastReport == pytest.approx(
+        snapshot, abs=1
+    )
     assert vault.balanceOf(fee_manager) == max_fee
 
 
@@ -287,7 +291,9 @@ def test_process_report__with_loss(chain, gov, asset, vault, lossy_strategy):
     assert strategy_params.totalLoss == loss
     assert strategy_params.currentDebt == initial_debt - loss
     assert vault.lockedProfit() == locked_profit
-    assert vault.strategies(lossy_strategy.address).lastReport == snapshot
+    assert vault.strategies(lossy_strategy.address).lastReport == pytest.approx(
+        snapshot, abs=1
+    )
 
 
 def test_set_fee_manager__with_fee_manager(gov, vault, fee_manager):
