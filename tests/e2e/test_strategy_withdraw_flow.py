@@ -1,7 +1,7 @@
 import ape
 from ape import chain
 from utils import actions, checks
-from utils.constants import DAY, MAX_INT
+from utils.constants import DAY
 
 
 def test_multiple_strategy_withdraw_flow(
@@ -32,18 +32,10 @@ def test_multiple_strategy_withdraw_flow(
 
     # set up strategies
     for strategy in strategies:
-        vault.addStrategy(strategy.address, sender=gov)
-        strategy.setMinDebt(0, sender=gov)
-        strategy.setMaxDebt(MAX_INT, sender=gov)
+        actions.add_strategy_to_vault(gov, strategy, vault)
 
-    vault.updateMaxDebtForStrategy(
-        liquid_strategy.address, liquid_strategy_debt, sender=gov
-    )
-    vault.updateDebt(liquid_strategy.address, sender=gov)
-    vault.updateMaxDebtForStrategy(
-        locked_strategy.address, locked_strategy_debt, sender=gov
-    )
-    vault.updateDebt(locked_strategy.address, sender=gov)
+    actions.add_debt_to_strategy(gov, liquid_strategy, vault, liquid_strategy_debt)
+    actions.add_debt_to_strategy(gov, locked_strategy, vault, locked_strategy_debt)
 
     # lock half of assets in locked strategy
     locked_strategy.setLockedFunds(amount_to_lock, DAY, sender=gov)

@@ -15,6 +15,14 @@ def airdrop_asset(gov, asset, target, amount):
     asset.mint(target.address, amount, sender=gov)
 
 
+# used for new adding a new strategy to vault with unlimited max debt settings
+def add_strategy_to_vault(user, strategy, vault):
+    vault.addStrategy(strategy.address, sender=user)
+    strategy.setMinDebt(0, sender=user)
+    strategy.setMaxDebt(MAX_INT, sender=user)
+
+
+# used to add debt to a strategy
 def add_debt_to_strategy(user, strategy, vault, max_debt: int):
     vault.updateMaxDebtForStrategy(strategy.address, max_debt, sender=user)
     vault.updateDebt(strategy.address, sender=user)

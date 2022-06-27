@@ -14,16 +14,9 @@ def test_withdraw__with_inactive_strategy__reverts(
     inactive_strategy = create_strategy(vault)
     strategies = [inactive_strategy]
 
-    vault.addStrategy(strategy.address, sender=gov)
-    strategy.setMinDebt(0, sender=gov)
-    strategy.setMaxDebt(MAX_INT, sender=gov)
-    vault.updateMaxDebtForStrategy(strategy.address, MAX_INT, sender=gov)
-
-    # deposit assets to vault
     actions.user_deposit(fish, vault, asset, amount)
-
-    # allocate all assets to strategy
-    vault.updateDebt(strategy.address, sender=gov)
+    actions.add_strategy_to_vault(gov, strategy, vault)
+    actions.add_debt_to_strategy(gov, strategy, vault, amount)
 
     with ape.reverts("inactive strategy"):
         vault.withdraw(shares, fish.address, strategies, sender=fish)
@@ -38,16 +31,9 @@ def test_withdraw__with_insufficient_funds_in_strategies__reverts(
     strategy = create_strategy(vault)
     strategies = []  # do not pass in any strategies
 
-    vault.addStrategy(strategy.address, sender=gov)
-    strategy.setMinDebt(0, sender=gov)
-    strategy.setMaxDebt(MAX_INT, sender=gov)
-    vault.updateMaxDebtForStrategy(strategy.address, MAX_INT, sender=gov)
-
-    # deposit assets to vault
     actions.user_deposit(fish, vault, asset, amount)
-
-    # allocate all assets to strategy
-    vault.updateDebt(strategy.address, sender=gov)
+    actions.add_strategy_to_vault(gov, strategy, vault)
+    actions.add_debt_to_strategy(gov, strategy, vault, amount)
 
     with ape.reverts("insufficient total idle"):
         vault.withdraw(shares, fish.address, strategies, sender=fish)
@@ -62,16 +48,9 @@ def test_withdraw__with_liquid_strategy_only__withdraws(
     strategy = create_strategy(vault)
     strategies = [strategy]
 
-    vault.addStrategy(strategy.address, sender=gov)
-    strategy.setMinDebt(0, sender=gov)
-    strategy.setMaxDebt(MAX_INT, sender=gov)
-    vault.updateMaxDebtForStrategy(strategy.address, MAX_INT, sender=gov)
-
-    # deposit assets to vault
     actions.user_deposit(fish, vault, asset, amount)
-
-    # allocate all assets to strategy
-    vault.updateDebt(strategy.address, sender=gov)
+    actions.add_strategy_to_vault(gov, strategy, vault)
+    actions.add_debt_to_strategy(gov, strategy, vault, amount)
 
     tx = vault.withdraw(shares, fish.address, strategies, sender=fish)
     event = list(tx.decode_logs(vault.Withdraw))
@@ -103,14 +82,8 @@ def test_withdraw__with_multiple_liquid_strategies__withdraws(
 
     # set up strategies
     for strategy in strategies:
-        vault.addStrategy(strategy.address, sender=gov)
-        strategy.setMinDebt(0, sender=gov)
-        strategy.setMaxDebt(MAX_INT, sender=gov)
-        vault.updateMaxDebtForStrategy(
-            strategy.address, amount_per_strategy, sender=gov
-        )
-        # allocate assets to strategies
-        vault.updateDebt(strategy.address, sender=gov)
+        actions.add_strategy_to_vault(gov, strategy, vault)
+        actions.add_debt_to_strategy(gov, strategy, vault, amount_per_strategy)
 
     tx = vault.withdraw(shares, fish.address, strategies, sender=fish)
     event = list(tx.decode_logs(vault.Withdraw))
@@ -145,14 +118,8 @@ def test_withdraw__with_locked_and_liquid_strategy__withdraws(
 
     # set up strategies
     for strategy in strategies:
-        vault.addStrategy(strategy.address, sender=gov)
-        strategy.setMinDebt(0, sender=gov)
-        strategy.setMaxDebt(MAX_INT, sender=gov)
-        vault.updateMaxDebtForStrategy(
-            strategy.address, amount_per_strategy, sender=gov
-        )
-        # allocate assets to strategies
-        vault.updateDebt(strategy.address, sender=gov)
+        actions.add_strategy_to_vault(gov, strategy, vault)
+        actions.add_debt_to_strategy(gov, strategy, vault, amount_per_strategy)
 
     # lock half of assets in locked strategy
     locked_strategy.setLockedFunds(amount_to_lock, DAY, sender=gov)
