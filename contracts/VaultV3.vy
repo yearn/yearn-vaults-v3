@@ -21,12 +21,6 @@ interface IFeeManager:
     def assess_fees(strategy: address, gain: uint256) -> uint256: view
 
 # EVENTS #
-event StrategyAdded: 
-   strategy: indexed(address)
-
-event StrategyRevoked: 
-   strategy: indexed(address)
-
 event Deposit:
     fnCaller: indexed(address)
     owner: indexed(address)
@@ -99,7 +93,6 @@ ASSET: immutable(ERC20)
 DECIMALS: immutable(uint256)
 
 # STORAGE #
-ASSET: immutable(ERC20)
 strategies: public(HashMap[address, StrategyParams])
 balanceOf: public(HashMap[address, uint256])
 allowance: public(HashMap[address, HashMap[address, uint256]])
@@ -118,7 +111,6 @@ future_role_manager: public(address)
 
 name: public(String[64])
 symbol: public(String[32])
-decimals: public(uint256)
 
 # `nonces` track `permit` approvals with signature.
 nonces: public(HashMap[address, uint256])
@@ -219,6 +211,7 @@ def permit(owner: address, spender: address, amount: uint256, expiry: uint256, s
 @external
 def asset() -> ERC20:
     return ASSET
+
 @view
 @external
 def decimals() -> uint256:
@@ -344,16 +337,15 @@ def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
         assert convert(response, bool), "Transfer failed!"
 
 @internal
-def _burnShares(shares: uint256, owner: address):
-    # TODO: do we need to check?
-    self.balanceOf[owner] -= shares
-    self.totalSupply -= shares
-
-
-@internal
 def _issueSharesForAmount(amount: uint256, recipient: address) -> uint256:
     newShares: uint256 = self._sharesForAmount(amount)
     assert newShares > 0
+
+    self.balanceOf[recipient] += newShares
+    self.totalSupply += newShares
+
+    # TODO: emit event
+    return newShares
 
 # USER FACING FUNCTIONS #
 @internal
@@ -375,7 +367,7 @@ def _redeem(fnCaller: address, _receiver: address, _owner: address, _shares: uin
       self._spendAllowance(_owner, msg.sender, _shares)
 
     shares: uint256 = _shares
-    sharesBalance: uint256 = self.balanceOf[owner]
+    sharesBalance: uint256 = self.balanceOf[_owner]
 
     if _shares == MAX_UINT256:
         shares = sharesBalance
@@ -398,12 +390,6 @@ def _redeem(fnCaller: address, _receiver: address, _owner: address, _shares: uin
     log Withdraw(msg.sender, _receiver, _owner, _shares, assets)
 
     return assets
-
-
-## ERC4626 ## 
-@external
-def asset() -> address:
-   return ASSET.address
 
 
 # SHARE MANAGEMENT FUNCTIONS #
@@ -473,7 +459,7 @@ def redeem(_shares: uint256, _receiver: address, _owner: address) -> uint256:
 @view
 @external
 def pricePerShare() -> uint256:
-    return self._amountForShares(10 ** self.decimals)
+    return self._amountForShares(10 ** DECIMALS)
 
 # STRATEGY MANAGEMENT FUNCTIONS #
 @external
@@ -677,24 +663,6 @@ def setFeeManager(newFeeManager: address):
     # TODO: permissioning
     self.feeManager = newFeeManager
     log UpdateFeeManager(newFeeManager)
-
-
-@internal
-def _transfer(sender: address, receiver: address, amount: uint256):
-    # See note on `transfer()`.
-
-    # Protect people from accidentally sending their shares to bad places
-    assert receiver not in [self, ZERO_ADDRESS]
-    self.balanceOf[sender] -= amount
-    self.balanceOf[receiver] += amount
-    log Transfer(sender, receiver, amount)
-
-
-@external
-def transfer(receiver: address, amount: uint256) -> bool:
-    self._transfer(msg.sender, receiver, amount)
-    return True
-
 
 # def forceProcessReport(strategy: address):
 #     # permissioned: ACCOUNTING_MANAGER
