@@ -211,7 +211,6 @@ def permit(owner: address, spender: address, amount: uint256, expiry: uint256, s
 
 
 # SUPPORT FUNCTIONS #
-
 @view
 @external
 def asset() -> address:
