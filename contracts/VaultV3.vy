@@ -289,15 +289,14 @@ def withdraw(_shares: uint256, _recipient: address, _strategies: DynArray[addres
 
     amount: uint256 = self._amountForShares(shares)
 
-    # load to memory to save gas
-    currTotalIdle: uint256 = self.totalIdle
-    currTotalDebt: uint256 = self.totalDebt
+    if amount > self.totalIdle:
+        # load to memory to save gas
+        currTotalIdle: uint256 = self.totalIdle
+        currTotalDebt: uint256 = self.totalDebt
 
-    if amount > currTotalIdle:
         # withdraw from strategies if insufficient total idle
         amountNeeded: uint256 = amount - currTotalIdle
         amountToWithdraw: uint256 = 0
-        # TODO: withdraw from strategies
         for strategy in _strategies:
             assert self.strategies[strategy].activation != 0, "inactive strategy"
 
@@ -320,12 +319,12 @@ def withdraw(_shares: uint256, _recipient: address, _strategies: DynArray[addres
 
         # if we exhaust the queue and still have insufficient total idle, revert
         assert currTotalIdle >= amount, "insufficient total idle"
+        # commit memory to storage
+        self.totalIdle = currTotalIdle
+        self.totalDebt = currTotalDebt
 
     self._burnShares(shares, owner)
-
-    # commit memory to storage
-    self.totalIdle = currTotalIdle - amount
-    self.totalDebt = currTotalDebt
+    self.totalIdle -= amount
     self.erc20_safe_transfer(ASSET.address, _recipient, amount)
 
     log Withdraw(_recipient, shares, amount)
@@ -633,5 +632,5 @@ def transfer_role_manager(role_manager: address):
 @external
 def accept_role_manager():
     assert msg.sender == self.future_role_manager
-    self.role_manager = msg.sender 
+    self.role_manager = msg.sender
     self.future_role_manager = ZERO_ADDRESS
