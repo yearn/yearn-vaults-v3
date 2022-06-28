@@ -22,13 +22,13 @@ interface IFeeManager:
 
 # EVENTS #
 event Deposit:
-    fnCaller: indexed(address)
+    sender: indexed(address)
     owner: indexed(address)
     assets: uint256 
     shares: uint256
 
 event Withdraw:
-    fnCaller: indexed(address)
+    sender: indexed(address)
     receiver: indexed(address)
     owner: indexed(address)
     assets: uint256
@@ -70,6 +70,11 @@ event DebtUpdated:
 
 event UpdateFeeManager:
     feeManager: address
+
+event UpdatedMaxDebtForStrategy:
+    sender: address
+    strategy: address
+    newDebt: uint256
 
 # STRUCTS #
 struct StrategyParams:
@@ -126,8 +131,8 @@ def __init__(asset: ERC20, role_manager: address):
 
 ## ERC20 ##
 @internal
-def _spendAllowance(owner: address, fnCaller: address, amount: uint256):
-   self.allowance[owner][fnCaller] -= amount
+def _spendAllowance(owner: address, sender: address, amount: uint256):
+   self.allowance[owner][sender] -= amount
 
 @internal
 def _transfer(sender: address, receiver: address, amount: uint256):
@@ -209,8 +214,8 @@ def permit(owner: address, spender: address, amount: uint256, expiry: uint256, s
 
 @view
 @external
-def asset() -> ERC20:
-    return ASSET
+def asset() -> address:
+    return ASSET.address
 
 @view
 @external
@@ -285,7 +290,7 @@ def _updateReportTimestamps():
 
 @view
 @internal
-def _amountForShares(shares: uint256) -> uint256:
+def _convertToAssets(shares: uint256) -> uint256:
     _totalSupply: uint256 = self.totalSupply
     amount: uint256 = shares
     if _totalSupply > 0:
@@ -294,7 +299,7 @@ def _amountForShares(shares: uint256) -> uint256:
 
 @view
 @internal
-def _sharesForAmount(amount: uint256) -> uint256:
+def _convertToShares(amount: uint256) -> uint256:
     _totalSupply: uint256 = self.totalSupply
     shares: uint256 = amount
     if _totalSupply > 0:
@@ -338,7 +343,7 @@ def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
 
 @internal
 def _issueSharesForAmount(amount: uint256, recipient: address) -> uint256:
-    newShares: uint256 = self._sharesForAmount(amount)
+    newShares: uint256 = self._convertToShares(amount)
     assert newShares > 0
 
     self.balanceOf[recipient] += newShares
@@ -349,21 +354,21 @@ def _issueSharesForAmount(amount: uint256, recipient: address) -> uint256:
 
 # USER FACING FUNCTIONS #
 @internal
-def _deposit(_fnCaller: address, _recipient: address, amount: uint256) -> uint256:
+def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256:
     assert _recipient not in [self, ZERO_ADDRESS], "invalid recipient"
     
-    shares: uint256 = self._issueSharesForAmount(amount, _recipient)
+    shares: uint256 = self._issueSharesForAmount(_assets, _recipient)
 
-    self.erc20_safe_transferFrom(ASSET.address, msg.sender, self, amount)
-    self.totalIdle += amount
+    self.erc20_safe_transferFrom(ASSET.address, msg.sender, self, _assets)
+    self.totalIdle += _assets 
 
-    log Deposit(_fnCaller, _recipient, amount, shares)
+    log Deposit(_sender, _recipient, _assets, shares)
 
     return shares
 
 @internal
-def _redeem(fnCaller: address, _receiver: address, _owner: address, _shares: uint256, _strategies: DynArray[address, 10] = []) -> uint256:
-    if fnCaller != _owner: 
+def _redeem(sender: address, _receiver: address, _owner: address, _shares: uint256, _strategies: DynArray[address, 10] = []) -> uint256:
+    if sender != _owner: 
       self._spendAllowance(_owner, msg.sender, _shares)
 
     shares: uint256 = _shares
@@ -375,7 +380,7 @@ def _redeem(fnCaller: address, _receiver: address, _owner: address, _shares: uin
     assert sharesBalance >= shares, "insufficient shares to withdraw"
     assert shares > 0, "no shares to withdraw"
 
-    assets: uint256 = self._amountForShares(_shares)
+    assets: uint256 = self._convertToAssets(_shares)
 
     # TODO: withdraw from strategies
     
@@ -387,7 +392,7 @@ def _redeem(fnCaller: address, _receiver: address, _owner: address, _shares: uin
     self.totalIdle -= assets
     self.erc20_safe_transfer(ASSET.address, _receiver, assets)
 
-    log Withdraw(msg.sender, _receiver, _owner, _shares, assets)
+    log Withdraw(msg.sender, _receiver, _owner, assets, _shares)
 
     return assets
 
@@ -400,39 +405,49 @@ def totalAssets() -> uint256:
 
 @external
 def convertToShares(assets: uint256) -> uint256:
-   return self._sharesForAmount(assets)
+   return self._convertToShares(assets)
 
 @external
 def convertToAssets(shares: uint256) -> uint256:
-   return self._amountForShares(shares)
+   return self._convertToAssets(shares)
 
 @external
-def maxDeposit(owner: address) -> uint256:
+def maxDeposit(receiver: address) -> uint256:
+   # TODO: implement deposit limit
    return MAX_UINT256
 
 @external
-def maxMint(owner: address) -> uint256: 
+def maxMint(receiver: address) -> uint256: 
    maxDeposit: uint256 = MAX_UINT256
-   return self._sharesForAmount(maxDeposit)
+   return self._convertToShares(maxDeposit)
 
 @external
 def maxWithdraw(owner: address) -> uint256:
-   # TODO: calculate max between liquidity and shares
-   return 0
+   # TODO: calculate max between liquidity
+   # TODO: take this into account when implementing withdrawing from custom strategies
+   return self._convertToAssets(self.balanceOf[owner])
 
 @external
 def maxRedeem(owner: address) -> uint256:
    # TODO: add max liquidity calculation
+   # TODO: take this into account when implementing withdrawing from custom strategies
    return self.balanceOf[owner]
 
 @external
 def previewDeposit(assets: uint256) -> uint256:
-   return self._sharesForAmount(assets)
+   return self._convertToShares(assets)
 
+@external
+def previewMint(shares: uint256) -> uint256:
+   return self._convertToAssets(shares)
 
 @external
 def previewWithdraw(shares: uint256) -> uint256:
-    return self._amountForShares(shares)
+    return self._convertToAssets(shares)
+
+@external
+def previewRedeem(shares: uint256) -> uint256:
+   return self._convertToAssets(shares)
 
 @external
 def deposit(assets: uint256, receiver: address) -> uint256:
@@ -440,13 +455,14 @@ def deposit(assets: uint256, receiver: address) -> uint256:
 
 @external
 def mint(shares: uint256, receiver: address) -> uint256:
-   assets: uint256 = self._amountForShares(shares)
+   assets: uint256 = self._convertToAssets(shares)
    self._deposit(msg.sender, receiver, assets)
    return assets
 
 @external
 def withdraw(_assets: uint256, _receiver: address, _owner: address) -> uint256:
-   shares: uint256 = self._sharesForAmount(_assets)
+   shares: uint256 = self._convertToShares(_assets)
+   # TODO: withdrawal queue is empty here. Do we need to implement a custom withdrawal queue?
    self._redeem(msg.sender, _receiver, _owner, shares, [])
    return shares
 
@@ -459,7 +475,7 @@ def redeem(_shares: uint256, _receiver: address, _owner: address) -> uint256:
 @view
 @external
 def pricePerShare() -> uint256:
-    return self._amountForShares(10 ** DECIMALS)
+    return self._convertToAssets(10 ** DECIMALS)
 
 # STRATEGY MANAGEMENT FUNCTIONS #
 @external
@@ -539,13 +555,13 @@ def updateMaxDebtForStrategy(strategy: address, new_maxDebt: uint256):
     assert self.strategies[strategy].activation != 0, "inactive strategy"
     # TODO: should we check that totalMaxDebt is not over 100% of assets?
     self.strategies[strategy].maxDebt = new_maxDebt
-    # TODO: should this emit an event?
+    
+    log UpdatedMaxDebtForStrategy(msg.sender, strategy, new_maxDebt)
 
 
 @external
 def updateDebt(strategy: address) -> uint256:
-    # TODO: permissioned: DEBT_MANAGER (or maybe open?)
-    # TODO: rebalance debt. if the strategy is allowed to take more debt and the strategy wants that debt, the vault will send more. if the strategy has too much debt, the vault will have less
+    self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
     currentDebt: uint256 = self.strategies[strategy].currentDebt
 
     minDesiredDebt: uint256 = 0
@@ -576,6 +592,7 @@ def updateDebt(strategy: address) -> uint256:
             newDebt = currentDebt - withdrawable
 
         IStrategy(strategy).freeFunds(amountToWithdraw)
+	# TODO: is it worth it to transfer the maxAmount between amountToWithdraw and balance? 
         ASSET.transferFrom(strategy, self, amountToWithdraw)
         self.totalIdle += amountToWithdraw
         self.totalDebt -= amountToWithdraw
