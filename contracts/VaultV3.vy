@@ -294,13 +294,42 @@ def withdraw(_shares: uint256, _recipient: address, _strategies: DynArray[addres
 
     amount: uint256 = self._amountForShares(shares)
 
-    # TODO: withdraw from strategies
+    if amount > self.totalIdle:
+        # load to memory to save gas
+        currTotalIdle: uint256 = self.totalIdle
+        currTotalDebt: uint256 = self.totalDebt
 
-    assert self.totalIdle >= amount, "insufficient total idle"
+        # withdraw from strategies if insufficient total idle
+        amountNeeded: uint256 = amount - currTotalIdle
+        amountToWithdraw: uint256 = 0
+        for strategy in _strategies:
+            assert self.strategies[strategy].activation != 0, "inactive strategy"
+
+            amountToWithdraw = min(amountNeeded, IStrategy(strategy).withdrawable())
+            # continue if nothing to withdraw
+            if amountToWithdraw == 0:
+                continue
+
+            IStrategy(strategy).freeFunds(amountToWithdraw)
+            ASSET.transferFrom(strategy, self, amountToWithdraw)
+            currTotalIdle += amountToWithdraw
+            currTotalDebt -= amountToWithdraw
+            self.strategies[strategy].currentDebt -= amountToWithdraw
+
+            # break if we have enough total idle
+            if amount <= currTotalIdle:
+                break
+
+            amountNeeded -= amountToWithdraw
+
+        # if we exhaust the queue and still have insufficient total idle, revert
+        assert currTotalIdle >= amount, "insufficient total idle"
+        # commit memory to storage
+        self.totalIdle = currTotalIdle
+        self.totalDebt = currTotalDebt
 
     self._burnShares(shares, owner)
     self.totalIdle -= amount
-
     self.erc20_safe_transfer(ASSET.address, _recipient, amount)
 
     log Withdraw(_recipient, shares, amount)

@@ -27,7 +27,7 @@ def whale_amount():
 
 
 @pytest.fixture(scope="session")
-def whale(accounts):
+def whale(accounts, asset, gov, whale_amount):
     whale = accounts[2]
     asset.mint(whale.address, whale_amount, sender=gov)
     yield whale

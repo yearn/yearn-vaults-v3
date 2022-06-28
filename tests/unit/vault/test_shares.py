@@ -145,6 +145,12 @@ def test_withdraw__withdrawing_maximum(fish, asset, create_vault):
 
     actions.user_deposit(fish, vault, asset, amount)
 
+    print(vault.totalAssets())
+    print(vault.totalIdle())
+    print(vault.totalDebt())
+    print(asset.balanceOf(vault))
+    print(asset.balanceOf(fish))
+
     tx = vault.withdraw(MAX_INT, fish.address, strategies, sender=fish)
     event = list(tx.decode_logs(vault.Withdraw))
 
@@ -152,6 +158,12 @@ def test_withdraw__withdrawing_maximum(fish, asset, create_vault):
     assert event[0].recipient == fish
     assert event[0].shares == shares
     assert event[0].amount == amount
+
+    print(vault.totalAssets())
+    print(vault.totalIdle())
+    print(vault.totalDebt())
+    print(asset.balanceOf(vault))
+    print(asset.balanceOf(fish))
 
     checks.check_vault_empty(vault)
     assert asset.balanceOf(vault) == 0
