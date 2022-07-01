@@ -4,8 +4,6 @@ from vyper.interfaces import ERC20
 from vyper.interfaces import ERC20Detailed
 
 # TODO: external contract: factory
-# TODO: external contract: access control
-# TODO: external contract: fee manager
 # TODO: external contract: healtcheck
 
 # INTERFACES #
@@ -351,7 +349,6 @@ def _issueSharesForAmount(amount: uint256, recipient: address) -> uint256:
     # TODO: emit event
     return newShares
 
-# USER FACING FUNCTIONS #
 @internal
 def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256:
     assert _recipient not in [self, ZERO_ADDRESS], "invalid recipient"
@@ -366,9 +363,9 @@ def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256
     return shares
 
 @internal
-def _redeem(sender: address, _receiver: address, _owner: address, _shares: uint256, _strategies: DynArray[address, 10] = []) -> uint256:
-    if sender != _owner: 
-      self._spendAllowance(_owner, msg.sender, _shares)
+def _redeem(_sender: address, _receiver: address, _owner: address, _shares: uint256, _strategies: DynArray[address, 10] = []) -> uint256:
+    if _sender != _owner: 
+      self._spendAllowance(_owner, _sender, _shares)
 
     shares: uint256 = _shares
     sharesBalance: uint256 = self.balanceOf[_owner]
@@ -376,6 +373,7 @@ def _redeem(sender: address, _receiver: address, _owner: address, _shares: uint2
     if _shares == MAX_UINT256:
         shares = sharesBalance
 
+    # TODO: is this needed? will revert in burn call
     assert sharesBalance >= shares, "insufficient shares to withdraw"
     assert shares > 0, "no shares to withdraw"
 
@@ -391,7 +389,7 @@ def _redeem(sender: address, _receiver: address, _owner: address, _shares: uint2
     self.totalIdle -= assets
     self.erc20_safe_transfer(ASSET.address, _receiver, assets)
 
-    log Withdraw(msg.sender, _receiver, _owner, assets, _shares)
+    log Withdraw(_sender, _receiver, _owner, assets, _shares)
 
     return assets
 
