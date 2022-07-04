@@ -20,7 +20,7 @@ def test_withdraw__with_inactive_strategy__reverts(
     actions.add_debt_to_strategy(gov, strategy, vault, amount)
 
     with ape.reverts("inactive strategy"):
-        vault.withdraw(shares, fish.address, strategies, sender=fish)
+        vault.withdraw(shares, fish.address, fish.address, strategies, sender=fish)
 
 
 def test_withdraw__with_insufficient_funds_in_strategies__reverts(
@@ -38,7 +38,7 @@ def test_withdraw__with_insufficient_funds_in_strategies__reverts(
     actions.add_debt_to_strategy(gov, strategy, vault, amount)
 
     with ape.reverts("insufficient total idle"):
-        vault.withdraw(shares, fish.address, strategies, sender=fish)
+        vault.withdraw(shares, fish.address, fish.address, strategies, sender=fish)
 
 
 def test_withdraw__with_liquid_strategy_only__withdraws(
@@ -55,13 +55,15 @@ def test_withdraw__with_liquid_strategy_only__withdraws(
     actions.add_strategy_to_vault(gov, strategy, vault)
     actions.add_debt_to_strategy(gov, strategy, vault, amount)
 
-    tx = vault.withdraw(shares, fish.address, strategies, sender=fish)
+    tx = vault.withdraw(shares, fish.address, fish.address, strategies, sender=fish)
     event = list(tx.decode_logs(vault.Withdraw))
 
     assert len(event) == 1
-    assert event[0].recipient == fish
+    assert event[0].sender == fish
+    assert event[0].receiver == fish
+    assert event[0].owner == fish
     assert event[0].shares == shares
-    assert event[0].amount == amount
+    assert event[0].assets == amount
 
     checks.check_vault_empty(vault)
     assert asset.balanceOf(vault) == 0
@@ -89,13 +91,15 @@ def test_withdraw__with_multiple_liquid_strategies__withdraws(
         actions.add_strategy_to_vault(gov, strategy, vault)
         actions.add_debt_to_strategy(gov, strategy, vault, amount_per_strategy)
 
-    tx = vault.withdraw(shares, fish.address, strategies, sender=fish)
+    tx = vault.withdraw(shares, fish.address, fish.address, strategies, sender=fish)
     event = list(tx.decode_logs(vault.Withdraw))
 
     assert len(event) == 1
-    assert event[0].recipient == fish
+    assert event[0].sender == fish
+    assert event[0].receiver == fish
+    assert event[0].owner == fish
     assert event[0].shares == shares
-    assert event[0].amount == amount
+    assert event[0].assets == amount
 
     checks.check_vault_empty(vault)
     assert asset.balanceOf(vault) == 0
@@ -129,13 +133,15 @@ def test_withdraw__with_locked_and_liquid_strategy__withdraws(
     # lock half of assets in locked strategy
     locked_strategy.setLockedFunds(amount_to_lock, DAY, sender=gov)
 
-    tx = vault.withdraw(shares, fish.address, strategies, sender=fish)
+    tx = vault.withdraw(shares, fish.address, fish.address, strategies, sender=fish)
     event = list(tx.decode_logs(vault.Withdraw))
 
     assert len(event) == 1
-    assert event[0].recipient == fish
+    assert event[0].sender == fish
+    assert event[0].receiver == fish
+    assert event[0].owner == fish
     assert event[0].shares == shares
-    assert event[0].amount == amount_to_withdraw
+    assert event[0].assets == amount_to_withdraw
 
     assert vault.totalAssets() == amount_to_lock
     assert vault.totalSupply() == amount_to_lock

@@ -365,31 +365,31 @@ def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256
     assert self._totalAssets() + assets <= self.depositLimit, "exceed deposit limit"
     assert assets > 0, "cannot deposit zero"
 
-    shares: uint256 = self._issueSharesForAmount(_assets, _recipient)
+    shares: uint256 = self._issueSharesForAmount(assets, _recipient)
 
-    self.erc20_safe_transferFrom(ASSET.address, msg.sender, self, _assets)
-    self.totalIdle += _assets
+    self.erc20_safe_transferFrom(ASSET.address, msg.sender, self, assets)
+    self.totalIdle += assets
 
-    log Deposit(_sender, _recipient, _assets, shares)
+    log Deposit(_sender, _recipient, assets, shares)
 
     return shares
 
 @internal
 def _redeem(_sender: address, _receiver: address, _owner: address, _shares: uint256, _strategies: DynArray[address, 10] = []) -> uint256:
     if _sender != _owner:
-      self._spendAllowance(_owner, _sender, _shares)
+        self._spendAllowance(_owner, _sender, _shares)
 
     shares: uint256 = _shares
     sharesBalance: uint256 = self.balanceOf[_owner]
 
-    if _shares == MAX_UINT256:
+    if shares == MAX_UINT256:
         shares = sharesBalance
 
     # TODO: is this needed? will revert in burn call
     assert sharesBalance >= shares, "insufficient shares to withdraw"
     assert shares > 0, "no shares to withdraw"
 
-    assets: uint256 = self._convertToAssets(_shares)
+    assets: uint256 = self._convertToAssets(shares)
 
     if assets > self.totalIdle:
         # load to memory to save gas
@@ -425,11 +425,11 @@ def _redeem(_sender: address, _receiver: address, _owner: address, _shares: uint
         self.totalIdle = currTotalIdle
         self.totalDebt = currTotalDebt
 
-    self._burnShares(_shares, _owner)
+    self._burnShares(shares, _owner)
     self.totalIdle -= assets
     self.erc20_safe_transfer(ASSET.address, _receiver, assets)
 
-    log Withdraw(_sender, _receiver, _owner, assets, _shares)
+    log Withdraw(_sender, _receiver, _owner, assets, shares)
 
     return assets
 
@@ -497,15 +497,15 @@ def mint(shares: uint256, receiver: address) -> uint256:
    return assets
 
 @external
-def withdraw(_assets: uint256, _receiver: address, _owner: address) -> uint256:
+def withdraw(_assets: uint256, _receiver: address, _owner: address, _strategies: DynArray[address, 10] = []) -> uint256:
    shares: uint256 = self._convertToShares(_assets)
    # TODO: withdrawal queue is empty here. Do we need to implement a custom withdrawal queue?
-   self._redeem(msg.sender, _receiver, _owner, shares, [])
+   self._redeem(msg.sender, _receiver, _owner, shares, _strategies)
    return shares
 
 @external
-def redeem(_shares: uint256, _receiver: address, _owner: address) -> uint256:
-   assets: uint256 = self._redeem(msg.sender, _receiver, _owner, _shares, [])
+def redeem(_shares: uint256, _receiver: address, _owner: address, _strategies: DynArray[address, 10] = []) -> uint256:
+   assets: uint256 = self._redeem(msg.sender, _receiver, _owner, _shares, _strategies)
    return assets
 
 # SHARE MANAGEMENT FUNCTIONS #

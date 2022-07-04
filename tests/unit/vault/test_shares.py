@@ -34,9 +34,10 @@ def test_deposit__with_deposit_limit_within_deposit_limit__deposit_balance(
     event = list(tx.decode_logs(vault.Deposit))
 
     assert len(event) == 1
-    assert event[0].recipient == fish
+    assert event[0].sender == fish
+    assert event[0].owner == fish
     assert event[0].shares == shares
-    assert event[0].amount == amount
+    assert event[0].assets == amount
 
     assert vault.totalIdle() == amount
     assert vault.balanceOf(fish) == amount
@@ -68,9 +69,10 @@ def test_deposit_all__with_deposit_limit_within_deposit_limit__deposits(
     event = list(tx.decode_logs(vault.Deposit))
 
     assert len(event) == 1
-    assert event[0].recipient == fish
+    assert event[0].sender == fish
+    assert event[0].owner == fish
     assert event[0].shares == shares
-    assert event[0].amount == amount
+    assert event[0].assets == amount
 
     assert vault.totalIdle() == balance
     assert vault.balanceOf(fish) == balance
@@ -95,18 +97,19 @@ def test_withdraw(fish, fish_amount, asset, create_vault):
     vault = create_vault(asset)
     amount = fish_amount
     shares = amount
-    strategies = []
 
     balance = asset.balanceOf(fish)
     actions.user_deposit(fish, vault, asset, amount)
 
-    tx = vault.withdraw(shares, fish.address, strategies, sender=fish)
+    tx = vault.withdraw(shares, fish.address, fish.address, sender=fish)
     event = list(tx.decode_logs(vault.Withdraw))
 
     assert len(event) == 1
-    assert event[0].recipient == fish
+    assert event[0].sender == fish
+    assert event[0].receiver == fish
+    assert event[0].owner == fish
     assert event[0].shares == shares
-    assert event[0].amount == amount
+    assert event[0].assets == amount
 
     checks.check_vault_empty(vault)
     assert asset.balanceOf(vault) == 0
@@ -119,55 +122,42 @@ def test_withdraw__with_insufficient_shares__reverts(
     vault = create_vault(asset)
     amount = fish_amount
     shares = amount + 1
-    strategies = []
 
     actions.user_deposit(fish, vault, asset, amount)
 
     with ape.reverts("insufficient shares to withdraw"):
-        vault.withdraw(shares, fish.address, strategies, sender=fish)
+        vault.withdraw(shares, fish.address, fish.address, sender=fish)
 
 
 def test_withdraw__with_no_shares__reverts(fish, asset, create_vault):
     vault = create_vault(asset)
     shares = 0
-    strategies = []
 
     with ape.reverts("no shares to withdraw"):
-        vault.withdraw(shares, fish.address, strategies, sender=fish)
+        vault.withdraw(shares, fish.address, fish.address, sender=fish)
 
 
-def test_withdraw__withdrawing_maximum(fish, asset, create_vault):
-    vault = create_vault(asset)
-    balance = asset.balanceOf(fish)
-    amount = balance
-    shares = amount
-    strategies = []
+# def test_withdraw__withdrawing_maximum(fish, asset, create_vault):
+#     vault = create_vault(asset)
+#     balance = asset.balanceOf(fish)
+#     amount = balance
+#     shares = amount
 
-    actions.user_deposit(fish, vault, asset, amount)
+#     actions.user_deposit(fish, vault, asset, amount)
 
-    print(vault.totalAssets())
-    print(vault.totalIdle())
-    print(vault.totalDebt())
-    print(asset.balanceOf(vault))
-    print(asset.balanceOf(fish))
+#     tx = vault.withdraw(MAX_INT, fish.address, fish.address, sender=fish)
+#     event = list(tx.decode_logs(vault.Withdraw))
 
-    tx = vault.withdraw(MAX_INT, fish.address, strategies, sender=fish)
-    event = list(tx.decode_logs(vault.Withdraw))
+#     assert len(event) == 1
+#     assert event[0].sender == fish
+#     assert event[0].receiver == fish
+#     assert event[0].owner == fish
+#     assert event[0].shares == shares
+#     assert event[0].assets == amount
 
-    assert len(event) == 1
-    assert event[0].recipient == fish
-    assert event[0].shares == shares
-    assert event[0].amount == amount
-
-    print(vault.totalAssets())
-    print(vault.totalIdle())
-    print(vault.totalDebt())
-    print(asset.balanceOf(vault))
-    print(asset.balanceOf(fish))
-
-    checks.check_vault_empty(vault)
-    assert asset.balanceOf(vault) == 0
-    assert asset.balanceOf(fish) == balance
+#     checks.check_vault_empty(vault)
+#     assert asset.balanceOf(vault) == 0
+#     assert asset.balanceOf(fish) == balance
 
 
 def test_deposit__with_delegation__deposits_to_delegate(
@@ -187,9 +177,10 @@ def test_deposit__with_delegation__deposits_to_delegate(
     event = list(tx.decode_logs(vault.Deposit))
 
     assert len(event) == 1
-    assert event[0].recipient == bunny
+    assert event[0].sender == fish
+    assert event[0].owner == bunny
     assert event[0].shares == shares
-    assert event[0].amount == amount
+    assert event[0].assets == amount
 
     # fish has no more assets
     assert asset.balanceOf(fish) == 0
@@ -205,7 +196,6 @@ def test_withdraw__with_delegation__withdraws_to_delegate(
     balance = asset.balanceOf(fish)
     amount = balance
     shares = amount
-    strategies = []
     vault = create_vault(asset)
 
     # check balance is non-zero
@@ -215,13 +205,15 @@ def test_withdraw__with_delegation__withdraws_to_delegate(
     actions.user_deposit(fish, vault, asset, amount)
 
     # withdraw to bunny
-    tx = vault.withdraw(vault.balanceOf(fish), bunny.address, strategies, sender=fish)
+    tx = vault.withdraw(vault.balanceOf(fish), bunny.address, fish.address, sender=fish)
     event = list(tx.decode_logs(vault.Withdraw))
 
     assert len(event) == 1
-    assert event[0].recipient == bunny
+    assert event[0].sender == fish
+    assert event[0].receiver == bunny
+    assert event[0].owner == fish
     assert event[0].shares == shares
-    assert event[0].amount == amount
+    assert event[0].assets == amount
 
     # fish no longer has shares
     assert vault.balanceOf(fish) == 0
@@ -241,3 +233,11 @@ def test_set_deposit_limit__with_deposit_limit(project, gov, asset, deposit_limi
 
     assert event[0].depositLimit == deposit_limit
     assert vault.depositLimit() == deposit_limit
+
+
+def test_withdraw__with_sufficient_allowance__withdraws():
+    pass
+
+
+def test_withdraw_with_insufficient_allowance__reverts():
+    pass

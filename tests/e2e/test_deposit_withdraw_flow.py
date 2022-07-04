@@ -43,8 +43,7 @@ def test_deposit_and_withdraw(asset, gov, fish, fish_amount, create_vault):
     assert vault.totalDebt() == 0
     assert vault.pricePerShare(sender=fish) == 10 ** asset.decimals()  # 1:1 price
 
-    strategies = []
-    vault.withdraw(half_amount, fish.address, strategies, sender=fish)
+    vault.withdraw(half_amount, fish.address, fish.address, sender=fish)
 
     assert vault.totalSupply() == half_amount
     assert asset.balanceOf(vault) == half_amount
@@ -52,7 +51,7 @@ def test_deposit_and_withdraw(asset, gov, fish, fish_amount, create_vault):
     assert vault.totalDebt() == 0
     assert vault.pricePerShare(sender=fish) == 10 ** asset.decimals()  # 1:1 price
 
-    vault.withdraw(half_amount, fish.address, strategies, sender=fish)
+    vault.withdraw(half_amount, fish.address, fish.address, sender=fish)
 
     checks.check_vault_empty(vault)
     assert asset.balanceOf(vault) == 0
@@ -64,7 +63,6 @@ def test_delegated_deposit_and_withdraw(
 ):
     vault = create_vault(asset)
     balance = asset.balanceOf(fish)
-    strategies = []
 
     # make sure we have some assets to play with
     assert balance > 0
@@ -81,7 +79,7 @@ def test_delegated_deposit_and_withdraw(
     assert vault.balanceOf(bunny) == balance
 
     # 2. Withdraw from bunny to doggie
-    vault.withdraw(vault.balanceOf(bunny), doggie.address, strategies, sender=bunny)
+    vault.withdraw(vault.balanceOf(bunny), doggie.address, bunny.address, sender=bunny)
 
     # bunny no longer has any shares
     assert vault.balanceOf(bunny) == 0
@@ -102,7 +100,7 @@ def test_delegated_deposit_and_withdraw(
     assert vault.balanceOf(panda) == balance
 
     # 4. Withdraw from panda to woofy
-    vault.withdraw(vault.balanceOf(panda), woofy.address, strategies, sender=panda)
+    vault.withdraw(vault.balanceOf(panda), woofy.address, panda.address, sender=panda)
 
     # panda no longer has any shares
     assert vault.balanceOf(panda) == 0
