@@ -80,6 +80,9 @@ event UpdateDepositLimit:
 event UpdateMinimumTotalIdle:
     minimum_total_idle: uint256
 
+event Shutdown:
+    pass
+
 # STRUCTS #
 struct StrategyParams:
     activation: uint256
@@ -96,6 +99,7 @@ MAX_BPS: constant(uint256) = 10_000
 enum Roles:
     STRATEGY_MANAGER
     DEBT_MANAGER
+    EMERGENCY_MANAGER
 
 # IMMUTABLE #
 ASSET: immutable(ERC20)
@@ -118,11 +122,11 @@ last_report: public(uint256)
 locked_profit: public(uint256)
 previous_harvest_time_delta: public(uint256)
 deposit_limit: public(uint256)
-
 fee_manager: public(address)
 health_check: public(address)
 role_manager: public(address)
 future_role_manager: public(address)
+shutdown: public(bool)
 
 name: public(String[64])
 symbol: public(String[32])
@@ -150,6 +154,7 @@ def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: a
             convert(self, bytes32)
         )
     )
+    self.shutdown = False
 
 ## ERC20 ##
 @internal
@@ -381,6 +386,7 @@ def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
 
 @internal
 def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256:
+    assert self.shutdown == False # dev: shutdown
     assert _recipient not in [self, ZERO_ADDRESS], "invalid recipient"
     assets: uint256 = _assets
 
@@ -406,6 +412,13 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
 
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
+
+@external
+def withdraw(_shares: uint256 = MAX_UINT256, _recipient: address = msg.sender, _strategies: DynArray[address, 10] = []) -> uint256:
+    # TODO: allow withdrawals by approved ?
+    owner: address = msg.sender
+    shares: uint256 = _shares
+    sharesBalance: uint256 = self.balanceOf[owner]
 
     if shares == MAX_UINT256:
         shares = shares_balance
@@ -517,6 +530,7 @@ def available_deposit_limit() -> uint256:
 # STRATEGY MANAGEMENT FUNCTIONS #
 @external
 def add_strategy(new_strategy: address):
+    assert self.shutdown == False # dev: shutdown
     self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
     assert new_strategy != ZERO_ADDRESS, "strategy cannot be zero address"
     assert IStrategy(new_strategy).asset() == ASSET.address, "invalid asset"
@@ -561,6 +575,7 @@ def revoke_strategy(old_strategy: address):
 
 @external
 def migrate_strategy(new_strategy: address, old_strategy: address):
+    assert self.shutdown == False # dev: shutdown
     self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
     assert self.strategies[old_strategy].activation != 0, "old strategy not active"
     assert self.strategies[old_strategy].current_debt == 0, "old strategy has debt"
@@ -588,6 +603,7 @@ def migrate_strategy(new_strategy: address, old_strategy: address):
 
 @external
 def update_max_debt_for_strategy(strategy: address, new_max_debt: uint256):
+    assert self.shutdown == False # dev: shutdown
     self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
     assert self.strategies[strategy].activation != 0, "inactive strategy"
     # TODO: should we check that total_max_debt is not over 100% of assets?
@@ -607,6 +623,8 @@ def update_debt(strategy: address) -> uint256:
 
     new_debt: uint256 = self.strategies[strategy].max_debt
 
+    if self.shutdown:
+        newDebt = 0
     if new_debt > current_debt:
         # only check if debt is increasing
         # if debt is decreasing, we ignore strategy min debt
@@ -808,6 +826,13 @@ def accept_role_manager():
     assert msg.sender == self.future_role_manager
     self.role_manager = msg.sender
     self.future_role_manager = ZERO_ADDRESS
+
+@external
+def shutdown_vault():
+    self._enforce_role(msg.sender, Roles.EMERGENCY_MANAGER)
+    assert self.shutdown == False
+    self.shutdown = True
+    log Shutdown()
 
 ## ERC20+4626 compatibility
 
