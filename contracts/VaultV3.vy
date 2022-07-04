@@ -22,7 +22,7 @@ interface IFeeManager:
 event Deposit:
     sender: indexed(address)
     owner: indexed(address)
-    assets: uint256 
+    assets: uint256
     shares: uint256
 
 event Withdraw:
@@ -74,6 +74,9 @@ event UpdatedMaxDebtForStrategy:
     strategy: address
     newDebt: uint256
 
+event UpdateDepositLimit:
+    depositLimit: uint256
+
 # STRUCTS #
 struct StrategyParams:
     activation: uint256
@@ -107,6 +110,8 @@ roles: public(HashMap[address, Roles])
 lastReport: public(uint256)
 lockedProfit: public(uint256)
 previousHarvestTimeDelta: public(uint256)
+depositLimit: public(uint256)
+
 feeManager: public(address)
 healthCheck: public(address)
 role_manager: public(address)
@@ -352,11 +357,18 @@ def _issueSharesForAmount(amount: uint256, recipient: address) -> uint256:
 @internal
 def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256:
     assert _recipient not in [self, ZERO_ADDRESS], "invalid recipient"
-    
+    assets: uint256 = _assets
+
+    if assets == MAX_UINT256:
+        assets = ASSET.balanceOf(_sender)
+
+    assert self._totalAssets() + assets <= self.depositLimit, "exceed deposit limit"
+    assert assets > 0, "cannot deposit zero"
+
     shares: uint256 = self._issueSharesForAmount(_assets, _recipient)
 
     self.erc20_safe_transferFrom(ASSET.address, msg.sender, self, _assets)
-    self.totalIdle += _assets 
+    self.totalIdle += _assets
 
     log Deposit(_sender, _recipient, _assets, shares)
 
@@ -364,7 +376,7 @@ def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256
 
 @internal
 def _redeem(_sender: address, _receiver: address, _owner: address, _shares: uint256, _strategies: DynArray[address, 10] = []) -> uint256:
-    if _sender != _owner: 
+    if _sender != _owner:
       self._spendAllowance(_owner, _sender, _shares)
 
     shares: uint256 = _shares
@@ -379,13 +391,41 @@ def _redeem(_sender: address, _receiver: address, _owner: address, _shares: uint
 
     assets: uint256 = self._convertToAssets(_shares)
 
-    # TODO: withdraw from strategies
-    
-    # TODO: gas savings: totalIdle should be cached if used above
-    assert self.totalIdle >= assets, "insufficient total idle"
+    if assets > self.totalIdle:
+        # load to memory to save gas
+        currTotalIdle: uint256 = self.totalIdle
+        currTotalDebt: uint256 = self.totalDebt
+
+        # withdraw from strategies if insufficient total idle
+        assetsNeeded: uint256 = assets - currTotalIdle
+        assetsToWithdraw: uint256 = 0
+        for strategy in _strategies:
+            assert self.strategies[strategy].activation != 0, "inactive strategy"
+
+            assetsToWithdraw = min(assetsNeeded, IStrategy(strategy).withdrawable())
+            # continue if nothing to withdraw
+            if assetsToWithdraw == 0:
+                continue
+
+            IStrategy(strategy).freeFunds(assetsToWithdraw)
+            ASSET.transferFrom(strategy, self, assetsToWithdraw)
+            currTotalIdle += assetsToWithdraw
+            currTotalDebt -= assetsToWithdraw
+            self.strategies[strategy].currentDebt -= assetsToWithdraw
+
+            # break if we have enough total idle
+            if assets <= currTotalIdle:
+                break
+
+            assetsNeeded -= assetsToWithdraw
+
+        # if we exhaust the queue and still have insufficient total idle, revert
+        assert currTotalIdle >= assets, "insufficient total idle"
+        # commit memory to storage
+        self.totalIdle = currTotalIdle
+        self.totalDebt = currTotalDebt
 
     self._burnShares(_shares, _owner)
-
     self.totalIdle -= assets
     self.erc20_safe_transfer(ASSET.address, _receiver, assets)
 
@@ -414,7 +454,7 @@ def maxDeposit(receiver: address) -> uint256:
    return MAX_UINT256
 
 @external
-def maxMint(receiver: address) -> uint256: 
+def maxMint(receiver: address) -> uint256:
    maxDeposit: uint256 = MAX_UINT256
    return self._convertToShares(maxDeposit)
 
@@ -473,6 +513,14 @@ def redeem(_shares: uint256, _receiver: address, _owner: address) -> uint256:
 @external
 def pricePerShare() -> uint256:
     return self._convertToAssets(10 ** DECIMALS)
+
+@view
+@external
+def availableDepositLimit() -> uint256:
+    if self.depositLimit > self._totalAssets():
+        return self.depositLimit - self._totalAssets()
+    return 0
+
 
 # STRATEGY MANAGEMENT FUNCTIONS #
 @external
@@ -552,7 +600,7 @@ def updateMaxDebtForStrategy(strategy: address, new_maxDebt: uint256):
     assert self.strategies[strategy].activation != 0, "inactive strategy"
     # TODO: should we check that totalMaxDebt is not over 100% of assets?
     self.strategies[strategy].maxDebt = new_maxDebt
-    
+
     log UpdatedMaxDebtForStrategy(msg.sender, strategy, new_maxDebt)
 
 
@@ -579,30 +627,30 @@ def updateDebt(strategy: address) -> uint256:
 
     if currentDebt > newDebt:
         # reduce debt
-        amountToWithdraw: uint256 = currentDebt - newDebt
+        assetsToWithdraw: uint256 = currentDebt - newDebt
         withdrawable: uint256 = IStrategy(strategy).withdrawable()
         assert withdrawable != 0, "nothing to withdraw"
 
         # if insufficient withdrawable, withdraw what we can
-        if (withdrawable < amountToWithdraw):
-            amountToWithdraw = withdrawable
+        if (withdrawable < assetsToWithdraw):
+            assetsToWithdraw = withdrawable
             newDebt = currentDebt - withdrawable
 
-        IStrategy(strategy).freeFunds(amountToWithdraw)
-	# TODO: is it worth it to transfer the maxAmount between amountToWithdraw and balance? 
-        ASSET.transferFrom(strategy, self, amountToWithdraw)
-        self.totalIdle += amountToWithdraw
-        self.totalDebt -= amountToWithdraw
+        IStrategy(strategy).freeFunds(assetsToWithdraw)
+	# TODO: is it worth it to transfer the maxAmount between assetsToWithdraw and balance?
+        ASSET.transferFrom(strategy, self, assetsToWithdraw)
+        self.totalIdle += assetsToWithdraw
+        self.totalDebt -= assetsToWithdraw
     else:
         # increase debt
-        amountToTransfer: uint256 = newDebt - currentDebt
+        assetsToTransfer: uint256 = newDebt - currentDebt
         # if insufficient funds to deposit, transfer only what is free
-        if amountToTransfer > self.totalIdle:
-            amountToTransfer = self.totalIdle
-            newDebt = currentDebt + amountToTransfer
-        ASSET.transfer(strategy, amountToTransfer)
-        self.totalIdle -= amountToTransfer
-        self.totalDebt += amountToTransfer
+        if assetsToTransfer > self.totalIdle:
+            assetsToTransfer = self.totalIdle
+            newDebt = currentDebt + assetsToTransfer
+        ASSET.transfer(strategy, assetsToTransfer)
+        self.totalIdle -= assetsToTransfer
+        self.totalDebt += assetsToTransfer
 
     self.strategies[strategy].currentDebt = newDebt
 
@@ -678,6 +726,14 @@ def setFeeManager(newFeeManager: address):
     self.feeManager = newFeeManager
     log UpdateFeeManager(newFeeManager)
 
+
+@external
+def setDepositLimit(depositLimit: uint256):
+    # TODO: permissioning
+    self.depositLimit = depositLimit
+    log UpdateDepositLimit(depositLimit)
+
+
 # def forceProcessReport(strategy: address):
 #     # permissioned: ACCOUNTING_MANAGER
 #     # TODO: allows processing the report with losses ! this should only be called in special situations
@@ -733,5 +789,5 @@ def transfer_role_manager(role_manager: address):
 @external
 def accept_role_manager():
     assert msg.sender == self.future_role_manager
-    self.role_manager = msg.sender 
+    self.role_manager = msg.sender
     self.future_role_manager = ZERO_ADDRESS
