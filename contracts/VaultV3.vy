@@ -143,6 +143,7 @@ def _transfer(sender: address, receiver: address, amount: uint256):
 
     # Protect people from accidentally sending their shares to bad places
     assert receiver not in [self, ZERO_ADDRESS]
+    assert self.balanceOf[sender] >= amount, "insufficient funds"
     self.balanceOf[sender] -= amount
     self.balanceOf[receiver] += amount
     log Transfer(sender, receiver, amount)
