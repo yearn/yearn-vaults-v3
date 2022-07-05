@@ -1,4 +1,6 @@
 import pytest
+from ape import chain
+from eth_account.messages import encode_structured_data
 from utils.constants import MAX_INT, ROLES
 
 # Accounts
@@ -102,7 +104,7 @@ def create_token(project, gov):
 @pytest.fixture(scope="session")
 def create_vault(project, gov, fee_manager):
     def create_vault(asset, governance=gov, deposit_limit=MAX_INT):
-        vault = gov.deploy(project.VaultV3, asset, governance)
+        vault = gov.deploy(project.VaultV3, asset, "VaultV3", "AV", governance)
         # set vault deposit
         vault.setDepositLimit(deposit_limit, sender=gov)
         # set up fee manager
@@ -183,3 +185,56 @@ def lossy_strategy(gov, vault, create_lossy_strategy):
 def fee_manager(project, gov):
     fee_manager = gov.deploy(project.FeeManager)
     yield fee_manager
+
+
+@pytest.fixture
+def sign_vault_permit(chain):
+    def sign_vault_permit(
+        vault,
+        owner,
+        spender: str,
+        allowance: int = MAX_INT,
+        deadline: int = 0,
+        override_nonce=None,
+    ):
+        name = "Yearn Vault"
+        version = vault.apiVersion()
+        if override_nonce:
+            nonce = override_nonce
+        else:
+            nonce = vault.nonces(owner.address)
+        data = {
+            "types": {
+                "EIP712Domain": [
+                    {"name": "name", "type": "string"},
+                    {"name": "version", "type": "string"},
+                    {"name": "chainId", "type": "uint256"},
+                    {"name": "verifyingContract", "type": "address"},
+                ],
+                "Permit": [
+                    {"name": "owner", "type": "address"},
+                    {"name": "spender", "type": "address"},
+                    {"name": "value", "type": "uint256"},
+                    {"name": "nonce", "type": "uint256"},
+                    {"name": "deadline", "type": "uint256"},
+                ],
+            },
+            "domain": {
+                "name": name,
+                "version": version,
+                "chainId": chain.chain_id,
+                "verifyingContract": str(vault),
+            },
+            "primaryType": "Permit",
+            "message": {
+                "owner": owner.address,
+                "spender": spender,
+                "value": allowance,
+                "nonce": nonce,
+                "deadline": deadline,
+            },
+        }
+        permit = encode_structured_data(data)
+        return owner.sign_message(permit).signature
+
+    return sign_vault_permit
