@@ -135,7 +135,8 @@ def __init__(asset: ERC20, role_manager: address):
 ## ERC20 ##
 @internal
 def _spendAllowance(owner: address, sender: address, amount: uint256):
-   self.allowance[owner][sender] -= amount
+    assert self.allowance[owner][sender] >= amount, "insufficient allowance"
+    self.allowance[owner][sender] -= amount
 
 @internal
 def _transfer(sender: address, receiver: address, amount: uint256):
@@ -435,79 +436,106 @@ def _redeem(_sender: address, _receiver: address, _owner: address, _shares: uint
     return assets
 
 
+@view
+@internal
+def _maxDeposit(receiver: address) -> uint256:
+    total_assets: uint256 = self._totalAssets()
+    deposit_limit: uint256 = self.depositLimit
+    if (total_assets >= deposit_limit):
+        return 0
+    return deposit_limit - total_assets
+
+
+@view
+@internal
+def _maxRedeem(owner: address) -> uint256:
+    return min(self.balanceOf[owner], self.totalIdle)
+
+
 # SHARE MANAGEMENT FUNCTIONS #
 @view
 @external
 def totalAssets() -> uint256:
     return self._totalAssets()
 
+@view
 @external
 def convertToShares(assets: uint256) -> uint256:
-   return self._convertToShares(assets)
+    return self._convertToShares(assets)
 
+@view
 @external
 def convertToAssets(shares: uint256) -> uint256:
-   return self._convertToAssets(shares)
-
-@external
-def maxDeposit(receiver: address) -> uint256:
-   # TODO: implement deposit limit
-   return MAX_UINT256
-
-@external
-def maxMint(receiver: address) -> uint256:
-   maxDeposit: uint256 = MAX_UINT256
-   return self._convertToShares(maxDeposit)
-
-@external
-def maxWithdraw(owner: address) -> uint256:
-   # TODO: calculate max between liquidity
-   # TODO: take this into account when implementing withdrawing from custom strategies
-   return self._convertToAssets(self.balanceOf[owner])
-
-@external
-def maxRedeem(owner: address) -> uint256:
-   # TODO: add max liquidity calculation
-   # TODO: take this into account when implementing withdrawing from custom strategies
-   return self.balanceOf[owner]
-
-@external
-def previewDeposit(assets: uint256) -> uint256:
-   return self._convertToShares(assets)
-
-@external
-def previewMint(shares: uint256) -> uint256:
-   return self._convertToAssets(shares)
-
-@external
-def previewWithdraw(shares: uint256) -> uint256:
     return self._convertToAssets(shares)
 
+@view
+@external
+def maxDeposit(receiver: address) -> uint256:
+    # TODO: can add restrictions per receiver
+    return self._maxDeposit(receiver)
+
+@view
+@external
+def maxMint(receiver: address) -> uint256:
+    maxDeposit: uint256 = self._maxDeposit(receiver)
+    return self._convertToShares(maxDeposit)
+
+@view
+@external
+def maxWithdraw(owner: address) -> uint256:
+    # TODO: calculate max between liquidity
+    # TODO: take this into account when implementing withdrawing from custom strategies
+    maxWithdraw: uint256 = self._maxRedeem(owner)
+    return self._convertToAssets(maxWithdraw)
+
+@view
+@external
+def maxRedeem(owner: address) -> uint256:
+    # TODO: add max liquidity calculation
+    # TODO: take this into account when implementing withdrawing from custom strategies
+    return self._maxRedeem(owner)
+
+@view
+@external
+def previewDeposit(assets: uint256) -> uint256:
+    return self._convertToShares(assets)
+
+@view
+@external
+def previewMint(shares: uint256) -> uint256:
+    return self._convertToAssets(shares)
+
+@view
+@external
+def previewWithdraw(assets: uint256) -> uint256:
+    return self._convertToShares(assets)
+
+@view
 @external
 def previewRedeem(shares: uint256) -> uint256:
    return self._convertToAssets(shares)
 
 @external
 def deposit(assets: uint256, receiver: address) -> uint256:
-       return self._deposit(msg.sender, receiver, assets)
+    return self._deposit(msg.sender, receiver, assets)
 
 @external
 def mint(shares: uint256, receiver: address) -> uint256:
-   assets: uint256 = self._convertToAssets(shares)
-   self._deposit(msg.sender, receiver, assets)
-   return assets
+    assets: uint256 = self._convertToAssets(shares)
+    self._deposit(msg.sender, receiver, assets)
+    return assets
 
 @external
 def withdraw(_assets: uint256, _receiver: address, _owner: address, _strategies: DynArray[address, 10] = []) -> uint256:
-   shares: uint256 = self._convertToShares(_assets)
-   # TODO: withdrawal queue is empty here. Do we need to implement a custom withdrawal queue?
-   self._redeem(msg.sender, _receiver, _owner, shares, _strategies)
-   return shares
+    shares: uint256 = self._convertToShares(_assets)
+    # TODO: withdrawal queue is empty here. Do we need to implement a custom withdrawal queue?
+    self._redeem(msg.sender, _receiver, _owner, shares, _strategies)
+    return shares
 
 @external
 def redeem(_shares: uint256, _receiver: address, _owner: address, _strategies: DynArray[address, 10] = []) -> uint256:
-   assets: uint256 = self._redeem(msg.sender, _receiver, _owner, _shares, _strategies)
-   return assets
+    assets: uint256 = self._redeem(msg.sender, _receiver, _owner, _shares, _strategies)
+    return assets
 
 # SHARE MANAGEMENT FUNCTIONS #
 @view
