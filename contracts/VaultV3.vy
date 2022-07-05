@@ -494,9 +494,10 @@ def updateDebt(strategy: address) -> uint256:
         if amountToTransfer > self.totalIdle:
             amountToTransfer = self.totalIdle
             newDebt = currentDebt + amountToTransfer
-        ASSET.transfer(strategy, amountToTransfer)
-        self.totalIdle -= amountToTransfer
-        self.totalDebt += amountToTransfer
+        if amountToTransfer > 0:
+            ASSET.transfer(strategy, amountToTransfer)
+            self.totalIdle -= amountToTransfer
+            self.totalDebt += amountToTransfer
 
     self.strategies[strategy].currentDebt = newDebt
 

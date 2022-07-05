@@ -5,7 +5,6 @@ from utils.constants import DAY, ROLES
 
 
 def test_multiple_strategy_withdraw_flow(
-    chain,
     gov,
     fish,
     whale,
@@ -51,7 +50,9 @@ def test_multiple_strategy_withdraw_flow(
     assert asset.balanceOf(locked_strategy) == locked_strategy_debt
 
     # withdraw small amount as fish from total idle
-    vault.withdraw(fish_amount // 2, fish.address, strategies, sender=fish)
+    vault.withdraw(
+        fish_amount // 2, fish.address, [s.address for s in strategies], sender=fish
+    )
 
     current_idle -= fish_amount // 2
 
@@ -73,7 +74,9 @@ def test_multiple_strategy_withdraw_flow(
     assert asset.balanceOf(locked_strategy) == locked_strategy_debt
 
     # withdraw small amount as fish from locked_strategy to bunny
-    vault.withdraw(fish_amount // 2, bunny.address, [locked_strategy], sender=fish)
+    vault.withdraw(
+        fish_amount // 2, bunny.address, [locked_strategy.address], sender=fish
+    )
 
     current_debt -= fish_amount // 2
     locked_strategy_debt -= fish_amount // 2
@@ -88,10 +91,14 @@ def test_multiple_strategy_withdraw_flow(
     # attempt to withdraw remaining amount from only liquid strategy but revert
     whale_balance = vault.balanceOf(whale) - amount_to_lock  # exclude locked amount
     with ape.reverts("insufficient total idle"):
-        vault.withdraw(whale_balance, whale.address, [liquid_strategy], sender=whale)
+        vault.withdraw(
+            whale_balance, whale.address, [liquid_strategy.address], sender=whale
+        )
 
     # withdraw remaining balance
-    vault.withdraw(whale_balance, whale.address, strategies, sender=whale)
+    vault.withdraw(
+        whale_balance, whale.address, [s.address for s in strategies], sender=whale
+    )
 
     assert asset.balanceOf(whale) == (whale_amount - amount_to_lock)
     assert vault.totalIdle() == 0
@@ -109,7 +116,9 @@ def test_multiple_strategy_withdraw_flow(
         liquid_strategy,
         locked_strategy,
     ]  # test withdrawing from empty strategy
-    vault.withdraw(amount_to_lock, whale.address, strategies, sender=whale)
+    vault.withdraw(
+        amount_to_lock, whale.address, [s.address for s in strategies], sender=whale
+    )
 
     checks.check_vault_empty(vault)
     assert asset.balanceOf(whale) == whale_amount
