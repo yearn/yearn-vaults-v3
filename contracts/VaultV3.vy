@@ -98,6 +98,9 @@ enum Roles:
 ASSET: immutable(ERC20)
 DECIMALS: immutable(uint256)
 
+# CONSTANTS #
+API_VERSION: constant(String[28]) = "0.1.0"
+
 # STORAGE #
 strategies: public(HashMap[address, StrategyParams])
 balanceOf: public(HashMap[address, uint256])
@@ -127,10 +130,22 @@ DOMAIN_TYPE_HASH: constant(bytes32) = keccak256('EIP712Domain(string name,string
 PERMIT_TYPE_HASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
 
 @external
-def __init__(asset: ERC20, role_manager: address):
+def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: address):
     ASSET = asset
     DECIMALS = convert(ERC20Detailed(asset.address).decimals(), uint256)
+    self.name = name
+    self.symbol = symbol
     self.role_manager = role_manager
+    # EIP-712
+    self.DOMAIN_SEPARATOR = keccak256(
+        concat(
+            DOMAIN_TYPE_HASH,
+            keccak256(convert("Yearn Vault", Bytes[11])),
+            keccak256(convert(API_VERSION, Bytes[28])),
+            convert(chain.id, bytes32),
+            convert(self, bytes32)
+        )
+    )
 
 ## ERC20 ##
 @internal
@@ -185,8 +200,8 @@ def decreaseAllowance(spender: address, amount: uint256) -> bool:
 
 @external
 def permit(owner: address, spender: address, amount: uint256, expiry: uint256, signature: Bytes[65]) -> bool:
-    assert owner != ZERO_ADDRESS  # dev: invalid owner
-    assert expiry == 0 or expiry >= block.timestamp  # dev: permit expired
+    assert owner != ZERO_ADDRESS, "invalid owner"
+    assert expiry == 0 or expiry >= block.timestamp, "permit expired"
     nonce: uint256 = self.nonces[owner]
     digest: bytes32 = keccak256(
         concat(
@@ -208,7 +223,7 @@ def permit(owner: address, spender: address, amount: uint256, expiry: uint256, s
     r: uint256 = convert(slice(signature, 0, 32), uint256)
     s: uint256 = convert(slice(signature, 32, 32), uint256)
     v: uint256 = convert(slice(signature, 64, 1), uint256)
-    assert ecrecover(digest, v, r, s) == owner  # dev: invalid signature
+    assert ecrecover(digest, v, r, s) == owner, "invalid signature"
     self.allowance[owner][spender] = amount
     self.nonces[owner] = nonce + 1
     log Approval(owner, spender, amount)
@@ -225,6 +240,11 @@ def asset() -> address:
 @external
 def decimals() -> uint256:
     return DECIMALS
+
+@view
+@external
+def apiVersion() -> String[28]:
+    return API_VERSION
 
 @view
 @internal
