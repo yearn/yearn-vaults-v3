@@ -413,13 +413,6 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
 
-@external
-def withdraw(_shares: uint256 = MAX_UINT256, _recipient: address = msg.sender, _strategies: DynArray[address, 10] = []) -> uint256:
-    # TODO: allow withdrawals by approved ?
-    owner: address = msg.sender
-    shares: uint256 = _shares
-    sharesBalance: uint256 = self.balanceOf[owner]
-
     if shares == MAX_UINT256:
         shares = shares_balance
 
@@ -624,7 +617,8 @@ def update_debt(strategy: address) -> uint256:
     new_debt: uint256 = self.strategies[strategy].max_debt
 
     if self.shutdown:
-        newDebt = 0
+        new_debt = 0
+
     if new_debt > current_debt:
         # only check if debt is increasing
         # if debt is decreasing, we ignore strategy min debt
@@ -832,6 +826,7 @@ def shutdown_vault():
     self._enforce_role(msg.sender, Roles.EMERGENCY_MANAGER)
     assert self.shutdown == False
     self.shutdown = True
+    self.roles[msg.sender] = self.roles[msg.sender] | Roles.DEBT_MANAGER
     log Shutdown()
 
 ## ERC20+4626 compatibility
