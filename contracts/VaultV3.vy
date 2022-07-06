@@ -16,7 +16,7 @@ interface IStrategy:
     def totalAssets() -> (uint256): view
 
 interface IFeeManager:
-    def assess_fees(strategy: address, gain: uint256) -> uint256: view
+    def assessFees(strategy: address, gain: uint256) -> uint256: view
 
 # EVENTS #
 event Deposit:
@@ -117,8 +117,8 @@ depositLimit: public(uint256)
 
 feeManager: public(address)
 healthCheck: public(address)
-role_manager: public(address)
-future_role_manager: public(address)
+roleManager: public(address)
+futureRoleManager: public(address)
 
 name: public(String[64])
 symbol: public(String[32])
@@ -130,12 +130,12 @@ DOMAIN_TYPE_HASH: constant(bytes32) = keccak256('EIP712Domain(string name,string
 PERMIT_TYPE_HASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
 
 @external
-def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: address):
+def __init__(asset: ERC20, name: String[64], symbol: String[32], roleManager: address):
     ASSET = asset
     DECIMALS = convert(ERC20Detailed(asset.address).decimals(), uint256)
     self.name = name
     self.symbol = symbol
-    self.role_manager = role_manager
+    self.roleManager = roleManager
     # EIP-712
     self.DOMAIN_SEPARATOR = keccak256(
         concat(
@@ -314,24 +314,23 @@ def _updateReportTimestamps():
 @view
 @internal
 def _convertToAssets(shares: uint256) -> uint256:
-    _totalSupply: uint256 = self.totalSupply
+    totalSupply: uint256 = self.totalSupply
     amount: uint256 = shares
-    if _totalSupply > 0:
+    if totalSupply > 0:
         amount = shares * self._totalAssets() / self.totalSupply
     return amount
 
 @view
 @internal
 def _convertToShares(amount: uint256) -> uint256:
-    _totalSupply: uint256 = self.totalSupply
+    totalSupply: uint256 = self.totalSupply
     shares: uint256 = amount
-    if _totalSupply > 0:
-        shares = amount * _totalSupply / self._totalAssets()
+    if totalSupply > 0:
+        shares = amount * totalSupply / self._totalAssets()
     return shares
 
-
 @internal
-def erc20_safe_transferFrom(token: address, sender: address, receiver: address, amount: uint256):
+def erc20SafeTransferFrom(token: address, sender: address, receiver: address, amount: uint256):
     # Used only to send tokens that are not the type managed by this Vault.
     # HACK: Used to handle non-compliant tokens like USDT
     response: Bytes[32] = raw_call(
@@ -349,7 +348,7 @@ def erc20_safe_transferFrom(token: address, sender: address, receiver: address, 
 
 
 @internal
-def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
+def erc20SafeTransfer(token: address, receiver: address, amount: uint256):
     # Used only to send tokens that are not the type managed by this Vault.
     # HACK: Used to handle non-compliant tokens like USDT
     response: Bytes[32] = raw_call(
@@ -376,40 +375,40 @@ def _issueSharesForAmount(amount: uint256, recipient: address) -> uint256:
     return newShares
 
 @internal
-def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256:
-    assert _recipient not in [self, ZERO_ADDRESS], "invalid recipient"
-    assets: uint256 = _assets
+def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
+    assert recipient not in [self, ZERO_ADDRESS], "invalid recipient"
+    assetsAmount: uint256 = assets
 
-    if assets == MAX_UINT256:
-        assets = ASSET.balanceOf(_sender)
+    if assetsAmount == MAX_UINT256:
+        assetsAmount = ASSET.balanceOf(sender)
 
-    assert self._totalAssets() + assets <= self.depositLimit, "exceed deposit limit"
-    assert assets > 0, "cannot deposit zero"
+    assert self._totalAssets() + assetsAmount <= self.depositLimit, "exceed deposit limit"
+    assert assetsAmount > 0, "cannot deposit zero"
 
-    shares: uint256 = self._issueSharesForAmount(assets, _recipient)
+    shares: uint256 = self._issueSharesForAmount(assetsAmount, recipient)
 
-    self.erc20_safe_transferFrom(ASSET.address, msg.sender, self, assets)
-    self.totalIdle += assets
+    self.erc20SafeTransferFrom(ASSET.address, msg.sender, self, assetsAmount)
+    self.totalIdle += assetsAmount
 
-    log Deposit(_sender, _recipient, assets, shares)
+    log Deposit(sender, recipient, assetsAmount, shares)
 
     return shares
 
 @internal
-def _redeem(_sender: address, _receiver: address, _owner: address, _shares: uint256, _strategies: DynArray[address, 10] = []) -> uint256:
-    if _sender != _owner:
-        self._spendAllowance(_owner, _sender, _shares)
+def _redeem(sender: address, receiver: address, owner: address, shares: uint256, strategies: DynArray[address, 10] = []) -> uint256:
+    if sender != owner:
+        self._spendAllowance(owner, sender, shares)
 
-    shares: uint256 = _shares
-    sharesBalance: uint256 = self.balanceOf[_owner]
+    sharesToBurn: uint256 = shares
+    sharesBalance: uint256 = self.balanceOf[owner]
 
-    if shares == MAX_UINT256:
-        shares = sharesBalance
+    if sharesToBurn == MAX_UINT256:
+        sharesToBurn = sharesBalance
 
-    assert sharesBalance >= shares, "insufficient shares to withdraw"
-    assert shares > 0, "no shares to withdraw"
+    assert sharesBalance >= sharesToBurn, "insufficient shares to withdraw"
+    assert sharesToBurn > 0, "no shares to withdraw"
 
-    assets: uint256 = self._convertToAssets(shares)
+    assets: uint256 = self._convertToAssets(sharesToBurn)
     
     # load to memory to save gas
     currTotalIdle: uint256 = self.totalIdle
@@ -421,7 +420,7 @@ def _redeem(_sender: address, _receiver: address, _owner: address, _shares: uint
         # withdraw from strategies if insufficient total idle
         assetsNeeded: uint256 = assets - currTotalIdle
         assetsToWithdraw: uint256 = 0
-        for strategy in _strategies:
+        for strategy in strategies:
             assert self.strategies[strategy].activation != 0, "inactive strategy"
 
             assetsToWithdraw = min(assetsNeeded, IStrategy(strategy).withdrawable())
@@ -448,11 +447,12 @@ def _redeem(_sender: address, _receiver: address, _owner: address, _shares: uint
         # commit memory to storage
         self.totalDebt = currTotalDebt
 
-    self._burnShares(shares, _owner)
+    self._burnShares(sharesToBurn, owner)
     self.totalIdle = currTotalIdle - assets
-    self.erc20_safe_transfer(ASSET.address, _receiver, assets)
+    self.erc20SafeTransfer(ASSET.address, receiver, assets)
 
-    log Withdraw(_sender, _receiver, _owner, assets, shares)
+    log Withdraw(sender, receiver, owner, assets, sharesToBurn)
+
 
     return assets
 
@@ -460,11 +460,11 @@ def _redeem(_sender: address, _receiver: address, _owner: address, _shares: uint
 @view
 @internal
 def _maxDeposit(receiver: address) -> uint256:
-    _totalAssets: uint256 = self._totalAssets()
-    _depositLimit: uint256 = self.depositLimit
-    if (_totalAssets >= _depositLimit):
+    totalAssets: uint256 = self._totalAssets()
+    depositLimit: uint256 = self.depositLimit
+    if (totalAssets >= depositLimit):
         return 0
-    return _depositLimit - _totalAssets 
+    return depositLimit - totalAssets 
 
 
 @view
@@ -547,15 +547,15 @@ def mint(shares: uint256, receiver: address) -> uint256:
     return assets
 
 @external
-def withdraw(_assets: uint256, _receiver: address, _owner: address, _strategies: DynArray[address, 10] = []) -> uint256:
-    shares: uint256 = self._convertToShares(_assets)
+def withdraw(assets: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
+    shares: uint256 = self._convertToShares(assets)
     # TODO: withdrawal queue is empty here. Do we need to implement a custom withdrawal queue?
-    self._redeem(msg.sender, _receiver, _owner, shares, _strategies)
+    self._redeem(msg.sender, receiver, owner, shares, strategies)
     return shares
 
 @external
-def redeem(_shares: uint256, _receiver: address, _owner: address, _strategies: DynArray[address, 10] = []) -> uint256:
-    assets: uint256 = self._redeem(msg.sender, _receiver, _owner, _shares, _strategies)
+def redeem(shares: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
+    assets: uint256 = self._redeem(msg.sender, receiver, owner, shares, strategies)
     return assets
 
 # SHARE MANAGEMENT FUNCTIONS #
@@ -575,7 +575,7 @@ def availableDepositLimit() -> uint256:
 # STRATEGY MANAGEMENT FUNCTIONS #
 @external
 def addStrategy(newStrategy: address):
-    self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
+    self._enforceRole(msg.sender, Roles.STRATEGY_MANAGER)
     assert newStrategy != ZERO_ADDRESS, "strategy cannot be zero address"
     assert IStrategy(newStrategy).asset() == ASSET.address, "invalid asset"
     assert IStrategy(newStrategy).vault() == self, "invalid vault"
@@ -592,9 +592,10 @@ def addStrategy(newStrategy: address):
 
     log StrategyAdded(newStrategy)
 
+
 @internal
 def _revokeStrategy(oldStrategy: address):
-    self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
+    self._enforceRole(msg.sender, Roles.STRATEGY_MANAGER)
     assert self.strategies[oldStrategy].activation != 0, "strategy not active"
     # NOTE: strategy needs to have 0 debt to be revoked
     assert self.strategies[oldStrategy].currentDebt == 0, "strategy has debt"
@@ -619,7 +620,7 @@ def revokeStrategy(oldStrategy: address):
 
 @external
 def migrateStrategy(newStrategy: address, oldStrategy: address):
-    self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
+    self._enforceRole(msg.sender, Roles.STRATEGY_MANAGER)
     assert self.strategies[oldStrategy].activation != 0, "old strategy not active"
     assert self.strategies[oldStrategy].currentDebt == 0, "old strategy has debt"
     assert newStrategy != ZERO_ADDRESS, "strategy cannot be zero address"
@@ -627,14 +628,14 @@ def migrateStrategy(newStrategy: address, oldStrategy: address):
     assert IStrategy(newStrategy).vault() == self, "invalid vault"
     assert self.strategies[newStrategy].activation == 0, "strategy already active"
 
-    migrated_strategy: StrategyParams = self.strategies[oldStrategy]
+    migratedStrategy: StrategyParams = self.strategies[oldStrategy]
 
     # NOTE: we add strategy with same params than the strategy being migrated
     self.strategies[newStrategy] = StrategyParams({
        activation: block.timestamp,
        lastReport: block.timestamp,
-       currentDebt: migrated_strategy.currentDebt,
-       maxDebt: migrated_strategy.maxDebt,
+       currentDebt: migratedStrategy.currentDebt,
+       maxDebt: migratedStrategy.maxDebt,
        totalGain: 0,
        totalLoss: 0
     })
@@ -645,18 +646,16 @@ def migrateStrategy(newStrategy: address, oldStrategy: address):
 
 
 @external
-def updateMaxDebtForStrategy(strategy: address, new_maxDebt: uint256):
-    self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
+def updateMaxDebtForStrategy(strategy: address, newMaxDebt: uint256):
+    self._enforceRole(msg.sender, Roles.DEBT_MANAGER)
     assert self.strategies[strategy].activation != 0, "inactive strategy"
     # TODO: should we check that totalMaxDebt is not over 100% of assets?
-    self.strategies[strategy].maxDebt = new_maxDebt
-
-    log UpdatedMaxDebtForStrategy(msg.sender, strategy, new_maxDebt)
-
+    self.strategies[strategy].maxDebt = newMaxDebt
+    log UpdatedMaxDebtForStrategy(msg.sender, strategy, newMaxDebt)
 
 @external
 def updateDebt(strategy: address) -> uint256:
-    self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
+    self._enforceRole(msg.sender, Roles.DEBT_MANAGER)
     currentDebt: uint256 = self.strategies[strategy].currentDebt
 
     minDesiredDebt: uint256 = 0
@@ -743,7 +742,7 @@ def processReport(strategy: address) -> (uint256, uint256):
         feeManager: address = self.feeManager
         # if fee manager is not set, fees are zero
         if feeManager != ZERO_ADDRESS:
-            totalFees = IFeeManager(feeManager).assess_fees(strategy, gain)
+            totalFees = IFeeManager(feeManager).assessFees(strategy, gain)
             # if fees are non-zero, issue shares
             if totalFees > 0:
                 self._issueSharesForAmount(totalFees, feeManager)
@@ -824,21 +823,21 @@ def setDepositLimit(depositLimit: uint256):
 
 # Role management
 @external
-def set_role(account: address, role: Roles):
-    assert msg.sender == self.role_manager
+def setRole(account: address, role: Roles):
+    assert msg.sender == self.roleManager
     self.roles[account] = role
 
 @internal
-def _enforce_role(account: address, role: Roles):
+def _enforceRole(account: address, role: Roles):
     assert role in self.roles[account] # dev: not allowed
 
 @external
-def transfer_role_manager(role_manager: address):
-    assert msg.sender == self.role_manager
-    self.future_role_manager = role_manager
+def transferRoleManager(roleManager: address):
+    assert msg.sender == self.roleManager
+    self.futureRoleManager = roleManager
 
 @external
-def accept_role_manager():
-    assert msg.sender == self.future_role_manager
-    self.role_manager = msg.sender
-    self.future_role_manager = ZERO_ADDRESS
+def acceptRoleManager():
+    assert msg.sender == self.futureRoleManager
+    self.roleManager = msg.sender
+    self.futureRoleManager = ZERO_ADDRESS

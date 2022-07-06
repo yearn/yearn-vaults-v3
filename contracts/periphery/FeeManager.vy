@@ -19,16 +19,16 @@ interface IStrategy:
 
 # EVENTS #
 event CommitFeeManager:
-    fee_manager: address
+    feeManager: address
 
 event ApplyFeeManager:
-    fee_manager: address
+    feeManager: address
 
 event UpdatePerformanceFee:
-    performance_fee: uint256
+    performanceFee: uint256
 
 event UpdateManagementFee:
-    management_fee: uint256
+    managementFee: uint256
 
 event DistributeRewards:
     rewards: uint256
@@ -36,8 +36,8 @@ event DistributeRewards:
 
 # STRUCTS #
 struct Fee:
-    management_fee: uint256
-    performance_fee: uint256
+    managementFee: uint256
+    performanceFee: uint256
 
 
 # CONSTANTS #
@@ -53,104 +53,104 @@ SECS_PER_YEAR: constant(uint256) = 31_556_952  # 365.2425 days
 
 
 # STORAGE #
-fee_manager: public(address)
-future_fee_manager: public(address)
+feeManager: public(address)
+futureFeeManager: public(address)
 fees: public(HashMap[address, Fee])
 
 
 @external
 def __init__():
-    self.fee_manager = msg.sender
+    self.feeManager = msg.sender
 
 
 @view
 @external
-def assess_fees(strategy: address, gain: uint256) -> uint256:
+def assessFees(strategy: address, gain: uint256) -> uint256:
     """
     @dev assumes gain > 0
     """
-    strategy_params: StrategyParams = IVault(msg.sender).strategies(strategy)
+    strategyParams: StrategyParams = IVault(msg.sender).strategies(strategy)
     fee: Fee = self.fees[strategy]
-    duration: uint256 = block.timestamp - strategy_params.lastReport
+    duration: uint256 = block.timestamp - strategyParams.lastReport
 
-    management_fee: uint256 = (
-        ((strategy_params.currentDebt - IStrategy(strategy).delegatedAssets()))
+    managementFee: uint256 = (
+        ((strategyParams.currentDebt - IStrategy(strategy).delegatedAssets()))
         * duration
-        * fee.management_fee
+        * fee.managementFee
         / MAX_BPS
         / SECS_PER_YEAR
     )
-    performance_fee: uint256 = (gain * fee.performance_fee) / MAX_BPS
-    total_fee: uint256 = management_fee + performance_fee
+    performanceFee: uint256 = (gain * fee.performanceFee) / MAX_BPS
+    totalFee: uint256 = managementFee + performanceFee
 
     # ensure fee does not exceed more than 75% of gain
-    maximum_fee: uint256 = (gain * MAX_SHARE) / MAX_BPS
+    maximumFee: uint256 = (gain * MAX_SHARE) / MAX_BPS
     # test with min?
-    if total_fee > maximum_fee:
-        total_fee = maximum_fee
+    if totalFee > maximumFee:
+        totalFee = maximumFee
 
-    return total_fee
+    return totalFee
 
 
 @external
 def distribute(vault: ERC20):
-    assert msg.sender == self.fee_manager, "not fee manager"
+    assert msg.sender == self.feeManager, "not fee manager"
     rewards: uint256 = vault.balanceOf(self)
     vault.transfer(msg.sender, rewards)
     log DistributeRewards(rewards)
 
 
 @external
-def set_performance_fee(vault: address, performance_fee: uint256):
-    assert msg.sender == self.fee_manager, "not fee manager"
-    assert performance_fee <= self._performance_fee_threshold(), "exceeds performance fee threshold"
-    self.fees[vault].performance_fee = performance_fee
-    log UpdatePerformanceFee(performance_fee)
+def setPerformanceFee(vault: address, performanceFee: uint256):
+    assert msg.sender == self.feeManager, "not fee manager"
+    assert performanceFee <= self._performanceFeeThreshold(), "exceeds performance fee threshold"
+    self.fees[vault].performanceFee = performanceFee
+    log UpdatePerformanceFee(performanceFee)
 
 
 @external
-def set_management_fee(vault: address, management_fee: uint256):
-    assert msg.sender == self.fee_manager, "not fee manager"
-    assert management_fee <= self._management_fee_threshold(), "exceeds management fee threshold"
-    self.fees[vault].management_fee = management_fee
-    log UpdateManagementFee(management_fee)
+def setManagementFee(vault: address, managementFee: uint256):
+    assert msg.sender == self.feeManager, "not fee manager"
+    assert managementFee <= self._managementFeeThreshold(), "exceeds management fee threshold"
+    self.fees[vault].managementFee = managementFee
+    log UpdateManagementFee(managementFee)
 
 
 @external
-def commit_fee_manager(future_fee_manager: address):
-    assert msg.sender == self.fee_manager, "not fee manager"
-    self.future_fee_manager = future_fee_manager
-    log CommitFeeManager(future_fee_manager)
+def commitFeeManager(futureFeeManager: address):
+    assert msg.sender == self.feeManager, "not fee manager"
+    self.futureFeeManager = futureFeeManager
+    log CommitFeeManager(futureFeeManager)
 
 
 @external
-def apply_fee_manager():
-    assert msg.sender == self.fee_manager, "not fee manager"
-    assert self.future_fee_manager != ZERO_ADDRESS, "future fee manager != zero address"
-    future_fee_manager: address = self.future_fee_manager
-    self.fee_manager = future_fee_manager
-    log ApplyFeeManager(future_fee_manager)
+def applyFeeManager():
+    assert msg.sender == self.feeManager, "not fee manager"
+    assert self.futureFeeManager != ZERO_ADDRESS, "future fee manager != zero address"
+    futureFeeManager: address = self.futureFeeManager
+    self.feeManager = futureFeeManager
+    log ApplyFeeManager(futureFeeManager)
 
 
 @view
 @external
-def performance_fee_threshold() -> uint256:
-    return self._performance_fee_threshold()
+def performanceFeeThreshold() -> uint256:
+    return self._performanceFeeThreshold()
 
 
 @view
 @internal
-def _performance_fee_threshold() -> uint256:
+def _performanceFeeThreshold() -> uint256:
     return MAX_BPS / 2
 
 
 @view
 @external
-def management_fee_threshold() -> uint256:
-    return self._management_fee_threshold()
+def managementFeeThreshold() -> uint256:
+    return self._managementFeeThreshold()
 
 
 @view
 @internal
-def _management_fee_threshold() -> uint256:
+def _managementFeeThreshold() -> uint256:
     return MAX_BPS

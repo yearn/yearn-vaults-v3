@@ -29,5 +29,5 @@ def add_debt_to_strategy(user, strategy, vault, max_debt: int):
 
 
 def set_fees_for_strategy(gov, strategy, fee_manager, management_fee, performance_fee):
-    fee_manager.set_management_fee(strategy.address, management_fee, sender=gov)
-    fee_manager.set_performance_fee(strategy.address, performance_fee, sender=gov)
+    fee_manager.setManagementFee(strategy.address, management_fee, sender=gov)
+    fee_manager.setPerformanceFee(strategy.address, performance_fee, sender=gov)

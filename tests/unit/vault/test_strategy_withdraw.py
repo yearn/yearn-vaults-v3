@@ -14,7 +14,7 @@ def test_withdraw__with_inactive_strategy__reverts(
     inactive_strategy = create_strategy(vault)
     strategies = [inactive_strategy]
 
-    vault.set_role(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
+    vault.setRole(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
     actions.user_deposit(fish, vault, asset, amount)
     actions.add_strategy_to_vault(gov, strategy, vault)
     actions.add_debt_to_strategy(gov, strategy, vault, amount)
@@ -38,7 +38,7 @@ def test_withdraw__with_insufficient_funds_in_strategies__reverts(
     strategy = create_strategy(vault)
     strategies = []  # do not pass in any strategies
 
-    vault.set_role(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
+    vault.setRole(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
     actions.user_deposit(fish, vault, asset, amount)
     actions.add_strategy_to_vault(gov, strategy, vault)
     actions.add_debt_to_strategy(gov, strategy, vault, amount)
@@ -62,7 +62,7 @@ def test_withdraw__with_liquid_strategy_only__withdraws(
     strategy = create_strategy(vault)
     strategies = [strategy]
 
-    vault.set_role(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
+    vault.setRole(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
     actions.user_deposit(fish, vault, asset, amount)
     actions.add_strategy_to_vault(gov, strategy, vault)
     actions.add_debt_to_strategy(gov, strategy, vault, amount)
@@ -100,7 +100,7 @@ def test_withdraw__with_multiple_liquid_strategies__withdraws(
     actions.user_deposit(fish, vault, asset, amount)
 
     # set up strategies
-    vault.set_role(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
+    vault.setRole(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
     for strategy in strategies:
         actions.add_strategy_to_vault(gov, strategy, vault)
         actions.add_debt_to_strategy(gov, strategy, vault, amount_per_strategy)
@@ -141,7 +141,7 @@ def test_withdraw__with_locked_and_liquid_strategy__withdraws(
     actions.user_deposit(fish, vault, asset, amount)
 
     # set up strategies
-    vault.set_role(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
+    vault.setRole(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
     for strategy in strategies:
         actions.add_strategy_to_vault(gov, strategy, vault)
         actions.add_debt_to_strategy(gov, strategy, vault, amount_per_strategy)

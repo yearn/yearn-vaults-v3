@@ -110,7 +110,7 @@ def create_vault(project, gov, fee_manager):
         # set up fee manager
         vault.setFeeManager(fee_manager.address, sender=gov)
 
-        vault.set_role(
+        vault.setRole(
             gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov
         )
 
@@ -149,6 +149,7 @@ def create_lossy_strategy(project, strategist):
 @pytest.fixture(scope="session")
 def vault(gov, asset, create_vault):
     vault = create_vault(asset)
+    vault.setRole(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
     yield vault
 
 
