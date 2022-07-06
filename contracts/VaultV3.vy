@@ -77,6 +77,9 @@ event UpdatedMaxDebtForStrategy:
 event UpdateDepositLimit:
     depositLimit: uint256
 
+event UpdateMinimumTotalIdle:
+    minimumTotalIdle: uint256
+
 # STRUCTS #
 struct StrategyParams:
     activation: uint256
@@ -109,6 +112,7 @@ allowance: public(HashMap[address, HashMap[address, uint256]])
 totalSupply: public(uint256)
 totalDebt: public(uint256)
 totalIdle: public(uint256)
+minimumTotalIdle: public(uint256)
 roles: public(HashMap[address, Roles])
 lastReport: public(uint256)
 lockedProfit: public(uint256)
@@ -677,7 +681,17 @@ def updateDebt(strategy: address) -> uint256:
 
     if currentDebt > newDebt:
         # reduce debt
-        assetsToWithdraw: uint256 = currentDebt - newDebt
+        amountToWithdraw: uint256 = currentDebt - newDebt
+
+        # ensure we always have minimumTotalIdle when updating debt
+        # HACK: to save gas
+        minimumTotalIdle: uint256 = self.minimumTotalIdle
+        totalIdle: uint256 = self.totalIdle
+
+        if totalIdle + amountToWithdraw < minimumTotalIdle:
+            amountToWithdraw = minimumTotalIdle-totalIdle   
+            newDebt = currentDebt-amountToWithdraw
+
         withdrawable: uint256 = IStrategy(strategy).withdrawable()
         assert withdrawable != 0, "nothing to withdraw"
 
@@ -693,15 +707,23 @@ def updateDebt(strategy: address) -> uint256:
         self.totalDebt -= assetsToWithdraw
     else:
         # increase debt
-        assetsToTransfer: uint256 = newDebt - currentDebt
+        amountToTransfer: uint256 = newDebt - currentDebt
+
+        # take into consideration minimumTotalIdle
+        # HACK: to save gas
+        minimumTotalIdle: uint256 = self.minimumTotalIdle
+        totalIdle: uint256 = self.totalIdle
+
+        assert totalIdle > minimumTotalIdle, "no funds to deposit"
+        availableIdle :uint256 = totalIdle - minimumTotalIdle
+        
         # if insufficient funds to deposit, transfer only what is free
-        if assetsToTransfer > self.totalIdle:
-            assetsToTransfer = self.totalIdle
-            newDebt = currentDebt + assetsToTransfer
-        if assetsToTransfer > 0:
-            ASSET.transfer(strategy, assetsToTransfer)
-            self.totalIdle -= assetsToTransfer
-            self.totalDebt += assetsToTransfer
+        if amountToTransfer > availableIdle:
+            amountToTransfer = availableIdle
+        newDebt = currentDebt + amountToTransfer
+        ASSET.transfer(strategy, amountToTransfer)
+        self.totalIdle -= amountToTransfer
+        self.totalDebt += amountToTransfer
 
     self.strategies[strategy].currentDebt = newDebt
 
@@ -783,6 +805,30 @@ def setDepositLimit(depositLimit: uint256):
     # TODO: permissioning: CONFIG_MANAGER
     self.depositLimit = depositLimit
     log UpdateDepositLimit(depositLimit)
+
+
+@external 
+def setMinimumTotalIdle(minimumTotalIdle: uint256):
+    self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
+    self.minimumTotalIdle = minimumTotalIdle
+    log UpdateMinimumTotalIdle(minimumTotalIdle)
+
+
+@internal
+def _transfer(sender: address, receiver: address, amount: uint256):
+    # See note on `transfer()`.
+
+    # Protect people from accidentally sending their shares to bad places
+    assert receiver not in [self, ZERO_ADDRESS]
+    self.balanceOf[sender] -= amount
+    self.balanceOf[receiver] += amount
+    log Transfer(sender, receiver, amount)
+
+
+@external
+def transfer(receiver: address, amount: uint256) -> bool:
+    self._transfer(msg.sender, receiver, amount)
+    return True
 
 
 # def forceProcessReport(strategy: address):
