@@ -4,6 +4,11 @@ from utils import actions
 from utils.constants import DAY
 
 
+@pytest.fixture(autouse=True)
+def seed_vault_with_funds(mint_and_deposit_into_vault, vault, gov):
+    mint_and_deposit_into_vault(vault, gov, 10**18, 10**18 // 2)
+
+
 @pytest.mark.parametrize("max_debt", [0, 10**22])
 def test_update_max_debt__with_debt_value(gov, vault, strategy, max_debt):
     vault.updateMaxDebtForStrategy(strategy.address, max_debt, sender=gov)

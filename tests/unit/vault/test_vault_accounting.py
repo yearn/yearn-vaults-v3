@@ -5,7 +5,8 @@ from utils import actions
 from utils.constants import YEAR
 
 
-def test_vault_airdrop_do_not_increase(gov, asset, vault):
+def test_vault_airdrop_do_not_increase(gov, asset, vault, mint_and_deposit_into_vault):
+    mint_and_deposit_into_vault(vault, gov)
     vault_balance = asset.balanceOf(vault)
     assert vault_balance != 0
     # vault.

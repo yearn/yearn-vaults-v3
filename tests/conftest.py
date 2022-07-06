@@ -109,6 +109,11 @@ def create_vault(project, gov, fee_manager):
         vault.setDepositLimit(deposit_limit, sender=gov)
         # set up fee manager
         vault.setFeeManager(fee_manager.address, sender=gov)
+
+        vault.set_role(
+            gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov
+        )
+
         return vault
 
     yield create_vault
@@ -144,12 +149,6 @@ def create_lossy_strategy(project, strategist):
 @pytest.fixture(scope="session")
 def vault(gov, asset, create_vault):
     vault = create_vault(asset)
-
-    # Make it so vault has some AUM to start
-    vault.set_role(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
-    asset.mint(gov.address, 10**18, sender=gov)
-    asset.approve(vault.address, asset.balanceOf(gov) // 2, sender=gov)
-    vault.deposit(asset.balanceOf(gov) // 2, gov.address, sender=gov)
     yield vault
 
 
@@ -185,6 +184,22 @@ def lossy_strategy(gov, vault, create_lossy_strategy):
 def fee_manager(project, gov):
     fee_manager = gov.deploy(project.FeeManager)
     yield fee_manager
+
+
+@pytest.fixture
+def mint_and_deposit_into_vault(project, gov):
+    def mint_and_deposit_into_vault(
+        vault, account=gov, amount_to_mint=10**18, amount_to_deposit=None
+    ):
+        if amount_to_deposit == None:
+            amount_to_deposit = amount_to_mint
+
+        asset = project.Token.at(vault.asset())
+        asset.mint(account.address, amount_to_mint, sender=account)
+        asset.approve(vault.address, amount_to_deposit, sender=account)
+        vault.deposit(amount_to_deposit, account.address, sender=account)
+
+    yield mint_and_deposit_into_vault
 
 
 @pytest.fixture

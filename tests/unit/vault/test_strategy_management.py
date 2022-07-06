@@ -68,8 +68,9 @@ def test_revoke_strategy__with_existing_strategy(gov, vault, strategy):
 
 
 def test_revoke_strategy__with_non_zero_debt__fails_with_error(
-    gov, asset, vault, strategy
+    gov, asset, vault, strategy, mint_and_deposit_into_vault
 ):
+    mint_and_deposit_into_vault(vault)
     vault_balance = asset.balanceOf(vault)
     new_debt = vault_balance
 
@@ -116,8 +117,9 @@ def test_migrate_strategy__with_no_debt(chain, gov, vault, strategy, create_stra
 
 
 def test_migrate_strategy__with_existing_debt(
-    gov, asset, vault, strategy, create_strategy
+    gov, asset, vault, strategy, mint_and_deposit_into_vault, create_strategy
 ):
+    mint_and_deposit_into_vault(vault)
     vault_balance = asset.balanceOf(vault)
     new_debt = vault_balance
     old_strategy = strategy

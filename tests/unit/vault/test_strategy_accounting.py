@@ -5,6 +5,11 @@ from utils import actions
 from utils.constants import YEAR
 
 
+@pytest.fixture(autouse=True)
+def seed_vault_with_funds(mint_and_deposit_into_vault, vault, gov):
+    mint_and_deposit_into_vault(vault, gov, 10**18, 10**18 // 2)
+
+
 def test_process_report__with_inactive_strategy__reverts(gov, vault, create_strategy):
     strategy = create_strategy(vault)
 
