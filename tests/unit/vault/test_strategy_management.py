@@ -101,8 +101,8 @@ def test_migrate_strategy__with_no_debt(chain, gov, vault, strategy, create_stra
     event = list(tx.decode_logs(vault.StrategyMigrated))
 
     assert len(event) == 1
-    assert event[0].old_strategy == old_strategy.address
-    assert event[0].new_strategy == new_strategy.address
+    assert event[0].oldStrategy == old_strategy.address
+    assert event[0].newStrategy == new_strategy.address
 
     new_strategy_params = vault.strategies(new_strategy)
     assert new_strategy_params.activation == pytest.approx(snapshot, abs=1)
