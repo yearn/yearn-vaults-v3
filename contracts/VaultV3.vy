@@ -698,10 +698,10 @@ def updateDebt(strategy: address) -> uint256:
         if assetsToTransfer > self.totalIdle:
             assetsToTransfer = self.totalIdle
             newDebt = currentDebt + assetsToTransfer
-        if amountToTransfer > 0:
-          ASSET.transfer(strategy, assetsToTransfer)
-          self.totalIdle -= assetsToTransfer
-          self.totalDebt += assetsToTransfer
+        if assetsToTransfer > 0:
+            ASSET.transfer(strategy, assetsToTransfer)
+            self.totalIdle -= assetsToTransfer
+            self.totalDebt += assetsToTransfer
 
     self.strategies[strategy].currentDebt = newDebt
 
