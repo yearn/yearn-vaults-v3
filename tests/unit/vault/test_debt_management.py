@@ -196,7 +196,9 @@ def test_update_debt__with_new_debt_less_than_min_desired_debt__reverts(
 
 
 @pytest.mark.parametrize("minimum_total_idle", [0, 10**21])
-def test_set_minimum_total_idle__with_minimum_total_idle(gov, vault, minimum_total_idle):
+def test_set_minimum_total_idle__with_minimum_total_idle(
+    gov, vault, minimum_total_idle
+):
 
     tx = vault.setMinimumTotalIdle(minimum_total_idle, sender=gov)
     assert vault.minimumTotalIdle() == minimum_total_idle
@@ -207,7 +209,9 @@ def test_set_minimum_total_idle__with_minimum_total_idle(gov, vault, minimum_tot
 
 
 @pytest.mark.parametrize("minimum_total_idle", [10**21])
-def test_set_minimum_total_idle__without_permission__reverts(accounts, vault, minimum_total_idle):
+def test_set_minimum_total_idle__without_permission__reverts(
+    accounts, vault, minimum_total_idle
+):
     """
     Only DEBT_MANAGER should be able to update minimumTotalIdle. Reverting if found any other sender.
     """
@@ -215,12 +219,14 @@ def test_set_minimum_total_idle__without_permission__reverts(accounts, vault, mi
         vault.setMinimumTotalIdle(minimum_total_idle, sender=accounts[-1])
 
 
-def test_update_debt__with_current_debt_less_than_new_debt_and_minimum_total_idle(gov, asset, vault, strategy):
+def test_update_debt__with_current_debt_less_than_new_debt_and_minimum_total_idle(
+    gov, asset, vault, strategy
+):
     """
     Current debt is greater than new debt. Vault has a minimum total idle value small that does not affect the updateDebt method.
     """
     vault_balance = asset.balanceOf(vault)
-    new_debt = vault_balance//2
+    new_debt = vault_balance // 2
     current_debt = vault.strategies(strategy.address).currentDebt
     difference = new_debt - current_debt
     initial_idle = vault.totalIdle()
@@ -251,9 +257,11 @@ def test_update_debt__with_current_debt_less_than_new_debt_and_minimum_total_idl
     assert vault.totalIdle() > vault.minimumTotalIdle()
 
 
-def test_update_debt__with_current_debt_less_than_new_debt_and_total_idle_lower_than_minimum_total_idle__revert(gov, asset, vault, strategy):
+def test_update_debt__with_current_debt_less_than_new_debt_and_total_idle_lower_than_minimum_total_idle__revert(
+    gov, asset, vault, strategy
+):
     """
-    Current debt is greater than new debt. Vault has a total idle value lower/equal to minimum total idle value. It cannot provide more 
+    Current debt is greater than new debt. Vault has a total idle value lower/equal to minimum total idle value. It cannot provide more
     assets to the strategy as there are no funds, we are therefore reverting.
     """
 
@@ -271,7 +279,9 @@ def test_update_debt__with_current_debt_less_than_new_debt_and_total_idle_lower_
         vault.updateDebt(strategy.address, sender=gov)
 
 
-def test_update_debt__with_current_debt_less_than_new_debt_and_minimum_total_idle_reducing_new_debt(gov, asset, vault, strategy):
+def test_update_debt__with_current_debt_less_than_new_debt_and_minimum_total_idle_reducing_new_debt(
+    gov, asset, vault, strategy
+):
     """
     Current debt is lower than new debt. Value of minimum total idle reduces the amount of assets that the vault can provide.
     """
@@ -310,7 +320,9 @@ def test_update_debt__with_current_debt_less_than_new_debt_and_minimum_total_idl
     assert vault.totalDebt() == initial_debt + expected_new_differnce
 
 
-def test_update_debt__with_current_debt_greater_than_new_debt_and_minimum_total_idle(gov, asset, vault, strategy):
+def test_update_debt__with_current_debt_greater_than_new_debt_and_minimum_total_idle(
+    gov, asset, vault, strategy
+):
     """
     Current debt is greater than new debt. Vault has a minimum total idle value small that does not affect the updateDebt method.
     """
@@ -350,7 +362,9 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_minimum_total_
     assert vault.totalDebt() == initial_debt - difference
 
 
-def test_update_debt__with_current_debt_greater_than_new_debt_and_total_iddle_less_than_minimum_total_idle(gov, asset, vault, strategy):
+def test_update_debt__with_current_debt_greater_than_new_debt_and_total_iddle_less_than_minimum_total_idle(
+    gov, asset, vault, strategy
+):
     """
     Current debt is greater than new debt. Vault has a total iddle value lower than its minimum total idle value.
     .updateDebt will reduce the new debt value to increase the amount of assets that its getting from the strategy and ensure that
@@ -373,7 +387,7 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_total_iddle_le
     assert vault.minimumTotalIdle() == current_debt - new_debt + 1
 
     # we compute expected changes in debt due to minimum total idle need
-    expected_new_difference = minimum_total_idle-initial_idle
+    expected_new_difference = minimum_total_idle - initial_idle
     expected_new_debt = current_debt - expected_new_difference
 
     # reduce debt in strategy
@@ -390,5 +404,5 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_total_iddle_le
     assert vault.strategies(strategy.address).currentDebt == expected_new_debt
     assert asset.balanceOf(strategy) == expected_new_debt
     assert asset.balanceOf(vault) == vault_balance + expected_new_difference
-    assert vault.totalIdle() == initial_idle +  expected_new_difference
-    assert vault.totalDebt() == initial_debt -  expected_new_difference
+    assert vault.totalIdle() == initial_idle + expected_new_difference
+    assert vault.totalDebt() == initial_debt - expected_new_difference
