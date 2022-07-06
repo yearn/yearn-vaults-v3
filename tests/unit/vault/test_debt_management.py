@@ -195,8 +195,6 @@ def test_update_debt__with_new_debt_less_than_min_desired_debt__reverts(
         vault.updateDebt(strategy.address, sender=gov)
 
 
-
-
 @pytest.mark.parametrize("minimum_total_idle", [0, 10**21])
 def test_set_minimum_total_idle__with_minimum_total_idle(gov, vault, minimum_total_idle):
 
