@@ -362,11 +362,11 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_minimum_total_
     assert vault.totalDebt() == initial_debt - difference
 
 
-def test_update_debt__with_current_debt_greater_than_new_debt_and_total_iddle_less_than_minimum_total_idle(
+def test_update_debt__with_current_debt_greater_than_new_debt_and_total_idle_less_than_minimum_total_idle(
     gov, asset, vault, strategy
 ):
     """
-    Current debt is greater than new debt. Vault has a total iddle value lower than its minimum total idle value.
+    Current debt is greater than new debt. Vault has a total idle value lower than its minimum total idle value.
     .updateDebt will reduce the new debt value to increase the amount of assets that its getting from the strategy and ensure that
     total idle value is greater than minimum total idle.
     """

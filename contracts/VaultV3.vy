@@ -689,8 +689,8 @@ def updateDebt(strategy: address) -> uint256:
         totalIdle: uint256 = self.totalIdle
 
         if totalIdle + assetsToWithdraw < minimumTotalIdle:
-            assetsToWithdraw = minimumTotalIdle-totalIdle   
-            newDebt = currentDebt-assetsToWithdraw
+            assetsToWithdraw = minimumTotalIdle - totalIdle   
+            newDebt = currentDebt - assetsToWithdraw
 
         withdrawable: uint256 = IStrategy(strategy).withdrawable()
         assert withdrawable != 0, "nothing to withdraw"
@@ -714,7 +714,7 @@ def updateDebt(strategy: address) -> uint256:
         totalIdle: uint256 = self.totalIdle
 
         assert totalIdle > minimumTotalIdle, "no funds to deposit"
-        availableIdle :uint256 = totalIdle - minimumTotalIdle
+        availableIdle: uint256 = totalIdle - minimumTotalIdle
 
         # if insufficient funds to deposit, transfer only what is free
         if assetsToTransfer > availableIdle:
