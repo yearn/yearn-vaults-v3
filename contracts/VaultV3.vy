@@ -77,6 +77,9 @@ event UpdatedMaxDebtForStrategy:
 event UpdateDepositLimit:
     depositLimit: uint256
 
+event UpdateMinimumTotalIdle:
+    minimumTotalIdle: uint256
+
 # STRUCTS #
 struct StrategyParams:
     activation: uint256
@@ -109,6 +112,7 @@ allowance: public(HashMap[address, HashMap[address, uint256]])
 totalSupply: public(uint256)
 totalDebt: public(uint256)
 totalIdle: public(uint256)
+minimumTotalIdle: public(uint256)
 roles: public(HashMap[address, Roles])
 lastReport: public(uint256)
 lockedProfit: public(uint256)
@@ -678,6 +682,16 @@ def updateDebt(strategy: address) -> uint256:
     if currentDebt > newDebt:
         # reduce debt
         assetsToWithdraw: uint256 = currentDebt - newDebt
+
+        # ensure we always have minimumTotalIdle when updating debt
+        # HACK: to save gas
+        minimumTotalIdle: uint256 = self.minimumTotalIdle
+        totalIdle: uint256 = self.totalIdle
+
+        if totalIdle + assetsToWithdraw < minimumTotalIdle:
+            assetsToWithdraw = minimumTotalIdle - totalIdle   
+            newDebt = currentDebt - assetsToWithdraw
+
         withdrawable: uint256 = IStrategy(strategy).withdrawable()
         assert withdrawable != 0, "nothing to withdraw"
 
@@ -694,9 +708,17 @@ def updateDebt(strategy: address) -> uint256:
     else:
         # increase debt
         assetsToTransfer: uint256 = newDebt - currentDebt
+        # take into consideration minimumTotalIdle
+        # HACK: to save gas
+        minimumTotalIdle: uint256 = self.minimumTotalIdle
+        totalIdle: uint256 = self.totalIdle
+
+        assert totalIdle > minimumTotalIdle, "no funds to deposit"
+        availableIdle: uint256 = totalIdle - minimumTotalIdle
+
         # if insufficient funds to deposit, transfer only what is free
-        if assetsToTransfer > self.totalIdle:
-            assetsToTransfer = self.totalIdle
+        if assetsToTransfer > availableIdle:
+            assetsToTransfer = availableIdle
             newDebt = currentDebt + assetsToTransfer
         if assetsToTransfer > 0:
             ASSET.transfer(strategy, assetsToTransfer)
@@ -783,6 +805,12 @@ def setDepositLimit(depositLimit: uint256):
     # TODO: permissioning: CONFIG_MANAGER
     self.depositLimit = depositLimit
     log UpdateDepositLimit(depositLimit)
+
+@external 
+def setMinimumTotalIdle(minimumTotalIdle: uint256):
+    self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
+    self.minimumTotalIdle = minimumTotalIdle
+    log UpdateMinimumTotalIdle(minimumTotalIdle)
 
 
 # def forceProcessReport(strategy: address):
