@@ -1,7 +1,7 @@
 import ape
 import pytest
 from ape import chain
-from utils import actions, checks
+from utils import checks
 from utils.constants import ROLES, ZERO_ADDRESS
 
 
@@ -68,13 +68,13 @@ def test_revoke_strategy__with_existing_strategy(gov, vault, strategy):
 
 
 def test_revoke_strategy__with_non_zero_debt__fails_with_error(
-    gov, asset, vault, strategy, mint_and_deposit_into_vault
+    gov, asset, vault, strategy, mint_and_deposit_into_vault, add_debt_to_strategy
 ):
     mint_and_deposit_into_vault(vault)
     vault_balance = asset.balanceOf(vault)
     new_debt = vault_balance
 
-    actions.add_debt_to_strategy(gov, strategy, vault, new_debt)
+    add_debt_to_strategy(gov, strategy, vault, new_debt)
 
     with ape.reverts("strategy has debt"):
         vault.revoke_strategy(strategy.address, sender=gov)
@@ -117,7 +117,13 @@ def test_migrate_strategy__with_no_debt(chain, gov, vault, strategy, create_stra
 
 
 def test_migrate_strategy__with_existing_debt(
-    gov, asset, vault, strategy, mint_and_deposit_into_vault, create_strategy
+    gov,
+    asset,
+    vault,
+    strategy,
+    mint_and_deposit_into_vault,
+    create_strategy,
+    add_debt_to_strategy,
 ):
     mint_and_deposit_into_vault(vault)
     vault_balance = asset.balanceOf(vault)
@@ -125,7 +131,7 @@ def test_migrate_strategy__with_existing_debt(
     old_strategy = strategy
     new_strategy = create_strategy(vault)
 
-    actions.add_debt_to_strategy(gov, strategy, vault, new_debt)
+    add_debt_to_strategy(gov, strategy, vault, new_debt)
 
     with ape.reverts("old strategy has debt"):
         vault.migrate_strategy(new_strategy.address, old_strategy.address, sender=gov)

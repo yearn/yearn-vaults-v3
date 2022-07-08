@@ -1,6 +1,5 @@
 import ape
 import pytest
-from utils import actions
 from utils.constants import DAY
 
 
@@ -55,25 +54,25 @@ def test_update_debt__with_current_debt_less_than_new_debt(gov, asset, vault, st
 
 
 def test_update_debt__with_current_debt_equal_to_new_debt__reverts(
-    gov, asset, vault, strategy
+    gov, asset, vault, strategy, add_debt_to_strategy
 ):
     vault_balance = asset.balanceOf(vault)
     new_debt = vault_balance // 2
 
-    actions.add_debt_to_strategy(gov, strategy, vault, new_debt)
+    add_debt_to_strategy(gov, strategy, vault, new_debt)
 
     with ape.reverts("new debt equals current debt"):
         vault.update_debt(strategy.address, sender=gov)
 
 
 def test_update_debt__with_current_debt_greater_than_new_debt_and_zero_withdrawable__reverts(
-    gov, asset, vault, locked_strategy
+    gov, asset, vault, locked_strategy, add_debt_to_strategy
 ):
     vault_balance = asset.balanceOf(vault)
     current_debt = vault_balance
     new_debt = vault_balance // 2
 
-    actions.add_debt_to_strategy(gov, locked_strategy, vault, current_debt)
+    add_debt_to_strategy(gov, locked_strategy, vault, current_debt)
     # lock funds to set withdrawable to zero
     locked_strategy.setLockedFunds(current_debt, DAY, sender=gov)
     # reduce debt in strategy
@@ -84,7 +83,7 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_zero_withdrawa
 
 
 def test_update_debt__with_current_debt_greater_than_new_debt_and_insufficient_withdrawable(
-    gov, asset, vault, locked_strategy
+    gov, asset, vault, locked_strategy, add_debt_to_strategy
 ):
     vault_balance = asset.balanceOf(vault)
     current_debt = vault_balance
@@ -92,7 +91,7 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_insufficient_w
     new_debt = vault_balance // 4
     difference = current_debt - locked_debt  # maximum we can withdraw
 
-    actions.add_debt_to_strategy(gov, locked_strategy, vault, current_debt)
+    add_debt_to_strategy(gov, locked_strategy, vault, current_debt)
 
     # reduce debt in strategy
     vault.update_max_debt_for_strategy(locked_strategy.address, new_debt, sender=gov)
@@ -117,16 +116,22 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_insufficient_w
 
 
 def test_update_debt__with_current_debt_greater_than_new_debt_and_sufficient_withdrawable(
-    gov, asset, vault, strategy
+    gov, asset, vault, strategy, add_debt_to_strategy
 ):
     vault_balance = asset.balanceOf(vault)
     current_debt = vault_balance
     new_debt = vault_balance // 2
     difference = current_debt - new_debt
 
+<<<<<<< HEAD
     actions.add_debt_to_strategy(gov, strategy, vault, current_debt)
     initial_idle = vault.total_idle()
     initial_debt = vault.total_debt()
+=======
+    add_debt_to_strategy(gov, strategy, vault, current_debt)
+    initial_idle = vault.totalIdle()
+    initial_debt = vault.totalDebt()
+>>>>>>> 95b7a89 (chore: moved actions to conftest as fixtures)
 
     # reduce debt in strategy
     vault.update_max_debt_for_strategy(strategy.address, new_debt, sender=gov)
@@ -177,7 +182,7 @@ def test_update_debt__with_new_debt_greater_than_max_desired_debt(
 
 
 def test_update_debt__with_new_debt_less_than_min_desired_debt__reverts(
-    gov, asset, vault, strategy
+    gov, asset, vault, strategy, add_debt_to_strategy
 ):
     vault_balance = asset.balanceOf(vault)
     current_debt = vault_balance // 2
@@ -185,7 +190,7 @@ def test_update_debt__with_new_debt_less_than_min_desired_debt__reverts(
     min_desired_debt = vault_balance * 2
 
     # set existing debt
-    actions.add_debt_to_strategy(gov, strategy, vault, current_debt)
+    add_debt_to_strategy(gov, strategy, vault, current_debt)
 
     # set new max debt lower than min debt
     vault.update_max_debt_for_strategy(strategy.address, new_debt, sender=gov)
@@ -321,7 +326,7 @@ def test_update_debt__with_current_debt_less_than_new_debt_and_minimum_total_idl
 
 
 def test_update_debt__with_current_debt_greater_than_new_debt_and_minimum_total_idle(
-    gov, asset, vault, strategy
+    gov, asset, vault, strategy, add_debt_to_strategy
 ):
     """
     Current debt is greater than new debt. Vault has a minimum total idle value small that does not affect the update_debt method.
@@ -331,7 +336,7 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_minimum_total_
     new_debt = vault_balance // 2
     difference = current_debt - new_debt
 
-    actions.add_debt_to_strategy(gov, strategy, vault, current_debt)
+    add_debt_to_strategy(gov, strategy, vault, current_debt)
 
     # we compute vault values again, as they have changed
     vault_balance = asset.balanceOf(vault)
@@ -363,7 +368,7 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_minimum_total_
 
 
 def test_update_debt__with_current_debt_greater_than_new_debt_and_total_idle_less_than_minimum_total_idle(
-    gov, asset, vault, strategy
+    gov, asset, vault, strategy, add_debt_to_strategy
 ):
     """
     Current debt is greater than new debt. Vault has a total idle value lower than its minimum total idle value.
@@ -374,7 +379,7 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_total_idle_les
     current_debt = vault_balance
     new_debt = vault_balance // 3
 
-    actions.add_debt_to_strategy(gov, strategy, vault, current_debt)
+    add_debt_to_strategy(gov, strategy, vault, current_debt)
 
     # we compute vault values again, as they have changed
     vault_balance = asset.balanceOf(vault)

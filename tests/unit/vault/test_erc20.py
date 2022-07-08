@@ -1,5 +1,4 @@
 import ape
-from utils import actions
 from utils.constants import MAX_INT
 
 
@@ -12,16 +11,12 @@ def test_transfer__with_insufficient_funds__revert(fish, bunny, asset, create_va
 
 
 def test_transfer__with_insufficient_funds__transfer(
-    fish,
-    fish_amount,
-    bunny,
-    asset,
-    create_vault,
+    fish, fish_amount, bunny, asset, create_vault, user_deposit
 ):
     vault = create_vault(asset)
     amount = fish_amount
 
-    actions.user_deposit(fish, vault, asset, amount)
+    user_deposit(fish, vault, asset, amount)
 
     tx = vault.transfer(bunny.address, amount, sender=fish)
     event = list(tx.decode_logs(vault.Transfer))
@@ -98,12 +93,12 @@ def test_decrease_allowance__with_amount__approve(
 
 
 def test_transfer_from__with_approval__transfer(
-    fish, fish_amount, bunny, doggie, asset, create_vault
+    fish, fish_amount, bunny, doggie, asset, create_vault, user_deposit
 ):
     vault = create_vault(asset)
     amount = fish_amount
 
-    actions.user_deposit(fish, vault, asset, amount)
+    user_deposit(fish, vault, asset, amount)
 
     vault.approve(bunny.address, amount, sender=fish)
     tx = vault.transferFrom(fish.address, doggie.address, amount, sender=bunny)
@@ -127,12 +122,12 @@ def test_transfer_from__with_approval__transfer(
 
 
 def test_transfer_from__with_insufficient_allowance__reverts(
-    fish, fish_amount, bunny, doggie, asset, create_vault
+    fish, fish_amount, bunny, doggie, asset, create_vault, user_deposit
 ):
     vault = create_vault(asset)
     amount = fish_amount
 
-    actions.user_deposit(fish, vault, asset, amount)
+    user_deposit(fish, vault, asset, amount)
 
     with ape.reverts():
         vault.transferFrom(fish.address, doggie.address, amount, sender=bunny)
