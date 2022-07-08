@@ -4,7 +4,6 @@ from vyper.interfaces import ERC20
 from vyper.interfaces import ERC20Detailed
 
 # TODO: external contract: factory
-# TODO: external contract: healtcheck
 
 # INTERFACES #
 interface IStrategy:
@@ -17,6 +16,9 @@ interface IStrategy:
 
 interface IFeeManager:
     def assess_fees(strategy: address, gain: uint256) -> uint256: view
+
+interface ICommonHealthCheck:
+    def check(strategy: address, gain: uint256, loss: uint256, currentDebt: uint256) -> bool: view
 
 # EVENTS #
 event Deposit:
@@ -68,6 +70,9 @@ event DebtUpdated:
 
 event UpdateFeeManager:
     feeManager: address
+
+event UpdateHealthCheck:
+    healthCheck: address
 
 event UpdatedMaxDebtForStrategy:
     sender: address
@@ -410,7 +415,7 @@ def _redeem(_sender: address, _receiver: address, _owner: address, _shares: uint
     assert shares > 0, "no shares to withdraw"
 
     assets: uint256 = self._convertToAssets(shares)
-    
+
     # load to memory to save gas
     currTotalIdle: uint256 = self.totalIdle
 
@@ -429,8 +434,8 @@ def _redeem(_sender: address, _receiver: address, _owner: address, _shares: uint
             if assetsToWithdraw == 0:
                 continue
 
-	    # TODO: should the vault check that the strategy has unlocked requested funds? 
-	    # if so, should it just withdraw the unlocked funds and just assume the rest are lost?
+            # TODO: should the vault check that the strategy has unlocked requested funds?
+            # if so, should it just withdraw the unlocked funds and just assume the rest are lost?
             IStrategy(strategy).freeFunds(assetsToWithdraw)
             ASSET.transferFrom(strategy, self, assetsToWithdraw)
             currTotalIdle += assetsToWithdraw
@@ -464,7 +469,7 @@ def _maxDeposit(receiver: address) -> uint256:
     _depositLimit: uint256 = self.depositLimit
     if (_totalAssets >= _depositLimit):
         return 0
-    return _depositLimit - _totalAssets 
+    return _depositLimit - _totalAssets
 
 
 @view
@@ -710,7 +715,7 @@ def updateDebt(strategy: address) -> uint256:
 
 # # P&L MANAGEMENT FUNCTIONS #
 @external
-def processReport(strategy: address) -> (uint256, uint256):
+def processReport(strategy: address, force: bool=False) -> (uint256, uint256):
     # TODO: permissioned: ACCOUNTING_MANAGER (open?)
 
     assert self.strategies[strategy].activation != 0, "inactive strategy"
@@ -721,12 +726,15 @@ def processReport(strategy: address) -> (uint256, uint256):
     gain: uint256 = 0
     loss: uint256 = 0
 
-    # TODO: implement health check
-
     if totalAssets > currentDebt:
         gain = totalAssets - currentDebt
     else:
         loss = currentDebt - totalAssets
+
+    if not force:
+        healthCheck: address = self.healthCheck
+        if (self.healthCheck != ZERO_ADDRESS):
+            assert ICommonHealthCheck(healthCheck).check(strategy, gain, loss, currentDebt), "unhealthy strategy"
 
     if loss > 0:
         self.strategies[strategy].totalLoss += loss
@@ -785,6 +793,13 @@ def setDepositLimit(depositLimit: uint256):
     log UpdateDepositLimit(depositLimit)
 
 
+@external
+def setHealthCheck(newHealthCheck: address):
+    # TODO: permissioning: CONFIG_MANAGER
+    self.healthCheck = newHealthCheck
+    log UpdateHealthCheck(newHealthCheck)
+
+
 # def forceProcessReport(strategy: address):
 #     # permissioned: ACCOUNTING_MANAGER
 #     # TODO: allows processing the report with losses ! this should only be called in special situations
@@ -812,15 +827,6 @@ def setDepositLimit(depositLimit: uint256):
 #     # TODO: change emergency shutdown flag
 #     return
 
-# # SETTERS #
-# def setHealthcheck(newhealtcheck: address):
-#     # permissioned: SETTER
-#     # TODO: change healtcheck contract
-#     return
-
-# def setFeeManager(newFeeManager: address):
-#     # TODO: change feemanager contract
-#     return
 
 # Role management
 @external

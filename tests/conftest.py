@@ -147,7 +147,7 @@ def create_lossy_strategy(project, strategist):
 
 
 @pytest.fixture(scope="session")
-def vault(gov, asset, create_vault):
+def vault(asset, create_vault):
     vault = create_vault(asset)
     yield vault
 
@@ -184,6 +184,12 @@ def lossy_strategy(gov, vault, create_lossy_strategy):
 def fee_manager(project, gov):
     fee_manager = gov.deploy(project.FeeManager)
     yield fee_manager
+
+
+@pytest.fixture(scope="session")
+def health_check(project, gov):
+    health_check = gov.deploy(project.CommonHealthCheck)
+    yield health_check
 
 
 @pytest.fixture
