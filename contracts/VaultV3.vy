@@ -19,6 +19,7 @@ interface IFeeManager:
     def assess_fees(strategy: address, gain: uint256) -> uint256: view
 
 # EVENTS #
+# ERC4626 EVENTS
 event Deposit:
     sender: indexed(address)
     owner: indexed(address)
@@ -32,6 +33,7 @@ event Withdraw:
     assets: uint256
     shares: uint256
 
+# ERC20 EVENTS
 event Transfer:
     sender: indexed(address)
     receiver: indexed(address)
@@ -42,6 +44,7 @@ event Approval:
     spender: indexed(address)
     value: uint256
 
+# STRATEGY MANAGEMENT EVENTS
 event StrategyAdded:
     strategy: indexed(address)
 
@@ -61,11 +64,13 @@ event StrategyReported:
     totalLoss: uint256
     totalFees: uint256
 
+# DEBT MANAGEMENT EVENTS
 event DebtUpdated:
     strategy: address
     currentDebt: uint256
     newDebt: uint256
 
+# STORAGE MANAGEMENT EVENTS
 event UpdateFeeManager:
     feeManager: address
 
@@ -153,9 +158,14 @@ def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: a
 
 ## ERC20 ##
 @internal
-def _spendAllowance(owner: address, sender: address, amount: uint256):
-    assert self.allowance[owner][sender] >= amount, "insufficient allowance"
-    self.allowance[owner][sender] -= amount
+def _spendAllowance(owner: address, spender: address, amount: uint256):
+    # Unlimited approval (saves an SSTORE)
+    if (self.allowance[owner][spender] < MAX_UINT256):
+        currentAllowance: uint256 = self.allowance[owner][spender]
+        assert currentAllowance >= amount, "insufficient allowance"
+        self.allowance[owner][spender] = currentAllowance - amount
+        # NOTE: Allows log filters to have a full accounting of allowance changes
+        log Approval(owner, spender, currentAllowance - amount)
 
 @internal
 def _transfer(sender: address, receiver: address, amount: uint256):
@@ -175,12 +185,7 @@ def transfer(receiver: address, amount: uint256) -> bool:
 
 @external
 def transferFrom(sender: address, receiver: address, amount: uint256) -> bool:
-    # Unlimited approval (saves an SSTORE)
-    if (self.allowance[sender][msg.sender] < MAX_UINT256):
-        allowance: uint256 = self.allowance[sender][msg.sender] - amount
-        self.allowance[sender][msg.sender] = allowance
-        # NOTE: Allows log filters to have a full accounting of allowance changes
-        log Approval(sender, msg.sender, allowance)
+    self._spendAllowance(sender, msg.sender, amount)
     self._transfer(sender, receiver, amount)
     return True
 
