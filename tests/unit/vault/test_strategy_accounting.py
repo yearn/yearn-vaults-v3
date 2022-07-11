@@ -1,7 +1,7 @@
+from hashlib import new
 import ape
 import pytest
 from ape import chain
-from utils import actions
 from utils.constants import YEAR
 
 
@@ -18,12 +18,12 @@ def test_process_report__with_inactive_strategy__reverts(gov, vault, create_stra
 
 
 def test_process_report__with_total_assets_equal_current_debt__reverts(
-    gov, asset, vault, strategy
+    gov, asset, vault, strategy, add_debt_to_strategy
 ):
     vault_balance = asset.balanceOf(vault)
     new_debt = vault_balance
 
-    actions.add_debt_to_strategy(gov, strategy, vault, new_debt)
+    add_debt_to_strategy(gov, strategy, vault, new_debt)
 
     with ape.reverts("nothing to report"):
         vault.process_report(strategy.address, sender=gov)
@@ -34,14 +34,16 @@ def test_process_report__with_unhealthy_strategy__reverts():
     pass
 
 
-def test_process_report__with_gain_and_zero_fees(chain, gov, asset, vault, strategy):
+def test_process_report__with_gain_and_zero_fees(
+    chain, gov, asset, vault, strategy, airdrop_asset, add_debt_to_strategy
+):
     vault_balance = asset.balanceOf(vault)
     new_debt = vault_balance
     gain = new_debt // 2
 
     # add debt to strategy
-    actions.add_debt_to_strategy(gov, strategy, vault, new_debt)
-    actions.airdrop_asset(gov, asset, strategy, gain)
+    add_debt_to_strategy(gov, strategy, vault, new_debt)
+    airdrop_asset(gov, asset, strategy, gain)
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
@@ -71,7 +73,15 @@ def test_process_report__with_gain_and_zero_fees(chain, gov, asset, vault, strat
 
 
 def test_process_report__with_gain_and_zero_management_fees(
-    chain, gov, asset, vault, strategy, fee_manager
+    chain,
+    gov,
+    asset,
+    vault,
+    strategy,
+    fee_manager,
+    airdrop_asset,
+    set_fees_for_strategy,
+    add_debt_to_strategy,
 ):
     vault_balance = asset.balanceOf(vault)
     new_debt = vault_balance
@@ -81,13 +91,11 @@ def test_process_report__with_gain_and_zero_management_fees(
     total_fee = gain // 2
 
     # add debt to strategy
-    actions.add_debt_to_strategy(gov, strategy, vault, new_debt)
+    add_debt_to_strategy(gov, strategy, vault, new_debt)
     # airdrop gain to strategy
-    actions.airdrop_asset(gov, asset, strategy, gain)
+    airdrop_asset(gov, asset, strategy, gain)
     # set up fee manager
-    actions.set_fees_for_strategy(
-        gov, strategy, fee_manager, management_fee, performance_fee
-    )
+    set_fees_for_strategy(gov, strategy, fee_manager, management_fee, performance_fee)
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
@@ -118,7 +126,15 @@ def test_process_report__with_gain_and_zero_management_fees(
 
 
 def test_process_report__with_gain_and_zero_performance_fees(
-    chain, gov, asset, vault, strategy, fee_manager
+    chain,
+    gov,
+    asset,
+    vault,
+    strategy,
+    fee_manager,
+    airdrop_asset,
+    set_fees_for_strategy,
+    add_debt_to_strategy,
 ):
     vault_balance = asset.balanceOf(vault)
     new_debt = vault_balance
@@ -128,13 +144,11 @@ def test_process_report__with_gain_and_zero_performance_fees(
     total_fee = vault_balance // 10  # 10% mgmt fee over all assets, over a year
 
     # add debt to strategy
-    actions.add_debt_to_strategy(gov, strategy, vault, new_debt)
+    add_debt_to_strategy(gov, strategy, vault, new_debt)
     # airdrop gain to strategy
-    actions.airdrop_asset(gov, asset, strategy, gain)
+    airdrop_asset(gov, asset, strategy, gain)
     # set up fee manager
-    actions.set_fees_for_strategy(
-        gov, strategy, fee_manager, management_fee, performance_fee
-    )
+    set_fees_for_strategy(gov, strategy, fee_manager, management_fee, performance_fee)
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
@@ -168,7 +182,15 @@ def test_process_report__with_gain_and_zero_performance_fees(
 
 
 def test_process_report__with_gain_and_both_fees(
-    chain, gov, asset, vault, strategy, fee_manager
+    chain,
+    gov,
+    asset,
+    vault,
+    strategy,
+    fee_manager,
+    airdrop_asset,
+    set_fees_for_strategy,
+    add_debt_to_strategy,
 ):
     vault_balance = asset.balanceOf(vault)
     new_debt = vault_balance
@@ -178,13 +200,11 @@ def test_process_report__with_gain_and_both_fees(
     total_fee = gain // 4
 
     # add debt to strategy
-    actions.add_debt_to_strategy(gov, strategy, vault, new_debt)
+    add_debt_to_strategy(gov, strategy, vault, new_debt)
     # airdrop gain to strategy
-    actions.airdrop_asset(gov, asset, strategy, gain)
+    airdrop_asset(gov, asset, strategy, gain)
     # set up fee manager
-    actions.set_fees_for_strategy(
-        gov, strategy, fee_manager, management_fee, performance_fee
-    )
+    set_fees_for_strategy(gov, strategy, fee_manager, management_fee, performance_fee)
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
@@ -217,7 +237,15 @@ def test_process_report__with_gain_and_both_fees(
 
 
 def test_process_report__with_fees_exceeding_fee_cap(
-    chain, gov, asset, vault, strategy, fee_manager
+    chain,
+    gov,
+    asset,
+    vault,
+    strategy,
+    fee_manager,
+    airdrop_asset,
+    set_fees_for_strategy,
+    add_debt_to_strategy,
 ):
     # test that fees are capped to 75% of gains
     vault_balance = asset.balanceOf(vault)
@@ -228,13 +256,11 @@ def test_process_report__with_fees_exceeding_fee_cap(
     max_fee = gain * 3 // 4  # max fee set at 3/4
 
     # add debt to strategy
-    actions.add_debt_to_strategy(gov, strategy, vault, new_debt)
+    add_debt_to_strategy(gov, strategy, vault, new_debt)
     # airdrop gain to strategy
-    actions.airdrop_asset(gov, asset, strategy, gain)
+    airdrop_asset(gov, asset, strategy, gain)
     # set up fee manager
-    actions.set_fees_for_strategy(
-        gov, strategy, fee_manager, management_fee, performance_fee
-    )
+    set_fees_for_strategy(gov, strategy, fee_manager, management_fee, performance_fee)
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
@@ -265,13 +291,15 @@ def test_process_report__with_fees_exceeding_fee_cap(
     assert vault.balanceOf(fee_manager) == max_fee
 
 
-def test_process_report__with_loss(chain, gov, asset, vault, lossy_strategy):
+def test_process_report__with_loss(
+    chain, gov, asset, vault, lossy_strategy, add_debt_to_strategy
+):
     vault_balance = asset.balanceOf(vault)
     new_debt = vault_balance
     loss = new_debt // 2
 
     # add debt to strategy and incur loss
-    actions.add_debt_to_strategy(gov, lossy_strategy, vault, new_debt)
+    add_debt_to_strategy(gov, lossy_strategy, vault, new_debt)
     lossy_strategy.setLoss(gov.address, loss, sender=gov)
 
     strategy_params = vault.strategies(lossy_strategy.address)

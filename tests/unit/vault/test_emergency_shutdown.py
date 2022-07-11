@@ -1,6 +1,5 @@
 import ape
 import pytest
-from utils import actions
 from utils.constants import ROLES
 
 
@@ -46,12 +45,12 @@ def test_shutdown_cant_deposit_can_withdraw(
 
 
 def test_strategy_return_funds(
-    vault, strategy, asset, gov, mint_and_deposit_into_vault
+    vault, strategy, asset, gov, mint_and_deposit_into_vault, add_debt_to_strategy
 ):
     mint_and_deposit_into_vault(vault, gov)
     vault_balance = asset.balanceOf(vault)
     assert vault_balance != 0
-    actions.add_debt_to_strategy(gov, strategy, vault, vault_balance)
+    add_debt_to_strategy(gov, strategy, vault, vault_balance)
     assert asset.balanceOf(strategy) == vault_balance
     assert asset.balanceOf(vault) == 0
     vault.shutdown_vault(sender=gov)
