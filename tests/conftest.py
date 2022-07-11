@@ -106,9 +106,9 @@ def create_vault(project, gov, fee_manager):
     def create_vault(asset, governance=gov, deposit_limit=MAX_INT):
         vault = gov.deploy(project.VaultV3, asset, "VaultV3", "AV", governance)
         # set vault deposit
-        vault.setDepositLimit(deposit_limit, sender=gov)
+        vault.set_deposit_limit(deposit_limit, sender=gov)
         # set up fee manager
-        vault.setFeeManager(fee_manager.address, sender=gov)
+        vault.set_fee_manager(fee_manager.address, sender=gov)
 
         vault.set_role(
             gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov
@@ -156,7 +156,7 @@ def vault(gov, asset, create_vault):
 @pytest.fixture(scope="session")
 def strategy(gov, vault, create_strategy):
     strategy = create_strategy(vault)
-    vault.addStrategy(strategy.address, sender=gov)
+    vault.add_strategy(strategy.address, sender=gov)
     strategy.setMinDebt(0, sender=gov)
     strategy.setMaxDebt(MAX_INT, sender=gov)
     yield strategy
@@ -165,7 +165,7 @@ def strategy(gov, vault, create_strategy):
 @pytest.fixture(scope="session")
 def locked_strategy(gov, vault, create_locked_strategy):
     strategy = create_locked_strategy(vault)
-    vault.addStrategy(strategy.address, sender=gov)
+    vault.add_strategy(strategy.address, sender=gov)
     strategy.setMinDebt(0, sender=gov)
     strategy.setMaxDebt(MAX_INT, sender=gov)
     yield strategy
@@ -174,7 +174,7 @@ def locked_strategy(gov, vault, create_locked_strategy):
 @pytest.fixture(scope="session")
 def lossy_strategy(gov, vault, create_lossy_strategy):
     strategy = create_lossy_strategy(vault)
-    vault.addStrategy(strategy.address, sender=gov)
+    vault.add_strategy(strategy.address, sender=gov)
     strategy.setMinDebt(0, sender=gov)
     strategy.setMaxDebt(MAX_INT, sender=gov)
     yield strategy
@@ -213,7 +213,7 @@ def sign_vault_permit(chain):
         override_nonce=None,
     ):
         name = "Yearn Vault"
-        version = vault.apiVersion()
+        version = vault.api_version()
         if override_nonce:
             nonce = override_nonce
         else:
@@ -223,8 +223,8 @@ def sign_vault_permit(chain):
                 "EIP712Domain": [
                     {"name": "name", "type": "string"},
                     {"name": "version", "type": "string"},
-                    {"name": "chainId", "type": "uint256"},
-                    {"name": "verifyingContract", "type": "address"},
+                    {"name": "chain_id", "type": "uint256"},
+                    {"name": "verifying_contract", "type": "address"},
                 ],
                 "Permit": [
                     {"name": "owner", "type": "address"},
@@ -237,8 +237,8 @@ def sign_vault_permit(chain):
             "domain": {
                 "name": name,
                 "version": version,
-                "chainId": chain.chain_id,
-                "verifyingContract": str(vault),
+                "chain_id": chain.chain_id,
+                "verifying_contract": str(vault),
             },
             "primaryType": "Permit",
             "message": {

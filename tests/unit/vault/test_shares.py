@@ -38,7 +38,7 @@ def test_deposit__with_deposit_limit_within_deposit_limit__deposit_balance(
     assert event[0].shares == shares
     assert event[0].assets == amount
 
-    assert vault.totalIdle() == amount
+    assert vault.total_idle() == amount
     assert vault.balanceOf(fish) == amount
     assert vault.totalSupply() == amount
     assert asset.balanceOf(fish) == 0
@@ -73,7 +73,7 @@ def test_deposit_all__with_deposit_limit_within_deposit_limit__deposits(
     assert event[0].shares == shares
     assert event[0].assets == amount
 
-    assert vault.totalIdle() == balance
+    assert vault.total_idle() == balance
     assert vault.balanceOf(fish) == balance
     assert vault.totalSupply() == balance
     assert asset.balanceOf(fish) == 0
@@ -156,7 +156,7 @@ def test_mint__with_deposit_limit_within_deposit_limit__deposit_balance(
     assert event[0].shares == shares
     assert event[0].assets == amount
 
-    assert vault.totalIdle() == amount
+    assert vault.total_idle() == amount
     assert vault.balanceOf(fish) == amount
     assert vault.totalSupply() == amount
     assert asset.balanceOf(fish) == 0
@@ -484,8 +484,8 @@ def test_set_deposit_limit__with_deposit_limit(project, gov, asset, deposit_limi
     # TODO unpermissioned set deposit limit test
     vault = gov.deploy(project.VaultV3, asset, "VaultV3", "AV", gov)
 
-    tx = vault.setDepositLimit(deposit_limit, sender=gov)
+    tx = vault.set_deposit_limit(deposit_limit, sender=gov)
     event = list(tx.decode_logs(vault.UpdateDepositLimit))
 
-    assert event[0].depositLimit == deposit_limit
-    assert vault.depositLimit() == deposit_limit
+    assert event[0].deposit_limit == deposit_limit
+    assert vault.deposit_limit() == deposit_limit
