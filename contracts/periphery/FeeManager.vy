@@ -5,11 +5,11 @@ from vyper.interfaces import ERC20
 # INTERFACES #
 struct StrategyParams:
     activation: uint256
-    lastReport: uint256
-    currentDebt: uint256
-    maxDebt: uint256
-    totalGain: uint256
-    totalLoss: uint256
+    last_report: uint256
+    current_debt: uint256
+    max_debt: uint256
+    total_gain: uint256
+    total_loss: uint256
 
 interface IVault:
     def strategies(strategy: address) -> StrategyParams: view
@@ -71,10 +71,10 @@ def assess_fees(strategy: address, gain: uint256) -> uint256:
     """
     strategy_params: StrategyParams = IVault(msg.sender).strategies(strategy)
     fee: Fee = self.fees[strategy]
-    duration: uint256 = block.timestamp - strategy_params.lastReport
+    duration: uint256 = block.timestamp - strategy_params.last_report
 
     management_fee: uint256 = (
-        ((strategy_params.currentDebt - IStrategy(strategy).delegatedAssets()))
+        ((strategy_params.current_debt - IStrategy(strategy).delegatedAssets()))
         * duration
         * fee.management_fee
         / MAX_BPS

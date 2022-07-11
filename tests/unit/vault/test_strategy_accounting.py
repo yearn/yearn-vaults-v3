@@ -14,7 +14,7 @@ def test_process_report__with_inactive_strategy__reverts(gov, vault, create_stra
     strategy = create_strategy(vault)
 
     with ape.reverts("inactive strategy"):
-        vault.processReport(strategy.address, sender=gov)
+        vault.process_report(strategy.address, sender=gov)
 
 
 def test_process_report__with_total_assets_equal_current_debt__reverts(
@@ -26,7 +26,7 @@ def test_process_report__with_total_assets_equal_current_debt__reverts(
     actions.add_debt_to_strategy(gov, strategy, vault, new_debt)
 
     with ape.reverts("nothing to report"):
-        vault.processReport(strategy.address, sender=gov)
+        vault.process_report(strategy.address, sender=gov)
 
 
 def test_process_report__with_unhealthy_strategy__reverts():
@@ -44,28 +44,28 @@ def test_process_report__with_gain_and_zero_fees(chain, gov, asset, vault, strat
     actions.airdrop_asset(gov, asset, strategy, gain)
 
     strategy_params = vault.strategies(strategy.address)
-    initial_debt = strategy_params.currentDebt
-    locked_profit = vault.lockedProfit()
+    initial_debt = strategy_params.current_debt
+    locked_profit = vault.locked_profit()
 
     snapshot = chain.pending_timestamp
-    tx = vault.processReport(strategy.address, sender=gov)
+    tx = vault.process_report(strategy.address, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
 
     assert len(event) == 1
     assert event[0].strategy == strategy.address
     assert event[0].gain == gain
     assert event[0].loss == 0
-    assert event[0].totalGain == gain
-    assert event[0].totalLoss == 0
-    assert event[0].currentDebt == initial_debt + gain
-    assert event[0].totalFees == 0
+    assert event[0].total_gain == gain
+    assert event[0].total_loss == 0
+    assert event[0].current_debt == initial_debt + gain
+    assert event[0].total_fees == 0
 
     strategy_params = vault.strategies(strategy.address)
-    assert strategy_params.totalGain == gain
-    assert strategy_params.totalLoss == 0
-    assert strategy_params.currentDebt == initial_debt + gain
-    assert vault.lockedProfit() == locked_profit + gain
-    assert vault.strategies(strategy.address).lastReport == pytest.approx(
+    assert strategy_params.total_gain == gain
+    assert strategy_params.total_loss == 0
+    assert strategy_params.current_debt == initial_debt + gain
+    assert vault.locked_profit() == locked_profit + gain
+    assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
 
@@ -90,28 +90,28 @@ def test_process_report__with_gain_and_zero_management_fees(
     )
 
     strategy_params = vault.strategies(strategy.address)
-    initial_debt = strategy_params.currentDebt
-    locked_profit = vault.lockedProfit()
+    initial_debt = strategy_params.current_debt
+    locked_profit = vault.locked_profit()
 
     snapshot = chain.pending_timestamp
-    tx = vault.processReport(strategy.address, sender=gov)
+    tx = vault.process_report(strategy.address, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
 
     assert len(event) == 1
     assert event[0].strategy == strategy.address
     assert event[0].gain == gain
     assert event[0].loss == 0
-    assert event[0].totalGain == gain
-    assert event[0].totalLoss == 0
-    assert event[0].currentDebt == initial_debt + gain
-    assert event[0].totalFees == total_fee
+    assert event[0].total_gain == gain
+    assert event[0].total_loss == 0
+    assert event[0].current_debt == initial_debt + gain
+    assert event[0].total_fees == total_fee
 
     strategy_params = vault.strategies(strategy.address)
-    assert strategy_params.totalGain == gain
-    assert strategy_params.totalLoss == 0
-    assert strategy_params.currentDebt == initial_debt + gain
-    assert vault.lockedProfit() == locked_profit + gain - total_fee
-    assert vault.strategies(strategy.address).lastReport == pytest.approx(
+    assert strategy_params.total_gain == gain
+    assert strategy_params.total_loss == 0
+    assert strategy_params.current_debt == initial_debt + gain
+    assert vault.locked_profit() == locked_profit + gain - total_fee
+    assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
     assert vault.balanceOf(fee_manager) == total_fee
@@ -137,31 +137,31 @@ def test_process_report__with_gain_and_zero_performance_fees(
     )
 
     strategy_params = vault.strategies(strategy.address)
-    initial_debt = strategy_params.currentDebt
-    locked_profit = vault.lockedProfit()
+    initial_debt = strategy_params.current_debt
+    locked_profit = vault.locked_profit()
 
     chain.pending_timestamp += YEAR
     snapshot = chain.pending_timestamp
-    tx = vault.processReport(strategy.address, sender=gov)
+    tx = vault.process_report(strategy.address, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
 
     assert len(event) == 1
     assert event[0].strategy == strategy.address
     assert event[0].gain == gain
     assert event[0].loss == 0
-    assert event[0].totalGain == gain
-    assert event[0].totalLoss == 0
-    assert event[0].currentDebt == initial_debt + gain
-    assert event[0].totalFees == pytest.approx(total_fee, rel=1e-4)
+    assert event[0].total_gain == gain
+    assert event[0].total_loss == 0
+    assert event[0].current_debt == initial_debt + gain
+    assert event[0].total_fees == pytest.approx(total_fee, rel=1e-4)
 
     strategy_params = vault.strategies(strategy.address)
-    assert strategy_params.totalGain == gain
-    assert strategy_params.totalLoss == 0
-    assert strategy_params.currentDebt == initial_debt + gain
-    assert vault.lockedProfit() == pytest.approx(
+    assert strategy_params.total_gain == gain
+    assert strategy_params.total_loss == 0
+    assert strategy_params.current_debt == initial_debt + gain
+    assert vault.locked_profit() == pytest.approx(
         locked_profit + gain - total_fee, rel=1e-4
     )
-    assert vault.strategies(strategy.address).lastReport == pytest.approx(
+    assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
     assert vault.balanceOf(fee_manager) == pytest.approx(total_fee, rel=1e-4)
@@ -187,30 +187,30 @@ def test_process_report__with_gain_and_both_fees(
     )
 
     strategy_params = vault.strategies(strategy.address)
-    initial_debt = strategy_params.currentDebt
-    locked_profit = vault.lockedProfit()
+    initial_debt = strategy_params.current_debt
+    locked_profit = vault.locked_profit()
 
     snapshot = chain.pending_timestamp
-    tx = vault.processReport(strategy.address, sender=gov)
+    tx = vault.process_report(strategy.address, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
 
     assert len(event) == 1
     assert event[0].strategy == strategy.address
     assert event[0].gain == gain
     assert event[0].loss == 0
-    assert event[0].totalGain == gain
-    assert event[0].totalLoss == 0
-    assert event[0].currentDebt == initial_debt + gain
-    assert event[0].totalFees == pytest.approx(total_fee, rel=1e-4)
+    assert event[0].total_gain == gain
+    assert event[0].total_loss == 0
+    assert event[0].current_debt == initial_debt + gain
+    assert event[0].total_fees == pytest.approx(total_fee, rel=1e-4)
 
     strategy_params = vault.strategies(strategy.address)
-    assert strategy_params.totalGain == gain
-    assert strategy_params.totalLoss == 0
-    assert strategy_params.currentDebt == initial_debt + gain
-    assert vault.lockedProfit() == pytest.approx(
+    assert strategy_params.total_gain == gain
+    assert strategy_params.total_loss == 0
+    assert strategy_params.current_debt == initial_debt + gain
+    assert vault.locked_profit() == pytest.approx(
         locked_profit + gain - total_fee, rel=1e-4
     )
-    assert vault.strategies(strategy.address).lastReport == pytest.approx(
+    assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
     assert vault.balanceOf(fee_manager) == pytest.approx(total_fee, rel=1e-4)
@@ -237,29 +237,29 @@ def test_process_report__with_fees_exceeding_fee_cap(
     )
 
     strategy_params = vault.strategies(strategy.address)
-    initial_debt = strategy_params.currentDebt
-    locked_profit = vault.lockedProfit()
+    initial_debt = strategy_params.current_debt
+    locked_profit = vault.locked_profit()
 
     chain.pending_timestamp += YEAR  # need time to pass to accrue more fees
     snapshot = chain.pending_timestamp
-    tx = vault.processReport(strategy.address, sender=gov)
+    tx = vault.process_report(strategy.address, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
 
     assert len(event) == 1
     assert event[0].strategy == strategy.address
     assert event[0].gain == gain
     assert event[0].loss == 0
-    assert event[0].totalGain == gain
-    assert event[0].totalLoss == 0
-    assert event[0].currentDebt == initial_debt + gain
-    assert event[0].totalFees == max_fee
+    assert event[0].total_gain == gain
+    assert event[0].total_loss == 0
+    assert event[0].current_debt == initial_debt + gain
+    assert event[0].total_fees == max_fee
 
     strategy_params = vault.strategies(strategy.address)
-    assert strategy_params.totalGain == gain
-    assert strategy_params.totalLoss == 0
-    assert strategy_params.currentDebt == initial_debt + gain
-    assert vault.lockedProfit() == locked_profit + gain - max_fee
-    assert vault.strategies(strategy.address).lastReport == pytest.approx(
+    assert strategy_params.total_gain == gain
+    assert strategy_params.total_loss == 0
+    assert strategy_params.current_debt == initial_debt + gain
+    assert vault.locked_profit() == locked_profit + gain - max_fee
+    assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
     assert vault.balanceOf(fee_manager) == max_fee
@@ -275,37 +275,37 @@ def test_process_report__with_loss(chain, gov, asset, vault, lossy_strategy):
     lossy_strategy.setLoss(gov.address, loss, sender=gov)
 
     strategy_params = vault.strategies(lossy_strategy.address)
-    initial_debt = strategy_params.currentDebt
-    locked_profit = vault.lockedProfit()
+    initial_debt = strategy_params.current_debt
+    locked_profit = vault.locked_profit()
 
     snapshot = chain.pending_timestamp
-    tx = vault.processReport(lossy_strategy.address, sender=gov)
+    tx = vault.process_report(lossy_strategy.address, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
 
     assert len(event) == 1
     assert event[0].strategy == lossy_strategy.address
     assert event[0].gain == 0
     assert event[0].loss == loss
-    assert event[0].totalGain == 0
-    assert event[0].totalLoss == loss
-    assert event[0].currentDebt == initial_debt - loss
-    assert event[0].totalFees == 0
+    assert event[0].total_gain == 0
+    assert event[0].total_loss == loss
+    assert event[0].current_debt == initial_debt - loss
+    assert event[0].total_fees == 0
 
     strategy_params = vault.strategies(lossy_strategy.address)
-    assert strategy_params.totalGain == 0
-    assert strategy_params.totalLoss == loss
-    assert strategy_params.currentDebt == initial_debt - loss
-    assert vault.lockedProfit() == locked_profit
-    assert vault.strategies(lossy_strategy.address).lastReport == pytest.approx(
+    assert strategy_params.total_gain == 0
+    assert strategy_params.total_loss == loss
+    assert strategy_params.current_debt == initial_debt - loss
+    assert vault.locked_profit() == locked_profit
+    assert vault.strategies(lossy_strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
 
 
 def test_set_fee_manager__with_fee_manager(gov, vault, fee_manager):
-    tx = vault.setFeeManager(fee_manager.address, sender=gov)
+    tx = vault.set_fee_manager(fee_manager.address, sender=gov)
     event = list(tx.decode_logs(vault.UpdateFeeManager))
 
     assert len(event) == 1
-    assert event[0].feeManager == fee_manager.address
+    assert event[0].fee_manager == fee_manager.address
 
-    assert vault.feeManager() == fee_manager.address
+    assert vault.fee_manager() == fee_manager.address
