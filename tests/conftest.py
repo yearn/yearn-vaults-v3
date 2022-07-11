@@ -163,7 +163,6 @@ def strategy(gov, vault, create_strategy):
     yield strategy
 
 
-# @pytest.fixture(scope="session")
 @pytest.fixture
 def locked_strategy(gov, vault, create_locked_strategy):
     strategy = create_locked_strategy(vault)
@@ -173,7 +172,6 @@ def locked_strategy(gov, vault, create_locked_strategy):
     yield strategy
 
 
-# @pytest.fixture(scope="session")
 @pytest.fixture
 def lossy_strategy(gov, vault, create_lossy_strategy):
     strategy = create_lossy_strategy(vault)
