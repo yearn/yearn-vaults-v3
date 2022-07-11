@@ -156,6 +156,7 @@ def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: a
         )
     )
 
+## SHARE MANAGEMENT ##
 ## ERC20 ##
 @internal
 def _spend_allowance(owner: address, spender: address, amount: uint256):
@@ -178,19 +179,14 @@ def _transfer(sender: address, receiver: address, amount: uint256):
     self.balance_of[receiver] += amount
     log Transfer(sender, receiver, amount)
 
-@external
-def transfer(receiver: address, amount: uint256) -> bool:
-    self._transfer(msg.sender, receiver, amount)
-    return True
-
 @internal
 def _transfer_from(sender: address, receiver: address, amount: uint256) -> bool:
     self._spend_allowance(sender, msg.sender, amount)
     self._transfer(sender, receiver, amount)
     return True
 
-@external
-def approve(spender: address, amount: uint256) -> bool:
+@internal
+def _approve(spender: address, amount: uint256) -> bool:
     self.allowance[msg.sender][spender] = amount
     log Approval(msg.sender, spender, amount)
     return True
@@ -207,8 +203,8 @@ def _decrease_allowance(spender: address, amount: uint256) -> bool:
     log Approval(msg.sender, spender, self.allowance[msg.sender][spender])
     return True
 
-@external
-def permit(owner: address, spender: address, amount: uint256, expiry: uint256, signature: Bytes[65]) -> bool:
+@internal
+def _permit(owner: address, spender: address, amount: uint256, expiry: uint256, signature: Bytes[65]) -> bool:
     assert owner != ZERO_ADDRESS, "invalid owner"
     assert expiry == 0 or expiry >= block.timestamp, "permit expired"
     nonce: uint256 = self.nonces[owner]
@@ -238,23 +234,6 @@ def permit(owner: address, spender: address, amount: uint256, expiry: uint256, s
     log Approval(owner, spender, amount)
     return True
 
-
-# SUPPORT FUNCTIONS #
-@view
-@external
-def asset() -> address:
-    return ASSET.address
-
-@view
-@external
-def decimals() -> uint256:
-    return DECIMALS
-
-@view
-@external
-def api_version() -> String[28]:
-    return API_VERSION
-
 @view
 @internal
 def _total_assets() -> uint256:
@@ -264,61 +243,6 @@ def _total_assets() -> uint256:
 def _burn_shares(shares: uint256, owner: address):
     self.balance_of[owner] -= shares
     self.total_supply -= shares
-
-
-@internal
-def _calculate_locked_profit() -> uint256:
-    """
-    @notice
-        Returns time adjusted locked profits depending on the current time delta and
-        the previous harvest time delta.
-    @return The time adjusted locked profits due to pps increase spread
-    """
-    current_time_delta: uint256 = block.timestamp - self.last_report
-
-    if current_time_delta < self.previous_harvest_time_delta:
-        return self.locked_profit - ((self.locked_profit * current_time_delta) / self.previous_harvest_time_delta)
-    return 0
-
-
-@internal
-def _update_report_timestamps():
-    """
-    maintains longer (fairer) harvest periods on close timed harvests
-    NOTE: correctly adjust time delta to avoid reducing locked-until time
-          all following examples have previous_harvest_time_delta = 10 set at h2 and used on h3
-          if new time delta reduces previous locked-until, keep locked-until and adjust remaining time
-          h1 = t0, h2 = t10 and h3 = t13 =>
-              current_time_delta = 3, (new)previous_harvest_time_delta = 7 (10-3), locked until t20
-          h1 = t0, h2 = t10 and h3 = t14 =>
-              current_time_delta = 4, (new)previous_harvest_time_delta = 6 (10-4), locked until t20
-          on 2nd example: h2 is getting carried into h3 (minus time delta 4) since it was previously trying to reach t20.
-          so it continues to spread the lock up to that point, and thus avoids reducing the previous distribution time.
-
-          if locked-until is unchanged, to avoid extra storage read and subtraction cost [behaves as examples below]
-          h1 = t0, h2 = t10 and h3 = t15 =>
-              current_time_delta = 5, (new)previous_harvest_time_delta = 5 locked until t20
-
-          if next total time delta is higher than previous period remaining, locked-until will increase
-          h1 = t0, h2 = t10 and h3 = t16 =>
-              current_time_delta = 6, (new)previous_harvest_time_delta = 6 locked until t22
-          h1 = t0, h2 = t10 and h3 = t17 =>
-              current_time_delta = 7, (new)previous_harvest_time_delta = 7 locked until t24
-
-          current_time_delta is the time delta between now and last_report.
-          previous_harvest_time_delta is the time delta between last_report and the previous last_report
-          previous_harvest_time_delta is assigned the higher value between current_time_delta and (previous_harvest_time_delta - current_time_delta)
-    """
-
-    # TODO: check how to solve deposit sniping for very profitable and infrequent strategy reports
-    # when there are also other more frequent strategies reducing time delta.
-    # (need to add time delta per strategy + accumulator)
-    current_time_delta: uint256 = block.timestamp - self.last_report
-    if self.previous_harvest_time_delta > current_time_delta * 2:
-      self.previous_harvest_time_delta = self.previous_harvest_time_delta - current_time_delta
-    else:
-      self.previous_harvest_time_delta = current_time_delta
-    self.last_report = block.timestamp
 
 @view
 @internal
@@ -383,6 +307,22 @@ def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
 
     # TODO: emit event
     return new_shares
+
+## ERC4626 ##
+@view
+@internal
+def _max_deposit(receiver: address) -> uint256:
+    _total_assets: uint256 = self._total_assets()
+    _deposit_limit: uint256 = self.deposit_limit
+    if (_total_assets >= _deposit_limit):
+        return 0
+    return _deposit_limit - _total_assets 
+
+@view
+@internal
+def _max_redeem(owner: address) -> uint256:
+    return min(self.balance_of[owner], self._convert_to_shares(self.total_idle))
+
 
 @internal
 def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256:
@@ -465,64 +405,9 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
 
     return assets
 
-
-@view
+## STRATEGY MANAGEMENT ##
 @internal
-def _max_deposit(receiver: address) -> uint256:
-    _total_assets: uint256 = self._total_assets()
-    _deposit_limit: uint256 = self.deposit_limit
-    if (_total_assets >= _deposit_limit):
-        return 0
-    return _deposit_limit - _total_assets 
-
-
-@view
-@internal
-def _max_redeem(owner: address) -> uint256:
-    return min(self.balance_of[owner], self._convert_to_shares(self.total_idle))
-
-
-# SHARE MANAGEMENT FUNCTIONS #
-@external
-def deposit(assets: uint256, receiver: address) -> uint256:
-    return self._deposit(msg.sender, receiver, assets)
-
-@external
-def mint(shares: uint256, receiver: address) -> uint256:
-    assets: uint256 = self._convert_to_assets(shares)
-    self._deposit(msg.sender, receiver, assets)
-    return assets
-
-@external
-def withdraw(assets: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
-    shares: uint256 = self._convert_to_shares(assets)
-    # TODO: withdrawal queue is empty here. Do we need to implement a custom withdrawal queue?
-    self._redeem(msg.sender, receiver, owner, shares, strategies)
-    return shares
-
-@external
-def redeem(shares: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
-    assets: uint256 = self._redeem(msg.sender, receiver, owner, shares, strategies)
-    return assets
-
-# SHARE MANAGEMENT FUNCTIONS #
-@view
-@external
-def price_per_share() -> uint256:
-    return self._convert_to_assets(10 ** DECIMALS)
-
-@view
-@external
-def available_deposit_limit() -> uint256:
-    if self.deposit_limit > self._total_assets():
-        return self.deposit_limit - self._total_assets()
-    return 0
-
-
-# STRATEGY MANAGEMENT FUNCTIONS #
-@external
-def add_strategy(new_strategy: address):
-    self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
+def _add_strategy(new_strategy: address):
     assert new_strategy != ZERO_ADDRESS, "strategy cannot be zero address"
     assert IStrategy(new_strategy).asset() == ASSET.address, "invalid asset"
     assert IStrategy(new_strategy).vault() == self, "invalid vault"
@@ -541,7 +426,6 @@ def add_strategy(new_strategy: address):
 
 @internal
 def _revoke_strategy(old_strategy: address):
-    self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
     assert self.strategies[old_strategy].activation != 0, "strategy not active"
     # NOTE: strategy needs to have 0 debt to be revoked
     assert self.strategies[old_strategy].current_debt == 0, "strategy has debt"
@@ -558,15 +442,8 @@ def _revoke_strategy(old_strategy: address):
 
     log StrategyRevoked(old_strategy)
 
-
-@external
-def revoke_strategy(old_strategy: address):
-    self._revoke_strategy(old_strategy)
-
-
-@external
-def migrate_strategy(new_strategy: address, old_strategy: address):
-    self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
+@internal
+def _migrate_strategy(new_strategy: address, old_strategy: address):
     assert self.strategies[old_strategy].activation != 0, "old strategy not active"
     assert self.strategies[old_strategy].current_debt == 0, "old strategy has debt"
     assert new_strategy != ZERO_ADDRESS, "strategy cannot be zero address"
@@ -590,19 +467,9 @@ def migrate_strategy(new_strategy: address, old_strategy: address):
 
     log StrategyMigrated(old_strategy, new_strategy)
 
-
-@external
-def update_max_debt_for_strategy(strategy: address, new_max_debt: uint256):
-    self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
-    assert self.strategies[strategy].activation != 0, "inactive strategy"
-    # TODO: should we check that total_max_debt is not over 100% of assets?
-    self.strategies[strategy].max_debt = new_max_debt
-
-    log UpdatedMaxDebtForStrategy(msg.sender, strategy, new_max_debt)
-
-
-@external
-def update_debt(strategy: address) -> uint256:
+# DEBT MANAGEMENT #
+@internal
+def _update_debt(strategy: address) -> uint256:
     self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
     current_debt: uint256 = self.strategies[strategy].current_debt
 
@@ -673,11 +540,63 @@ def update_debt(strategy: address) -> uint256:
     log DebtUpdated(strategy, current_debt, new_debt)
     return new_debt
 
-# # P&L MANAGEMENT FUNCTIONS #
-@external
-def process_report(strategy: address) -> (uint256, uint256):
-    # TODO: permissioned: ACCOUNTING_MANAGER (open?)
+## ACCOUNTING MANAGEMENT ##
+@internal
+def _calculate_locked_profit() -> uint256:
+    """
+    @notice
+        Returns time adjusted locked profits depending on the current time delta and
+        the previous harvest time delta.
+    @return The time adjusted locked profits due to pps increase spread
+    """
+    current_time_delta: uint256 = block.timestamp - self.last_report
 
+    if current_time_delta < self.previous_harvest_time_delta:
+        return self.locked_profit - ((self.locked_profit * current_time_delta) / self.previous_harvest_time_delta)
+    return 0
+
+@internal
+def _update_report_timestamps():
+    """
+    maintains longer (fairer) harvest periods on close timed harvests
+    NOTE: correctly adjust time delta to avoid reducing locked-until time
+          all following examples have previous_harvest_time_delta = 10 set at h2 and used on h3
+          if new time delta reduces previous locked-until, keep locked-until and adjust remaining time
+          h1 = t0, h2 = t10 and h3 = t13 =>
+              current_time_delta = 3, (new)previous_harvest_time_delta = 7 (10-3), locked until t20
+          h1 = t0, h2 = t10 and h3 = t14 =>
+              current_time_delta = 4, (new)previous_harvest_time_delta = 6 (10-4), locked until t20
+          on 2nd example: h2 is getting carried into h3 (minus time delta 4) since it was previously trying to reach t20.
+          so it continues to spread the lock up to that point, and thus avoids reducing the previous distribution time.
+
+          if locked-until is unchanged, to avoid extra storage read and subtraction cost [behaves as examples below]
+          h1 = t0, h2 = t10 and h3 = t15 =>
+              current_time_delta = 5, (new)previous_harvest_time_delta = 5 locked until t20
+
+          if next total time delta is higher than previous period remaining, locked-until will increase
+          h1 = t0, h2 = t10 and h3 = t16 =>
+              current_time_delta = 6, (new)previous_harvest_time_delta = 6 locked until t22
+          h1 = t0, h2 = t10 and h3 = t17 =>
+              current_time_delta = 7, (new)previous_harvest_time_delta = 7 locked until t24
+
+          current_time_delta is the time delta between now and last_report.
+          previous_harvest_time_delta is the time delta between last_report and the previous last_report
+          previous_harvest_time_delta is assigned the higher value between current_time_delta and (previous_harvest_time_delta - current_time_delta)
+    """
+
+    # TODO: check how to solve deposit sniping for very profitable and infrequent strategy reports
+    # when there are also other more frequent strategies reducing time delta.
+    # (need to add time delta per strategy + accumulator)
+    current_time_delta: uint256 = block.timestamp - self.last_report
+    if self.previous_harvest_time_delta > current_time_delta * 2:
+      self.previous_harvest_time_delta = self.previous_harvest_time_delta - current_time_delta
+    else:
+      self.previous_harvest_time_delta = current_time_delta
+    self.last_report = block.timestamp
+
+
+@internal
+def _process_report(strategy: address) -> (uint256, uint256):
     assert self.strategies[strategy].activation != 0, "inactive strategy"
     total_assets: uint256 = IStrategy(strategy).totalAssets()
     current_debt: uint256 = self.strategies[strategy].current_debt
@@ -734,6 +653,11 @@ def process_report(strategy: address) -> (uint256, uint256):
     )
     return (gain, loss)
 
+# # EMERGENCY FUNCTIONS #
+# def set_emergency_shutdown(emergency: bool):
+#     # permissioned: EMERGENCY_MANAGER
+#     # TODO: change emergency shutdown flag
+#     return
 
 # SETTERS #
 @external
@@ -742,66 +666,27 @@ def set_fee_manager(new_fee_manager: address):
     self.fee_manager = new_fee_manager
     log UpdateFeeManager(new_fee_manager)
 
-
 @external
 def set_deposit_limit(deposit_limit: uint256):
     # TODO: permissioning: CONFIG_MANAGER
     self.deposit_limit = deposit_limit
     log UpdateDepositLimit(deposit_limit)
 
-@external 
+@external
 def set_minimum_total_idle(minimum_total_idle: uint256):
     self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
     self.minimum_total_idle = minimum_total_idle
     log UpdateMinimumTotalIdle(minimum_total_idle)
 
+# ROLE MANAGEMENT #
+@internal
+def _enforce_role(account: address, role: Roles):
+    assert role in self.roles[account] # dev: not allowed
 
-# def force_process_report(strategy: address):
-#     # permissioned: ACCOUNTING_MANAGER
-#     # TODO: allows processing the report with losses ! this should only be called in special situations
-#     #    - deactivate the healthcheck
-#     #    - call process report
-#     return
-
-# # DEBT MANAGEMENT FUNCTIONS #
-# def set_max_debt_for_strategy(strategy: address, max_amount: uint256):
-#     # permissioned: DEBT_MANAGER
-#     # TODO: change max_debt in strategy params for _strategy
-#     return
-
-
-# def update_debt_emergency():
-#     # permissioned: EMERGENCY_DEBT_MANAGER
-#     # TODO: use a different function to rebalance the debt. this function allows to incur into losses while withdrawing
-#     # this function needs to be called through private mempool as could have MEV
-#     return
-
-
-# # EMERGENCY FUNCTIONS #
-# def set_emergency_shutdown(emergency: bool):
-#     # permissioned: EMERGENCY_MANAGER
-#     # TODO: change emergency shutdown flag
-#     return
-
-# # SETTERS #
-# def set_healthcheck(newhealtcheck: address):
-#     # permissioned: SETTER
-#     # TODO: change healtcheck contract
-#     return
-
-# def set_fee_manager(new_fee_manager: address):
-#     # TODO: change feemanager contract
-#     return
-
-# Role management
 @external
 def set_role(account: address, role: Roles):
     assert msg.sender == self.role_manager
     self.roles[account] = role
-
-@internal
-def _enforce_role(account: address, role: Roles):
-    assert role in self.roles[account] # dev: not allowed
 
 @external
 def transfer_role_manager(role_manager: address):
@@ -814,7 +699,87 @@ def accept_role_manager():
     self.role_manager = msg.sender
     self.future_role_manager = ZERO_ADDRESS
 
-## ERC20+4626 compatibility
+# VAULT STATUS VIEWS
+@view
+@external
+def price_per_share() -> uint256:
+    return self._convert_to_assets(10 ** DECIMALS)
+
+@view
+@external
+def available_deposit_limit() -> uint256:
+    if self.deposit_limit > self._total_assets():
+        return self.deposit_limit - self._total_assets()
+    return 0
+
+## ACCOUNTING MANAGEMENT ##
+@external
+def process_report(strategy: address) -> (uint256, uint256):
+    # TODO: permissioned: ACCOUNTING_MANAGER (open?)
+    return self._process_report(strategy)
+
+## STRATEGY MANAGEMENT ##
+@external
+def add_strategy(new_strategy: address): 
+    self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
+    self._add_strategy(new_strategy) 
+
+@external
+def revoke_strategy(old_strategy: address):
+    self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
+    self._revoke_strategy(old_strategy)
+
+@external
+def migrate_strategy(new_strategy: address, old_strategy: address):
+    self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
+    self._migrate_strategy(new_strategy, old_strategy)
+
+## DEBT MANAGEMENT ##
+@external
+def update_max_debt_for_strategy(strategy: address, new_max_debt: uint256):
+    self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
+    assert self.strategies[strategy].activation != 0, "inactive strategy"
+    # TODO: should we check that total_max_debt is not over 100% of assets?
+    self.strategies[strategy].max_debt = new_max_debt
+
+    log UpdatedMaxDebtForStrategy(msg.sender, strategy, new_max_debt)
+
+@external
+def update_debt(strategy: address) -> uint256:
+    return self._update_debt(strategy)
+
+## SHARE MANAGEMENT ##
+## ERC20 + ERC4626 ##
+@external
+def deposit(assets: uint256, receiver: address) -> uint256:
+    return self._deposit(msg.sender, receiver, assets)
+
+@external
+def mint(shares: uint256, receiver: address) -> uint256:
+    assets: uint256 = self._convert_to_assets(shares)
+    self._deposit(msg.sender, receiver, assets)
+    return assets
+
+@external
+def withdraw(assets: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
+    shares: uint256 = self._convert_to_shares(assets)
+    # TODO: withdrawal queue is empty here. Do we need to implement a custom withdrawal queue?
+    self._redeem(msg.sender, receiver, owner, shares, strategies)
+    return shares
+
+@external
+def redeem(shares: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
+    assets: uint256 = self._redeem(msg.sender, receiver, owner, shares, strategies)
+    return assets
+
+@external
+def approve(spender: address, amount: uint256) -> bool:
+    return self._approve(spender, amount)
+
+@external
+def transfer(receiver: address, amount: uint256) -> bool:
+    self._transfer(msg.sender, receiver, amount)
+    return True
 
 @external
 def transferFrom(sender: address, receiver: address, amount: uint256) -> bool:
@@ -828,6 +793,10 @@ def increaseAllowance(spender: address, amount: uint256) -> bool:
 def decreaseAllowance(spender: address, amount: uint256) -> bool:
     return self._decrease_allowance(spender, amount)
 
+@external
+def permit(owner: address, spender: address, amount: uint256, expiry: uint256, signature: Bytes[65]) -> bool:
+    return self._permit(owner, spender, amount, expiry, signature)
+
 @view
 @external
 def balanceOf(addr: address) -> uint256:
@@ -837,6 +806,16 @@ def balanceOf(addr: address) -> uint256:
 @external
 def totalSupply() -> uint256:
     return self.total_supply
+
+@view
+@external
+def asset() -> address:
+    return ASSET.address
+
+@view
+@external
+def decimals() -> uint256:
+    return DECIMALS
 
 @view
 @external
@@ -866,7 +845,6 @@ def convertToAssets(shares: uint256) -> uint256:
 @view
 @external
 def maxDeposit(receiver: address) -> uint256:
-    # TODO: can add restrictions per receiver
     return self._max_deposit(receiver)
 
 @view
@@ -899,3 +877,8 @@ def previewWithdraw(assets: uint256) -> uint256:
 @external
 def previewRedeem(shares: uint256) -> uint256:
    return self._convert_to_assets(shares)
+
+@view
+@external
+def api_version() -> String[28]:
+    return API_VERSION
