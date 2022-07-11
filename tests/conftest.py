@@ -223,8 +223,8 @@ def sign_vault_permit(chain):
                 "EIP712Domain": [
                     {"name": "name", "type": "string"},
                     {"name": "version", "type": "string"},
-                    {"name": "chain_id", "type": "uint256"},
-                    {"name": "verifying_contract", "type": "address"},
+                    {"name": "chainId", "type": "uint256"},
+                    {"name": "verifyingContract", "type": "address"},
                 ],
                 "Permit": [
                     {"name": "owner", "type": "address"},
@@ -237,8 +237,8 @@ def sign_vault_permit(chain):
             "domain": {
                 "name": name,
                 "version": version,
-                "chain_id": chain.chain_id,
-                "verifying_contract": str(vault),
+                "chainId": chain.chain_id,
+                "verifyingContract": str(vault),
             },
             "primaryType": "Permit",
             "message": {
