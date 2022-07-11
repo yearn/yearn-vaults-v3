@@ -5,7 +5,7 @@ def vault_status(vault):
     print(f"--- Vault {vault.name()} ---")
     print(f"API: {vault.apiVersion()}")
     print(f"TotalAssets: {to_units(vault, vault.totalAssets())}")
-    print(f"price_per_share: {to_units(vault, vault.price_per_share())}")
+    print(f"PricePerShare: {to_units(vault, vault.price_per_share())}")
     print(f"TotalSupply: {to_units(vault, vault.totalSupply())}")
 
 
@@ -14,9 +14,9 @@ def strategy_status(vault, strategy):
     print(f"--- Strategy {strategy.name()} ---")
     print(f"Performance fee {status['performanceFee']}")
     print(f"Debt Ratio {status['debtRatio']}")
-    print(f"Total Debt {to_units(vault, status['total_debt'])}")
-    print(f"Total Gain {to_units(vault, status['total_gain'])}")
-    print(f"Total Loss {to_units(vault, status['total_loss'])}")
+    print(f"Total Debt {to_units(vault, status['totalDebt'])}")
+    print(f"Total Gain {to_units(vault, status['totalGain'])}")
+    print(f"Total Loss {to_units(vault, status['totalLoss'])}")
 
 
 def to_units(token, amount):
