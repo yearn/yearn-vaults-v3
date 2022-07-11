@@ -106,10 +106,10 @@ API_VERSION: constant(String[28]) = "0.1.0"
 
 # STORAGE #
 strategies: public(HashMap[address, StrategyParams])
-balance_of: public(HashMap[address, uint256])
+balance_of: HashMap[address, uint256]
 allowance: public(HashMap[address, HashMap[address, uint256]])
 
-total_supply: public(uint256)
+total_supply: uint256
 total_debt: public(uint256)
 total_idle: public(uint256)
 minimum_total_idle: public(uint256)
@@ -400,11 +400,11 @@ def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256
     return shares
 
 @internal
-def _redeem(sender: address, receiver: address, owner: address, sharesToBurn: uint256, strategies: DynArray[address, 10] = []) -> uint256:
+def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: uint256, strategies: DynArray[address, 10] = []) -> uint256:
     if sender != owner:
-        self._spend_allowance(owner, sender, sharesToBurn)
+        self._spend_allowance(owner, sender, shares_to_burn)
 
-    shares: uint256 = sharesToBurn
+    shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
 
     if shares == MAX_UINT256:
