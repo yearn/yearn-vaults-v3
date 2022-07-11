@@ -50,7 +50,7 @@ def test_max_deposit__with_total_assets_greater_than_or_equal_deposit_limit__ret
 
     actions.user_deposit(fish, vault, asset, assets)
 
-    vault.setDepositLimit(deposit_limit, sender=gov)
+    vault.set_deposit_limit(deposit_limit, sender=gov)
 
     assert vault.maxDeposit(fish.address) == 0
 
@@ -62,7 +62,7 @@ def test_max_deposit__with_total_assets_less_than_deposit_limit__returns_net_dep
     assets = fish_amount
     deposit_limit = assets // 2
 
-    vault.setDepositLimit(deposit_limit, sender=gov)
+    vault.set_deposit_limit(deposit_limit, sender=gov)
 
     assert vault.maxDeposit(fish.address) == deposit_limit
 
@@ -86,7 +86,7 @@ def test_max_mint__with_total_assets_greater_than_or_equal_deposit_limit__return
 
     actions.user_deposit(fish, vault, asset, assets)
 
-    vault.setDepositLimit(deposit_limit, sender=gov)
+    vault.set_deposit_limit(deposit_limit, sender=gov)
 
     assert vault.maxMint(fish.address) == 0
 
@@ -98,7 +98,7 @@ def test_max_mint__with_total_assets_less_than_deposit_limit__returns_net_deposi
     assets = fish_amount
     deposit_limit = assets // 2
 
-    vault.setDepositLimit(deposit_limit, sender=gov)
+    vault.set_deposit_limit(deposit_limit, sender=gov)
 
     assert vault.maxMint(fish.address) == deposit_limit
 
