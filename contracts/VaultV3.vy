@@ -85,6 +85,9 @@ event UpdateDepositLimit:
 event UpdateMinimumTotalIdle:
     minimum_total_idle: uint256
 
+event Shutdown:
+    pass
+
 # STRUCTS #
 struct StrategyParams:
     activation: uint256
@@ -101,6 +104,7 @@ MAX_BPS: constant(uint256) = 10_000
 enum Roles:
     STRATEGY_MANAGER
     DEBT_MANAGER
+    EMERGENCY_MANAGER
 
 # IMMUTABLE #
 ASSET: immutable(ERC20)
@@ -123,11 +127,11 @@ last_report: public(uint256)
 locked_profit: public(uint256)
 previous_harvest_time_delta: public(uint256)
 deposit_limit: public(uint256)
-
 fee_manager: public(address)
 health_check: public(address)
 role_manager: public(address)
 future_role_manager: public(address)
+shutdown: public(bool)
 
 name: public(String[64])
 symbol: public(String[32])
@@ -135,7 +139,7 @@ symbol: public(String[32])
 # `nonces` track `permit` approvals with signature.
 nonces: public(HashMap[address, uint256])
 DOMAIN_SEPARATOR: public(bytes32)
-DOMAIN_TYPE_HASH: constant(bytes32) = keccak256('EIP712Domain(string name,string version,uint256 chain_id,address verifying_contract)')
+DOMAIN_TYPE_HASH: constant(bytes32) = keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)')
 PERMIT_TYPE_HASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
 
 @external
@@ -155,6 +159,7 @@ def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: a
             convert(self, bytes32)
         )
     )
+    self.shutdown = False
 
 ## SHARE MANAGEMENT ##
 ## ERC20 ##
@@ -326,6 +331,7 @@ def _max_redeem(owner: address) -> uint256:
 
 @internal
 def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256:
+    assert self.shutdown == False # dev: shutdown
     assert _recipient not in [self, ZERO_ADDRESS], "invalid recipient"
     assets: uint256 = _assets
 
@@ -408,39 +414,39 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
 ## STRATEGY MANAGEMENT ##
 @internal
 def _add_strategy(new_strategy: address):
-    assert new_strategy != ZERO_ADDRESS, "strategy cannot be zero address"
-    assert IStrategy(new_strategy).asset() == ASSET.address, "invalid asset"
-    assert IStrategy(new_strategy).vault() == self, "invalid vault"
-    assert self.strategies[new_strategy].activation == 0, "strategy already active"
-
-    self.strategies[new_strategy] = StrategyParams({
-        activation: block.timestamp,
-        last_report: block.timestamp,
-        current_debt: 0,
-        max_debt: 0,
-        total_gain: 0,
-        total_loss: 0
-    })
-
-    log StrategyAdded(new_strategy)
-
+   assert new_strategy != ZERO_ADDRESS, "strategy cannot be zero address"
+   assert IStrategy(new_strategy).asset() == ASSET.address, "invalid asset"
+   assert IStrategy(new_strategy).vault() == self, "invalid vault"
+   assert self.strategies[new_strategy].activation == 0, "strategy already active"
+   
+   self.strategies[new_strategy] = StrategyParams({
+      activation: block.timestamp,
+      last_report: block.timestamp,
+      current_debt: 0,
+      max_debt: 0,
+      total_gain: 0,
+      total_loss: 0
+   })
+   
+   log StrategyAdded(new_strategy)
+   
 @internal
 def _revoke_strategy(old_strategy: address):
-    assert self.strategies[old_strategy].activation != 0, "strategy not active"
-    # NOTE: strategy needs to have 0 debt to be revoked
-    assert self.strategies[old_strategy].current_debt == 0, "strategy has debt"
-
-    # NOTE: strategy params are set to 0 (warning: it can be readded)
-    self.strategies[old_strategy] = StrategyParams({
-        activation: 0,
-        last_report: 0,
-        current_debt: 0,
-        max_debt: 0,
-        total_gain: 0,
-        total_loss: 0
-    })
-
-    log StrategyRevoked(old_strategy)
+   assert self.strategies[old_strategy].activation != 0, "strategy not active"
+   # NOTE: strategy needs to have 0 debt to be revoked
+   assert self.strategies[old_strategy].current_debt == 0, "strategy has debt"
+   
+   # NOTE: strategy params are set to 0 (warning: it can be readded)
+   self.strategies[old_strategy] = StrategyParams({
+      activation: 0,
+      last_report: 0,
+      current_debt: 0,
+      max_debt: 0,
+      total_gain: 0,
+      total_loss: 0
+   })
+   
+   log StrategyRevoked(old_strategy)
 
 @internal
 def _migrate_strategy(new_strategy: address, old_strategy: address):
@@ -478,6 +484,9 @@ def _update_debt(strategy: address) -> uint256:
     min_desired_debt, max_desired_debt = IStrategy(strategy).investable()
 
     new_debt: uint256 = self.strategies[strategy].max_debt
+
+    if self.shutdown:
+        new_debt = 0
 
     if new_debt > current_debt:
         # only check if debt is increasing
@@ -781,6 +790,16 @@ def transfer(receiver: address, amount: uint256) -> bool:
     self._transfer(msg.sender, receiver, amount)
     return True
 
+## EMERGENCY MANAGEMENT ##
+@external
+def shutdown_vault():
+    self._enforce_role(msg.sender, Roles.EMERGENCY_MANAGER)
+    assert self.shutdown == False
+    self.shutdown = True
+    self.roles[msg.sender] = self.roles[msg.sender] | Roles.DEBT_MANAGER
+    log Shutdown()
+
+## ERC20+4626 compatibility
 @external
 def transferFrom(sender: address, receiver: address, amount: uint256) -> bool:
     return self._transfer_from(sender, receiver, amount)
