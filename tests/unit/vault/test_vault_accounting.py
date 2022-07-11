@@ -12,6 +12,6 @@ def test_vault_airdrop_do_not_increase(
     assert vault_balance != 0
     # vault.
     # aidrop to vault
-    price_per_share = vault.pricePerShare()
+    price_per_share = vault.price_per_share()
     airdrop_asset(gov, asset, vault, int(vault_balance / 10))
-    assert vault.pricePerShare() == price_per_share
+    assert vault.price_per_share() == price_per_share

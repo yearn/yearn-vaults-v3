@@ -283,7 +283,7 @@ def airdrop_asset():
 def add_strategy_to_vault():
     # used for new adding a new strategy to vault with unlimited max debt settings
     def add_strategy_to_vault(user, strategy, vault):
-        vault.addStrategy(strategy.address, sender=user)
+        vault.add_strategy(strategy.address, sender=user)
         strategy.setMinDebt(0, sender=user)
         strategy.setMaxDebt(MAX_INT, sender=user)
 
@@ -294,8 +294,8 @@ def add_strategy_to_vault():
 @pytest.fixture
 def add_debt_to_strategy():
     def add_debt_to_strategy(user, strategy, vault, max_debt: int):
-        vault.updateMaxDebtForStrategy(strategy.address, max_debt, sender=user)
-        vault.updateDebt(strategy.address, sender=user)
+        vault.update_max_debt_for_strategy(strategy.address, max_debt, sender=user)
+        vault.update_debt(strategy.address, sender=user)
 
     return add_debt_to_strategy
 

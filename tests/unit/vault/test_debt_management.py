@@ -123,16 +123,9 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_sufficient_wit
     new_debt = vault_balance // 2
     difference = current_debt - new_debt
 
-<<<<<<< HEAD
-    actions.add_debt_to_strategy(gov, strategy, vault, current_debt)
+    add_debt_to_strategy(gov, strategy, vault, current_debt)
     initial_idle = vault.total_idle()
     initial_debt = vault.total_debt()
-=======
-    add_debt_to_strategy(gov, strategy, vault, current_debt)
-    initial_idle = vault.totalIdle()
-    initial_debt = vault.totalDebt()
->>>>>>> 95b7a89 (chore: moved actions to conftest as fixtures)
-
     # reduce debt in strategy
     vault.update_max_debt_for_strategy(strategy.address, new_debt, sender=gov)
 
