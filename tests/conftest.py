@@ -1,5 +1,6 @@
 import pytest
 from ape import chain
+from ape.types import ContractLog
 from eth_account.messages import encode_structured_data
 from utils.constants import MAX_INT, ROLES
 
@@ -106,9 +107,9 @@ def create_vault(project, gov, fee_manager):
     def create_vault(asset, governance=gov, deposit_limit=MAX_INT):
         vault = gov.deploy(project.VaultV3, asset, "VaultV3", "AV", governance)
         # set vault deposit
-        vault.setDepositLimit(deposit_limit, sender=gov)
+        vault.set_deposit_limit(deposit_limit, sender=gov)
         # set up fee manager
-        vault.setFeeManager(fee_manager.address, sender=gov)
+        vault.set_fee_manager(fee_manager.address, sender=gov)
 
         vault.set_role(
             gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov
@@ -156,25 +157,25 @@ def vault(asset, create_vault):
 @pytest.fixture(scope="session")
 def strategy(gov, vault, create_strategy):
     strategy = create_strategy(vault)
-    vault.addStrategy(strategy.address, sender=gov)
+    vault.add_strategy(strategy.address, sender=gov)
     strategy.setMinDebt(0, sender=gov)
     strategy.setMaxDebt(MAX_INT, sender=gov)
     yield strategy
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def locked_strategy(gov, vault, create_locked_strategy):
     strategy = create_locked_strategy(vault)
-    vault.addStrategy(strategy.address, sender=gov)
+    vault.add_strategy(strategy.address, sender=gov)
     strategy.setMinDebt(0, sender=gov)
     strategy.setMaxDebt(MAX_INT, sender=gov)
     yield strategy
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def lossy_strategy(gov, vault, create_lossy_strategy):
     strategy = create_lossy_strategy(vault)
-    vault.addStrategy(strategy.address, sender=gov)
+    vault.add_strategy(strategy.address, sender=gov)
     strategy.setMinDebt(0, sender=gov)
     strategy.setMaxDebt(MAX_INT, sender=gov)
     yield strategy
@@ -219,7 +220,7 @@ def sign_vault_permit(chain):
         override_nonce=None,
     ):
         name = "Yearn Vault"
-        version = vault.apiVersion()
+        version = vault.api_version()
         if override_nonce:
             nonce = override_nonce
         else:
@@ -259,3 +260,56 @@ def sign_vault_permit(chain):
         return owner.sign_message(permit).signature
 
     return sign_vault_permit
+
+
+@pytest.fixture
+def user_deposit():
+    def user_deposit(user, vault, token, amount) -> ContractLog:
+        initial_balance = token.balanceOf(vault)
+        if token.allowance(user, vault) < amount:
+            token.approve(vault.address, MAX_INT, sender=user)
+        tx = vault.deposit(amount, user.address, sender=user)
+        assert token.balanceOf(vault) == initial_balance + amount
+        return tx
+
+    return user_deposit
+
+
+@pytest.fixture
+def airdrop_asset():
+    def airdrop_asset(gov, asset, target, amount):
+        asset.mint(target.address, amount, sender=gov)
+
+    return airdrop_asset
+
+
+@pytest.fixture
+def add_strategy_to_vault():
+    # used for new adding a new strategy to vault with unlimited max debt settings
+    def add_strategy_to_vault(user, strategy, vault):
+        vault.add_strategy(strategy.address, sender=user)
+        strategy.setMinDebt(0, sender=user)
+        strategy.setMaxDebt(MAX_INT, sender=user)
+
+    return add_strategy_to_vault
+
+
+# used to add debt to a strategy
+@pytest.fixture
+def add_debt_to_strategy():
+    def add_debt_to_strategy(user, strategy, vault, max_debt: int):
+        vault.update_max_debt_for_strategy(strategy.address, max_debt, sender=user)
+        vault.update_debt(strategy.address, sender=user)
+
+    return add_debt_to_strategy
+
+
+@pytest.fixture
+def set_fees_for_strategy():
+    def set_fees_for_strategy(
+        gov, strategy, fee_manager, management_fee, performance_fee
+    ):
+        fee_manager.set_management_fee(strategy.address, management_fee, sender=gov)
+        fee_manager.set_performance_fee(strategy.address, performance_fee, sender=gov)
+
+    return set_fees_for_strategy

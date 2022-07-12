@@ -2,7 +2,6 @@ import ape
 import pytest
 from ape import chain
 from eth_account import Account
-from utils import actions
 from utils.constants import MAX_INT, ZERO_ADDRESS
 
 
