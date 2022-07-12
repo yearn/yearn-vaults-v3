@@ -525,7 +525,7 @@ def _update_debt(strategy: address) -> uint256:
             new_debt = current_debt - withdrawable
 
         IStrategy(strategy).freeFunds(assets_to_withdraw)
-	# TODO: is it worth it to transfer the max_amount between assets_to_withdraw and balance?
+	    # TODO: is it worth it to transfer the max_amount between assets_to_withdraw and balance?
         ASSET.transferFrom(strategy, self, assets_to_withdraw)
         self.total_idle += assets_to_withdraw
         self.total_debt -= assets_to_withdraw
@@ -610,7 +610,7 @@ def _update_report_timestamps():
 
 
 @internal
-def _process_report(strategy: address) -> (uint256, uint256):
+def _process_report(strategy: address, force: bool) -> (uint256, uint256):
     assert self.strategies[strategy].activation != 0, "inactive strategy"
     total_assets: uint256 = IStrategy(strategy).totalAssets()
     current_debt: uint256 = self.strategies[strategy].current_debt
@@ -619,12 +619,15 @@ def _process_report(strategy: address) -> (uint256, uint256):
     gain: uint256 = 0
     loss: uint256 = 0
 
-    # TODO: implement health check
-
     if total_assets > current_debt:
         gain = total_assets - current_debt
     else:
         loss = current_debt - total_assets
+
+    if not force:
+        health_check: address = self.health_check
+        if health_check != ZERO_ADDRESS:
+            assert ICommonHealthCheck(health_check).check(strategy, gain, loss, current_debt), "unhealthy strategy"
 
     if loss > 0:
         self.strategies[strategy].total_loss += loss
@@ -734,9 +737,9 @@ def available_deposit_limit() -> uint256:
 
 ## ACCOUNTING MANAGEMENT ##
 @external
-def process_report(strategy: address) -> (uint256, uint256):
+def process_report(strategy: address, force: bool=False) -> (uint256, uint256):
     # TODO: permissioned: ACCOUNTING_MANAGER (open?)
-    return self._process_report(strategy)
+    return self._process_report(strategy, force)
 
 ## STRATEGY MANAGEMENT ##
 @external

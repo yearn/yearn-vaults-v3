@@ -8,19 +8,19 @@ interface IStrategy:
 
 # EVENTS #
 event CommitHealthCheckManager:
-    healthCheckManager: address
+    health_check_manager: address
 
 event ApplyHealthCheckManager:
-    healthCheckManager: address
+    health_check_manager: address
 
 event DisableHealthCheckStatusUpdated:
     strategy: address
-    isDisabled: bool
+    is_disabled: bool
 
 # STRUCTS #
 struct Limits:
-    profitLimitRatio: uint256
-    lossLimitRatio: uint256
+    profit_limit_ratio: uint256
+    loss_limit_ratio: uint256
     active: bool
 
 
@@ -29,85 +29,85 @@ MAX_BPS: constant(uint256) = 10_000
 
 
 # STORAGE #
-healthCheckManager: public(address)
-futureHealthCheckManager: public(address)
-strategyLimits: public(HashMap[address, Limits])
+health_check_manager: public(address)
+future_health_check_manager: public(address)
+strategy_limits: public(HashMap[address, Limits])
 
-profitLimitRatio: public(uint256)
-lossLimitRatio: public(uint256)
-disabledHealthChecks: public(HashMap[address, bool])
+profit_limit_ratio: public(uint256)
+loss_limit_ratio: public(uint256)
+disabled_health_checks: public(HashMap[address, bool])
 
 
 @external
 def __init__():
-    self.healthCheckManager = msg.sender
-    self.profitLimitRatio = 100
-    self.lossLimitRatio = 1
+    self.health_check_manager = msg.sender
+    self.profit_limit_ratio = 100
+    self.loss_limit_ratio = 1
 
 
 @external
-def setDefaultProfitLimitRatio(profitLimitRatio: uint256):
-    assert msg.sender == self.healthCheckManager, "not health check manager"
-    assert profitLimitRatio < MAX_BPS, "profit limit ratio out of bounds"
-    self.profitLimitRatio = profitLimitRatio
+def set_default_profit_limit_ratio(profit_limit_ratio: uint256):
+    assert msg.sender == self.health_check_manager, "not health check manager"
+    assert profit_limit_ratio < MAX_BPS, "profit limit ratio out of bounds"
+    self.profit_limit_ratio = profit_limit_ratio
 
 
 @external
-def setDisabledHealthCheckState(strategy: address, isDisabled: bool):
+def set_default_loss_limit_ratio(loss_limit_ratio: uint256):
+    assert msg.sender == self.health_check_manager, "not health check manager"
+    assert loss_limit_ratio < MAX_BPS, "loss limit ratio out of bounds"
+    self.loss_limit_ratio = loss_limit_ratio
+
+
+@external
+def set_disabled_health_check_state(strategy: address, is_disabled: bool):
     # health checks are enabled by default
-    assert msg.sender == self.healthCheckManager, "not health check manager"
-    log DisableHealthCheckStatusUpdated(strategy, isDisabled)
-    self.disabledHealthChecks[strategy] = isDisabled
+    assert msg.sender == self.health_check_manager, "not health check manager"
+    log DisableHealthCheckStatusUpdated(strategy, is_disabled)
+    self.disabled_health_checks[strategy] = is_disabled
 
 
 @external
-def setDefaultLossLimitRatio(lossLimitRatio: uint256):
-    assert msg.sender == self.healthCheckManager, "not health check manager"
-    assert lossLimitRatio < MAX_BPS, "loss limit ratio out of bounds"
-    self.lossLimitRatio = lossLimitRatio
-
-
-@external
-def setStrategyLimits(strategy: address, profitLimitRatio: uint256, lossLimitRatio: uint256):
-    assert msg.sender == self.healthCheckManager, "not health check manager"
-    assert profitLimitRatio < MAX_BPS, "profit limit ratio out of bounds"
-    assert lossLimitRatio < MAX_BPS, "loss limit ratio out of bounds"
-    self.strategyLimits[strategy] = Limits({
-        profitLimitRatio: profitLimitRatio,
-        lossLimitRatio: lossLimitRatio,
+def set_strategy_limits(strategy: address, profit_limit_ratio: uint256, loss_limit_ratio: uint256):
+    assert msg.sender == self.health_check_manager, "not health check manager"
+    assert profit_limit_ratio < MAX_BPS, "profit limit ratio out of bounds"
+    assert loss_limit_ratio < MAX_BPS, "loss limit ratio out of bounds"
+    self.strategy_limits[strategy] = Limits({
+        profit_limit_ratio: profit_limit_ratio,
+        loss_limit_ratio: loss_limit_ratio,
         active: True
     })
 
 
 @external
-def commitHealthCheckManager(futureHealthCheckManager: address):
-    assert msg.sender == self.healthCheckManager, "not health check manager"
-    self.futureHealthCheckManager = futureHealthCheckManager
-    log CommitHealthCheckManager(futureHealthCheckManager)
+def commit_health_check_manager(future_health_check_manager: address):
+    assert msg.sender == self.health_check_manager, "not health check manager"
+    self.future_health_check_manager = future_health_check_manager
+    log CommitHealthCheckManager(future_health_check_manager)
 
 
 @external
-def applyHealthCheckManager():
-    assert msg.sender == self.healthCheckManager, "not health check manager"
-    assert self.futureHealthCheckManager != ZERO_ADDRESS, "future health check manager != zero address"
-    futureHealthCheckManager: address = self.futureHealthCheckManager
-    self.healthCheckManager = futureHealthCheckManager
-    log ApplyHealthCheckManager(futureHealthCheckManager)
+def apply_health_check_manager():
+    assert msg.sender == self.health_check_manager, "not health check manager"
+    assert self.future_health_check_manager != ZERO_ADDRESS, "future health check manager != zero address"
+    future_health_check_manager: address = self.future_health_check_manager
+    self.health_check_manager = future_health_check_manager
+    log ApplyHealthCheckManager(future_health_check_manager)
 
 
 @view
 @external
 def check(strategy: address, gain: uint256, loss: uint256, currentDebt: uint256) -> bool:
-    limits: Limits = self.strategyLimits[strategy]
+    limits: Limits = self.strategy_limits[strategy]
     # use default values if limits have not been set
-    profitLimitRatio: uint256 = self.profitLimitRatio
-    lossLimitRatio: uint256 = self.lossLimitRatio
+    profit_limit_ratio: uint256 = self.profit_limit_ratio
+    loss_limit_ratio: uint256 = self.loss_limit_ratio
     if limits.active:
-        profitLimitRatio = limits.profitLimitRatio
-        lossLimitRatio = limits.lossLimitRatio
+        profit_limit_ratio = limits.profit_limit_ratio
+        loss_limit_ratio = limits.loss_limit_ratio
 
-    if (gain > ((currentDebt * profitLimitRatio) / MAX_BPS)):
+    if (gain > ((currentDebt * profit_limit_ratio) / MAX_BPS)):
         return False
-    if (loss > ((currentDebt * lossLimitRatio) / MAX_BPS)):
+    if (loss > ((currentDebt * loss_limit_ratio) / MAX_BPS)):
         return False
     return True

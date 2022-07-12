@@ -163,7 +163,7 @@ def strategy(gov, vault, create_strategy):
     yield strategy
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def locked_strategy(gov, vault, create_locked_strategy):
     strategy = create_locked_strategy(vault)
     vault.add_strategy(strategy.address, sender=gov)
@@ -172,7 +172,7 @@ def locked_strategy(gov, vault, create_locked_strategy):
     yield strategy
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def lossy_strategy(gov, vault, create_lossy_strategy):
     strategy = create_lossy_strategy(vault)
     vault.add_strategy(strategy.address, sender=gov)
@@ -193,7 +193,7 @@ def health_check(project, gov):
     yield health_check
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def mint_and_deposit_into_vault(project, gov):
     def mint_and_deposit_into_vault(
         vault, account=gov, amount_to_mint=10**18, amount_to_deposit=None
@@ -262,7 +262,7 @@ def sign_vault_permit(chain):
     return sign_vault_permit
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def user_deposit():
     def user_deposit(user, vault, token, amount) -> ContractLog:
         initial_balance = token.balanceOf(vault)
@@ -275,7 +275,7 @@ def user_deposit():
     return user_deposit
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def airdrop_asset():
     def airdrop_asset(gov, asset, target, amount):
         asset.mint(target.address, amount, sender=gov)
@@ -283,7 +283,7 @@ def airdrop_asset():
     return airdrop_asset
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def add_strategy_to_vault():
     # used for new adding a new strategy to vault with unlimited max debt settings
     def add_strategy_to_vault(user, strategy, vault):
@@ -295,7 +295,7 @@ def add_strategy_to_vault():
 
 
 # used to add debt to a strategy
-@pytest.fixture
+@pytest.fixture(scope="session")
 def add_debt_to_strategy():
     def add_debt_to_strategy(user, strategy, vault, max_debt: int):
         vault.update_max_debt_for_strategy(strategy.address, max_debt, sender=user)
@@ -304,7 +304,7 @@ def add_debt_to_strategy():
     return add_debt_to_strategy
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def set_fees_for_strategy():
     def set_fees_for_strategy(
         gov, strategy, fee_manager, management_fee, performance_fee
