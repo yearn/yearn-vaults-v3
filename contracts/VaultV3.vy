@@ -105,6 +105,7 @@ enum Roles:
     STRATEGY_MANAGER
     DEBT_MANAGER
     EMERGENCY_MANAGER
+    ACCOUNTING_MANAGER
 
 # IMMUTABLE #
 ASSET: immutable(ERC20)
@@ -724,7 +725,8 @@ def available_deposit_limit() -> uint256:
 ## ACCOUNTING MANAGEMENT ##
 @external
 def process_report(strategy: address) -> (uint256, uint256):
-    # TODO: permissioned: ACCOUNTING_MANAGER (open?)
+    # TODO: should it be open?
+    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
     return self._process_report(strategy)
 
 ## STRATEGY MANAGEMENT ##

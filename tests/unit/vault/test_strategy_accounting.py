@@ -2,12 +2,24 @@ from hashlib import new
 import ape
 import pytest
 from ape import chain
-from utils.constants import YEAR
+from utils.constants import YEAR, ROLES
 
 
 @pytest.fixture(autouse=True)
 def seed_vault_with_funds(mint_and_deposit_into_vault, vault, gov):
     mint_and_deposit_into_vault(vault, gov, 10**18, 10**18 // 2)
+
+
+@pytest.fixture(autouse=True)
+def set_role(vault, gov):
+    vault.set_role(
+        gov.address,
+        ROLES.EMERGENCY_MANAGER
+        | ROLES.STRATEGY_MANAGER
+        | ROLES.DEBT_MANAGER
+        | ROLES.ACCOUNTING_MANAGER,
+        sender=gov,
+    )
 
 
 def test_process_report__with_inactive_strategy__reverts(gov, vault, create_strategy):
