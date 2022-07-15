@@ -1,4 +1,15 @@
 import ape
+import pytest
+from utils.constants import ROLES
+
+
+@pytest.fixture(autouse=True)
+def set_role(vault, gov):
+    vault.set_role(
+        gov.address,
+        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        sender=gov,
+    )
 
 
 def test_sweep__with_asset_token_and_no_dust__reverts(gov, asset, vault):

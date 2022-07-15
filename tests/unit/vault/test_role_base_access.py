@@ -1,7 +1,5 @@
 import ape
-from ape import chain
-from utils.constants import ROLES, MAX_INT
-import pytest
+from utils.constants import ROLES
 
 
 # STRATEGY_MANAGER
@@ -202,3 +200,33 @@ def test_process_report__accounting_manager(
     assert event[0].strategy == strategy.address
     assert event[0].gain == 1
     assert event[0].loss == 0
+
+
+def test_sweep__no_accounting_manager__reverts(vault, strategy, bunny):
+    with ape.reverts():
+        vault.process_report(strategy, sender=bunny)
+
+
+def test_sweep__accounting_manager(
+    gov,
+    asset,
+    vault,
+    bunny,
+    airdrop_asset,
+    mint_and_deposit_into_vault,
+):
+    # We temporarily give bunny the role of ACCOUNTING_MANAGER
+    vault.set_role(bunny.address, ROLES.ACCOUNTING_MANAGER, sender=gov)
+
+    vault_balance = 10**22
+    asset_airdrop = vault_balance // 10
+    mint_and_deposit_into_vault(vault, gov, vault_balance)
+
+    airdrop_asset(gov, asset, vault, asset_airdrop)
+
+    tx = vault.sweep(asset.address, sender=bunny)
+    event = list(tx.decode_logs(vault.Sweep))
+
+    assert len(event) == 1
+    assert event[0].token == asset.address
+    assert event[0].amount == asset_airdrop

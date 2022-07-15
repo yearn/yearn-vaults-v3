@@ -735,7 +735,7 @@ def process_report(strategy: address) -> (uint256, uint256):
 
 @external
 def sweep(token: address) -> (uint256):
-    # TODO: permissioned: ACCOUNTING_MANAGER
+    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
     amount: uint256 = 0
     if token == ASSET.address:
         amount = ASSET.balanceOf(self) - self.total_idle
