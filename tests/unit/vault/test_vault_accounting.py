@@ -1,7 +1,6 @@
 import ape
 import pytest
 from ape import chain
-from utils.constants import YEAR
 
 
 def test_vault_airdrop_do_not_increase(
