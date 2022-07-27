@@ -205,7 +205,7 @@ def test_withdraw__with_locked_and_liquid_strategy__withdraws(
     assert vault.totalAssets() == amount_to_lock
     assert vault.totalSupply() == amount_to_lock
     assert vault.total_idle() == 0
-    assert vault.total_debt() == amount_to_lock
+    assert vault.totalDebt() == amount_to_lock
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(liquid_strategy) == 0
     assert asset.balanceOf(locked_strategy) == amount_to_lock

@@ -14,7 +14,7 @@ def test_deposit_and_withdraw(asset, gov, fish, fish_amount, create_vault):
     assert vault.totalSupply() == quarter_amount
     assert asset.balanceOf(vault) == quarter_amount
     assert vault.total_idle() == quarter_amount
-    assert vault.total_debt() == 0
+    assert vault.totalDebt() == 0
     assert vault.price_per_share(sender=fish) == 10 ** asset.decimals()  # 1:1 price
 
     # set deposit limit to half_amount and max deposit to test deposit limit
@@ -28,7 +28,7 @@ def test_deposit_and_withdraw(asset, gov, fish, fish_amount, create_vault):
     assert vault.totalSupply() == half_amount
     assert asset.balanceOf(vault) == half_amount
     assert vault.total_idle() == half_amount
-    assert vault.total_debt() == 0
+    assert vault.totalDebt() == 0
     assert vault.price_per_share(sender=fish) == 10 ** asset.decimals()  # 1:1 price
 
     # raise deposit limit to fish_amount and allow full deposit through to test deposit limit change
@@ -40,7 +40,7 @@ def test_deposit_and_withdraw(asset, gov, fish, fish_amount, create_vault):
     assert vault.totalSupply() == amount
     assert asset.balanceOf(vault) == amount
     assert vault.total_idle() == amount
-    assert vault.total_debt() == 0
+    assert vault.totalDebt() == 0
     assert vault.price_per_share(sender=fish) == 10 ** asset.decimals()  # 1:1 price
 
     vault.withdraw(half_amount, fish.address, fish.address, sender=fish)
@@ -48,7 +48,7 @@ def test_deposit_and_withdraw(asset, gov, fish, fish_amount, create_vault):
     assert vault.totalSupply() == half_amount
     assert asset.balanceOf(vault) == half_amount
     assert vault.total_idle() == half_amount
-    assert vault.total_debt() == 0
+    assert vault.totalDebt() == 0
     assert vault.price_per_share(sender=fish) == 10 ** asset.decimals()  # 1:1 price
 
     vault.withdraw(half_amount, fish.address, fish.address, sender=fish)

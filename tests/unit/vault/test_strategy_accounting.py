@@ -59,7 +59,7 @@ def test_process_report__with_gain_and_zero_fees(
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
-    locked_profit = vault.locked_profit()
+    profit_buffer = vault.profit_buffer()
 
     snapshot = chain.pending_timestamp
     tx = vault.process_report(strategy.address, sender=gov)
@@ -78,7 +78,7 @@ def test_process_report__with_gain_and_zero_fees(
     assert strategy_params.total_gain == gain
     assert strategy_params.total_loss == 0
     assert strategy_params.current_debt == initial_debt + gain
-    assert vault.locked_profit() == locked_profit + gain
+    assert vault.profit_buffer() == profit_buffer + gain
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
@@ -111,7 +111,7 @@ def test_process_report__with_gain_and_zero_management_fees(
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
-    locked_profit = vault.locked_profit()
+    profit_buffer = vault.profit_buffer()
 
     snapshot = chain.pending_timestamp
     tx = vault.process_report(strategy.address, sender=gov)
@@ -130,7 +130,7 @@ def test_process_report__with_gain_and_zero_management_fees(
     assert strategy_params.total_gain == gain
     assert strategy_params.total_loss == 0
     assert strategy_params.current_debt == initial_debt + gain
-    assert vault.locked_profit() == locked_profit + gain - total_fee
+    assert vault.profit_buffer() == profit_buffer + gain - total_fee
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
@@ -164,7 +164,7 @@ def test_process_report__with_gain_and_zero_performance_fees(
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
-    locked_profit = vault.locked_profit()
+    profit_buffer = vault.profit_buffer()
 
     chain.pending_timestamp += YEAR
     snapshot = chain.pending_timestamp
@@ -184,8 +184,8 @@ def test_process_report__with_gain_and_zero_performance_fees(
     assert strategy_params.total_gain == gain
     assert strategy_params.total_loss == 0
     assert strategy_params.current_debt == initial_debt + gain
-    assert vault.locked_profit() == pytest.approx(
-        locked_profit + gain - total_fee, rel=1e-4
+    assert vault.profit_buffer() == pytest.approx(
+        profit_buffer + gain - total_fee, rel=1e-4
     )
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
@@ -220,7 +220,7 @@ def test_process_report__with_gain_and_both_fees(
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
-    locked_profit = vault.locked_profit()
+    profit_buffer = vault.profit_buffer()
 
     snapshot = chain.pending_timestamp
     tx = vault.process_report(strategy.address, sender=gov)
@@ -239,8 +239,8 @@ def test_process_report__with_gain_and_both_fees(
     assert strategy_params.total_gain == gain
     assert strategy_params.total_loss == 0
     assert strategy_params.current_debt == initial_debt + gain
-    assert vault.locked_profit() == pytest.approx(
-        locked_profit + gain - total_fee, rel=1e-4
+    assert vault.profit_buffer() == pytest.approx(
+        profit_buffer + gain - total_fee, rel=1e-4
     )
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
@@ -276,7 +276,7 @@ def test_process_report__with_fees_exceeding_fee_cap(
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
-    locked_profit = vault.locked_profit()
+    profit_buffer = vault.profit_buffer()
 
     chain.pending_timestamp += YEAR  # need time to pass to accrue more fees
     snapshot = chain.pending_timestamp
@@ -296,7 +296,7 @@ def test_process_report__with_fees_exceeding_fee_cap(
     assert strategy_params.total_gain == gain
     assert strategy_params.total_loss == 0
     assert strategy_params.current_debt == initial_debt + gain
-    assert vault.locked_profit() == locked_profit + gain - max_fee
+    assert vault.profit_buffer() == profit_buffer + gain - max_fee
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
@@ -316,7 +316,7 @@ def test_process_report__with_loss(
 
     strategy_params = vault.strategies(lossy_strategy.address)
     initial_debt = strategy_params.current_debt
-    locked_profit = vault.locked_profit()
+    profit_buffer = vault.profit_buffer()
 
     snapshot = chain.pending_timestamp
     tx = vault.process_report(lossy_strategy.address, sender=gov)
@@ -335,7 +335,7 @@ def test_process_report__with_loss(
     assert strategy_params.total_gain == 0
     assert strategy_params.total_loss == loss
     assert strategy_params.current_debt == initial_debt - loss
-    assert vault.locked_profit() == locked_profit
+    assert vault.profit_buffer() == profit_buffer
     assert vault.strategies(lossy_strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )

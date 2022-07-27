@@ -112,7 +112,9 @@ def create_vault(project, gov, fee_manager):
         vault.set_fee_manager(fee_manager.address, sender=gov)
 
         vault.set_role(
-            gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov
+            gov.address,
+            ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+            sender=gov,
         )
 
         return vault
