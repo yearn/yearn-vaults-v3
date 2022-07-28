@@ -147,7 +147,7 @@ def test_profit_distribution__one_gain(
     assert vault.total_idle() == 0
 
     assert vault.profit_buffer() == first_profit
-    assert vault.profit_history(0).distribution_rate / MAX_BPS == pytest.approx(
+    assert vault.get_profit_history(0).distribution_rate / MAX_BPS == pytest.approx(
         first_profit / int(vault.profit_unlock_time()), 1e-5
     )
     assert days_to_secs(1) <= vault.last_profit_buffer_update() < days_to_secs(1) + 15
@@ -157,7 +157,8 @@ def test_profit_distribution__one_gain(
     chain.mine(timestamp=chain.pending_timestamp)
 
     assert vault.totalAssets() == pytest.approx(
-        amount + vault.profit_history(0).distribution_rate * days_to_secs(2) / MAX_BPS,
+        amount
+        + vault.get_profit_history(0).distribution_rate * days_to_secs(2) / MAX_BPS,
         1e-5,
     )
 
@@ -166,14 +167,14 @@ def test_profit_distribution__one_gain(
 
     assert vault.profit_buffer() == pytest.approx(
         first_profit
-        - vault.profit_history(0).distribution_rate * days_to_secs(2) / MAX_BPS,
+        - vault.get_profit_history(0).distribution_rate * days_to_secs(2) / MAX_BPS,
         1e-5,
     )
-    assert vault.profit_history(0).distribution_rate / MAX_BPS == pytest.approx(
+    assert vault.get_profit_history(0).distribution_rate / MAX_BPS == pytest.approx(
         first_profit / (vault.profit_unlock_time()), 1e-5
     )
 
-    chain.pending_timestamp = days_to_secs(8)
+    chain.pending_timestamp = days_to_secs(8) + 15
     chain.mine(timestamp=chain.pending_timestamp)
 
     assert vault.totalAssets() == pytest.approx(amount + first_profit, 1e-5)
@@ -183,8 +184,9 @@ def test_profit_distribution__one_gain(
     assert vault.totalAssets() == pytest.approx(amount + first_profit, 1e-5)
     assert vault.totalDebt() == pytest.approx(amount + first_profit, 1e-5)
     assert vault.profit_buffer() / 10 ** vault.decimals() == pytest.approx(0, abs=0.5)
-    with reverts():
-        vault.profit_history(0)
+
+    with reverts("empty array"):
+        vault.get_profit_history(0)
 
 
 def test_profit_distribution__two_gain(
@@ -250,7 +252,8 @@ def test_profit_distribution__two_gain(
     asset.transfer(strategy, second_profit, sender=fish)
 
     assert vault.totalAssets() == pytest.approx(
-        amount + vault.profit_history(0).distribution_rate * days_to_secs(2) / MAX_BPS,
+        amount
+        + vault.get_profit_history(0).distribution_rate * days_to_secs(2) / MAX_BPS,
         1e-5,
     )
 
@@ -261,11 +264,13 @@ def test_profit_distribution__two_gain(
     assert event[0].total_gain == first_profit + second_profit
 
     assert vault.totalAssets() == pytest.approx(
-        amount + vault.profit_history(0).distribution_rate * days_to_secs(2) / MAX_BPS,
+        amount
+        + vault.get_profit_history(0).distribution_rate * days_to_secs(2) / MAX_BPS,
         1e-5,
     )
     assert vault.totalDebt() == pytest.approx(
-        amount + vault.profit_history(0).distribution_rate * days_to_secs(2) / MAX_BPS,
+        amount
+        + vault.get_profit_history(0).distribution_rate * days_to_secs(2) / MAX_BPS,
         1e-5,
     )
 
@@ -275,7 +280,7 @@ def test_profit_distribution__two_gain(
     vault.update_profit_buffer(sender=gov)
 
     # First profit should be gone already, therefore we should only have second profit on history
-    assert vault.profit_history(0).distribution_rate / MAX_BPS == pytest.approx(
+    assert vault.get_profit_history(0).distribution_rate / MAX_BPS == pytest.approx(
         second_profit / vault.profit_unlock_time(), 1e-5
     )
 
@@ -285,8 +290,8 @@ def test_profit_distribution__two_gain(
     vault.update_profit_buffer(sender=gov)
 
     # All profits should have been unlocked
-    with reverts():
-        vault.profit_history(0)
+    with reverts("empty array"):
+        vault.get_profit_history(0)
 
     assert vault.totalAssets() == pytest.approx(
         amount + first_profit + second_profit, 1e-5
@@ -358,8 +363,8 @@ def test_profit_distribution__two_gain_one_loss(
     strategy.setLoss(fish, first_loss, sender=gov)
     assert strategy.totalAssets() == first_profit + second_profit + amount - first_loss
 
-    dist_rate_profit_1_before_loss = vault.profit_history(0).distribution_rate
-    dist_rate_profit_2_before_loss = vault.profit_history(1).distribution_rate
+    dist_rate_profit_1_before_loss = vault.get_profit_history(0).distribution_rate
+    dist_rate_profit_2_before_loss = vault.get_profit_history(1).distribution_rate
 
     tx = vault.process_report(strategy, sender=gov)
 
@@ -369,8 +374,12 @@ def test_profit_distribution__two_gain_one_loss(
     assert event[0].total_loss == first_loss
     assert event[0].total_gain == first_profit + second_profit
 
-    assert vault.profit_history(0).distribution_rate < dist_rate_profit_1_before_loss
-    assert vault.profit_history(0).distribution_rate < dist_rate_profit_2_before_loss
+    assert (
+        vault.get_profit_history(0).distribution_rate < dist_rate_profit_1_before_loss
+    )
+    assert (
+        vault.get_profit_history(0).distribution_rate < dist_rate_profit_2_before_loss
+    )
 
     chain.pending_timestamp = days_to_secs(10) + 15
     chain.mine(timestamp=days_to_secs(10) + 15)
@@ -378,8 +387,8 @@ def test_profit_distribution__two_gain_one_loss(
     vault.update_profit_buffer(sender=gov)
 
     # All profits should have been unlocked
-    with reverts():
-        vault.profit_history(0)
+    with reverts("empty array"):
+        vault.get_profit_history(0)
 
     assert vault.totalAssets() == pytest.approx(
         amount + first_profit + second_profit - first_loss, 1e-5
@@ -440,8 +449,8 @@ def test_profit_distribution__one_gain_one_big_loss(
     vault.process_report(strategy, sender=gov)
 
     # There should not be any profit on the history
-    with pytest.raises(ContractLogicError):
-        vault.profit_history(0)
+    with reverts("empty array"):
+        vault.get_profit_history(0)
 
     assert vault.profit_buffer() == 0
     assert vault.totalAssets() == int(10**9 / 2)
@@ -513,7 +522,7 @@ def test_profit_distribution__one_gain_with_fees(
         first_profit * (MAX_BPS - performance_fee) / MAX_BPS
     )
     assert vault.profit_buffer() == first_profit_without_fees
-    assert vault.profit_history(0).distribution_rate / MAX_BPS == pytest.approx(
+    assert vault.get_profit_history(0).distribution_rate / MAX_BPS == pytest.approx(
         first_profit_without_fees / int(vault.profit_unlock_time()), 1e-5
     )
 
@@ -648,10 +657,10 @@ def test_set_unlocking_time_higher_value(
 
     vault.process_report(strategy, sender=gov)
     assert (
-        vault.profit_history(0).end_time
+        vault.get_profit_history(0).end_time
         == days_to_secs(7) + vault.last_profit_buffer_update()
     )
-    dist_rate_profit_1 = vault.profit_history(0).distribution_rate
+    dist_rate_profit_1 = vault.get_profit_history(0).distribution_rate
 
     # We change locking time and create a virtual profit
     new_unlocking_time = days_to_secs(8)
@@ -660,11 +669,11 @@ def test_set_unlocking_time_higher_value(
     vault.process_report(strategy, sender=gov)
 
     assert (
-        vault.profit_history(1).end_time
+        vault.get_profit_history(1).end_time
         == new_unlocking_time + vault.last_profit_buffer_update()
     )
-    assert vault.profit_history(1).distribution_rate < dist_rate_profit_1
-    dist_rate_profit_2 = vault.profit_history(1).distribution_rate
+    assert vault.get_profit_history(1).distribution_rate < dist_rate_profit_1
+    dist_rate_profit_2 = vault.get_profit_history(1).distribution_rate
 
     # We change locking time and create a virtual profit
     new_unlocking_time = days_to_secs(10)
@@ -673,10 +682,10 @@ def test_set_unlocking_time_higher_value(
     vault.process_report(strategy, sender=gov)
 
     assert (
-        vault.profit_history(2).end_time
+        vault.get_profit_history(2).end_time
         == new_unlocking_time + vault.last_profit_buffer_update()
     )
-    assert vault.profit_history(2).distribution_rate < dist_rate_profit_2
+    assert vault.get_profit_history(2).distribution_rate < dist_rate_profit_2
 
 
 def test_set_unlocking_time_lower_value(
@@ -712,10 +721,10 @@ def test_set_unlocking_time_lower_value(
 
     vault.process_report(strategy, sender=gov)
     assert (
-        vault.profit_history(0).end_time
+        vault.get_profit_history(0).end_time
         == days_to_secs(7) + vault.last_profit_buffer_update()
     )
-    dist_rate_profit_1 = vault.profit_history(0).distribution_rate
+    dist_rate_profit_1 = vault.get_profit_history(0).distribution_rate
 
     # We change locking time and create a virtual profit
     new_unlocking_time = days_to_secs(6)
@@ -724,11 +733,11 @@ def test_set_unlocking_time_lower_value(
     vault.process_report(strategy, sender=gov)
 
     assert (
-        vault.profit_history(1).end_time
+        vault.get_profit_history(1).end_time
         == new_unlocking_time + vault.last_profit_buffer_update()
     )
-    assert vault.profit_history(1).distribution_rate > dist_rate_profit_1
-    dist_rate_profit_2 = vault.profit_history(1).distribution_rate
+    assert vault.get_profit_history(1).distribution_rate > dist_rate_profit_1
+    dist_rate_profit_2 = vault.get_profit_history(1).distribution_rate
 
     # We change locking time and create a virtual profit
     new_unlocking_time = days_to_secs(4)
@@ -737,7 +746,7 @@ def test_set_unlocking_time_lower_value(
     vault.process_report(strategy, sender=gov)
 
     assert (
-        vault.profit_history(2).end_time
+        vault.get_profit_history(2).end_time
         == new_unlocking_time + vault.last_profit_buffer_update()
     )
-    assert vault.profit_history(2).distribution_rate > dist_rate_profit_2
+    assert vault.get_profit_history(2).distribution_rate > dist_rate_profit_2

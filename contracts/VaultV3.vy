@@ -158,7 +158,7 @@ PERMIT_TYPE_HASH: constant(bytes32) = keccak256("Permit(address owner,address sp
 last_profit_buffer_update: public(uint256)  # Timestamp where profit buffer was last updated    
 profit_buffer: public(uint256)  # Total amount of profits locked. It is updated till 'last_profit_buffer_update'
 profit_unlock_time: public(uint256)  # Time profits need to be locked for
-profit_history: public(DynArray[Profit, MAX_PROFITS_HISTORY])  # History of all active profits
+profit_history: DynArray[Profit, MAX_PROFITS_HISTORY]  # History of all active profits
 
 @external
 def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: address):
@@ -762,6 +762,27 @@ def available_deposit_limit() -> uint256:
     return 0
 
 ## ACCOUNTING MANAGEMENT ##
+
+@view
+@external
+def get_profit_history(index: uint128) -> Profit:
+    """
+    Returns Profit for given index. If array is empty it will revert. 
+    If index not present, it returns a Profit with all values set to 0.
+    
+    Implemented because since commit 
+    https://github.com/vyperlang/vyper/commit/be2c59a604070c75212dca90beb4c33fed908c8b#diff-8afc0c14609045bfe2ec50a38af63606500ad18edae6cef864ee28d2e1a5e41a
+    DynArrays cannot be 'public'. Can be deleted if Vyper behaviour changes and use built in getter.
+    """
+    assert len(self.profit_history) > 0, "empty array"
+    i: uint128 = 0
+    profit: Profit = Profit({end_time: 0, distribution_rate: 0})
+    for e in self.profit_history:
+        if i == index:
+            profit = e
+            return e
+        i += 1
+    return profit
 
 @external
 def update_profit_buffer():
