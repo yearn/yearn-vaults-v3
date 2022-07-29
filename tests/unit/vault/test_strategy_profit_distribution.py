@@ -5,7 +5,7 @@ from ape.exceptions import ContractLogicError
 import pytest
 
 
-def test_totalAssets(
+def test_totalDebt(
     create_vault,
     asset,
     create_strategy,
@@ -16,8 +16,8 @@ def test_totalAssets(
     gov,
 ):
     """
-    Method vault.totalAssets() returns all assets that the vault has. If there are profits locked, it will
-    estimate them.
+    Method vault.totalDebt() returns the total debt that the vault has. If there are profits that have been unlocked,
+    it will estimate them.
     Test wants to check that we are able to estimate them properly.
     """
 
@@ -38,7 +38,7 @@ def test_totalAssets(
     add_debt_to_strategy(gov, strategy, vault, amount)
 
     assert strategy.totalAssets() == amount
-    assert vault.profit_buffer() == 0
+    assert vault.profitBuffer() == 0
 
     # We create a virtual profit
     asset.transfer(strategy, first_profit, sender=fish)
@@ -90,6 +90,61 @@ def test_totalAssets(
     )
 
 
+def test_profitBuffer(
+    create_vault,
+    asset,
+    create_strategy,
+    user_deposit,
+    fish,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    gov,
+):
+    """
+    Method vault.profitBuffet() returns the up to date assets in buffer. It will estimate them
+    if storage var is not updated.
+    """
+
+    amount = 10**9
+    first_profit = 10**9
+    second_profit = int(10**9 / 2)
+
+    # We reset time to 1 to facilitate reporting
+    chain.pending_timestamp = 1
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    vault = create_vault(asset)
+    strategy = create_strategy(vault)
+
+    # Deposit assets to vault and get strategy ready
+    user_deposit(fish, vault, asset, amount)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, amount)
+
+    assert vault.profitBuffer() == 0
+
+    # We create a virtual profit
+    asset.transfer(strategy, first_profit, sender=fish)
+    vault.process_report(strategy, sender=gov)
+
+    assert vault.profitBuffer() == amount
+
+    # We increase time and check estimation
+    chain.pending_timestamp = days_to_secs(4)
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    assert vault.profitBuffer() == pytest.approx(
+        amount - amount / vault.profit_unlock_time() * (days_to_secs(4)), 1e-3
+    )
+
+    # We increase time and check estimation
+    chain.pending_timestamp = days_to_secs(10)
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    # Profit should be release by day 10, so profit buffer should be approximately 0
+    assert vault.profitBuffer() == pytest.approx(0, abs=1e4)
+
+
 def test_profit_distribution__one_gain(
     gov,
     fish,
@@ -129,7 +184,7 @@ def test_profit_distribution__one_gain(
     assert vault.totalDebt() == amount
     assert vault.total_idle() == 0
 
-    assert vault.profit_buffer() == 0
+    assert vault.profitBuffer() == 0
     assert vault.profit_unlock_time() == days_to_secs(7)
 
     # We call process_report at t_1
@@ -146,7 +201,7 @@ def test_profit_distribution__one_gain(
     assert vault.totalDebt() == amount
     assert vault.total_idle() == 0
 
-    assert vault.profit_buffer() == first_profit
+    assert vault.profitBuffer() == first_profit
     assert vault.get_profit_history(0).distribution_rate / MAX_BPS == pytest.approx(
         first_profit / int(vault.profit_unlock_time()), 1e-5
     )
@@ -165,7 +220,7 @@ def test_profit_distribution__one_gain(
     # We update profit values manually to current time
     vault.update_profit_buffer(sender=gov)
 
-    assert vault.profit_buffer() == pytest.approx(
+    assert vault.profitBuffer() == pytest.approx(
         first_profit
         - vault.get_profit_history(0).distribution_rate * days_to_secs(2) / MAX_BPS,
         1e-5,
@@ -183,7 +238,7 @@ def test_profit_distribution__one_gain(
 
     assert vault.totalAssets() == pytest.approx(amount + first_profit, 1e-5)
     assert vault.totalDebt() == pytest.approx(amount + first_profit, 1e-5)
-    assert vault.profit_buffer() / 10 ** vault.decimals() == pytest.approx(0, abs=0.5)
+    assert vault.profitBuffer() / 10 ** vault.decimals() == pytest.approx(0, abs=0.5)
 
     with reverts("empty array"):
         vault.get_profit_history(0)
@@ -230,7 +285,7 @@ def test_profit_distribution__two_gain(
     assert vault.totalDebt() == amount
     assert vault.total_idle() == 0
 
-    assert vault.profit_buffer() == 0
+    assert vault.profitBuffer() == 0
     assert vault.profit_unlock_time() == days_to_secs(7)
 
     chain.pending_timestamp = days_to_secs(1)
@@ -296,7 +351,7 @@ def test_profit_distribution__two_gain(
     assert vault.totalAssets() == pytest.approx(
         amount + first_profit + second_profit, 1e-5
     )
-    assert vault.profit_buffer() / 10 ** vault.decimals() == pytest.approx(0, abs=0.5)
+    assert vault.profitBuffer() / 10 ** vault.decimals() == pytest.approx(0, abs=0.5)
 
 
 def test_profit_distribution__two_gain_one_loss(
@@ -393,7 +448,7 @@ def test_profit_distribution__two_gain_one_loss(
     assert vault.totalAssets() == pytest.approx(
         amount + first_profit + second_profit - first_loss, 1e-5
     )
-    assert vault.profit_buffer() / 10 ** vault.decimals() == pytest.approx(0, abs=0.5)
+    assert vault.profitBuffer() / 10 ** vault.decimals() == pytest.approx(0, abs=0.5)
 
 
 def test_profit_distribution__one_gain_one_big_loss(
@@ -411,7 +466,7 @@ def test_profit_distribution__one_gain_one_big_loss(
     day 2 of 1000 assets.
     Initially we have 1000 assets and therefore 1000 shares (1:1).
     By day 2, total_assets should be 1000 + 500 - 1000 = 500 assets.
-    Loss is too big for the profit_buffer, so it should drain it and delete before profits from profit_history
+    Loss is too big for the profitBuffer, so it should drain it and delete before profits from profit_history
     """
 
     amount = 10**9
@@ -452,7 +507,7 @@ def test_profit_distribution__one_gain_one_big_loss(
     with reverts("empty array"):
         vault.get_profit_history(0)
 
-    assert vault.profit_buffer() == 0
+    assert vault.profitBuffer() == 0
     assert vault.totalAssets() == int(10**9 / 2)
 
 
@@ -501,7 +556,7 @@ def test_profit_distribution__one_gain_with_fees(
     assert vault.totalDebt() == amount
     assert vault.total_idle() == 0
 
-    assert vault.profit_buffer() == 0
+    assert vault.profitBuffer() == 0
     assert vault.profit_unlock_time() == days_to_secs(7)
 
     # We call process_report at t_1
@@ -521,7 +576,7 @@ def test_profit_distribution__one_gain_with_fees(
     first_profit_without_fees = int(
         first_profit * (MAX_BPS - performance_fee) / MAX_BPS
     )
-    assert vault.profit_buffer() == first_profit_without_fees
+    assert vault.profitBuffer() == first_profit_without_fees
     assert vault.get_profit_history(0).distribution_rate / MAX_BPS == pytest.approx(
         first_profit_without_fees / int(vault.profit_unlock_time()), 1e-5
     )
@@ -569,7 +624,7 @@ def test_profit_distribution__one_gain_one_deposit_one_withdraw(
     assert vault.totalDebt() == amount
     assert vault.total_idle() == 0
 
-    assert vault.profit_buffer() == 0
+    assert vault.profitBuffer() == 0
     assert vault.profit_unlock_time() == days_to_secs(7)
 
     # We call process_report at t_1
@@ -598,7 +653,7 @@ def test_profit_distribution__one_gain_one_deposit_one_withdraw(
     assert balance_before_deposit < vault.balanceOf(fish)
     assert pps_before_deposit < vault.price_per_share()
 
-    assert vault.totalAssets() + vault.profit_buffer() == amount + 2 * deposit
+    assert vault.totalAssets() + vault.profitBuffer() == amount + 2 * deposit
 
     # Due to the report of profits, vault pps should be higher: for the same amount, second deposit gives fewer shares
     assert balance_before_deposit > (vault.balanceOf(fish) - balance_before_deposit)
@@ -619,7 +674,7 @@ def test_profit_distribution__one_gain_one_deposit_one_withdraw(
     # pps keeps increasing as profits are being released
     assert pps_before_withdraw < vault.price_per_share()
 
-    assert vault.totalAssets() + vault.profit_buffer() == pytest.approx(
+    assert vault.totalAssets() + vault.profitBuffer() == pytest.approx(
         amount + 2 * deposit - withdraw, 1e-6
     )
 

@@ -156,9 +156,9 @@ DOMAIN_TYPE_HASH: constant(bytes32) = keccak256('EIP712Domain(string name,string
 PERMIT_TYPE_HASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
 
 last_profit_buffer_update: public(uint256)  # Timestamp where profit buffer was last updated    
-profit_buffer: public(uint256)  # Total amount of profits locked. It is updated till 'last_profit_buffer_update'
-profit_unlock_time: public(uint256)  # Time profits need to be locked for
+profit_buffer: uint256  # Total amount of profits locked. It is updated till 'last_profit_buffer_update'. See 'profitBuffer()' for up to date value
 profit_history: DynArray[Profit, MAX_PROFITS_HISTORY]  # History of all active profits
+profit_unlock_time: public(uint256)  # Time profits need to be locked for
 
 @external
 def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: address):
@@ -675,13 +675,12 @@ def _process_report(strategy: address) -> (uint256, uint256):
     )
     return (gain, loss)    
 
-
 @view
 @internal
-def _total_debt() -> uint256:
+def _estimate_unlocked_profit() -> uint256:
     """
-    Returns vault 'total_debt' storage value. If there is at least one profit on 'profit_history' and profit locking values are 
-    not up to date, it will sum to 'total_debt' the unlocked profit since profit locking values where last updated.
+    If there is at least one profit on 'profit_history' and profit locking values are 
+    not up to date, it will return the unlocked profit since profit locking values where last updated.
     """
     if self.last_profit_buffer_update != block.timestamp and len(self.profit_history) > 0:
         unlocked_profit: uint256 = 0
@@ -690,8 +689,15 @@ def _total_debt() -> uint256:
                 unlocked_profit += (block.timestamp - self.last_profit_buffer_update) * e.distribution_rate / MAX_BPS
             else:
                 unlocked_profit += (e.end_time - self.last_profit_buffer_update) * e.distribution_rate / MAX_BPS
-        return self.total_debt + unlocked_profit
-    return self.total_debt
+        if unlocked_profit > self.profit_buffer:
+            unlocked_profit = self.profit_buffer
+        return unlocked_profit
+    return 0
+
+@view
+@internal
+def _total_debt() -> uint256:
+    return self.total_debt + self._estimate_unlocked_profit()
 
 
 # # EMERGENCY FUNCTIONS #
@@ -762,27 +768,6 @@ def available_deposit_limit() -> uint256:
     return 0
 
 ## ACCOUNTING MANAGEMENT ##
-
-@view
-@external
-def get_profit_history(index: uint128) -> Profit:
-    """
-    Returns Profit for given index. If array is empty it will revert. 
-    If index not present, it returns a Profit with all values set to 0.
-    
-    Implemented because since commit 
-    https://github.com/vyperlang/vyper/commit/be2c59a604070c75212dca90beb4c33fed908c8b#diff-8afc0c14609045bfe2ec50a38af63606500ad18edae6cef864ee28d2e1a5e41a
-    DynArrays cannot be 'public'. Can be deleted if Vyper behaviour changes and use built in getter.
-    """
-    assert len(self.profit_history) > 0, "empty array"
-    i: uint128 = 0
-    profit: Profit = Profit({end_time: 0, distribution_rate: 0})
-    for e in self.profit_history:
-        if i == index:
-            profit = e
-            return e
-        i += 1
-    return profit
 
 @external
 def update_profit_buffer():
@@ -986,3 +971,29 @@ def previewRedeem(shares: uint256) -> uint256:
 @external
 def api_version() -> String[28]:
     return API_VERSION
+
+@view
+@external
+def profitBuffer() -> uint256:
+    return self.profit_buffer - self._estimate_unlocked_profit()
+
+@view
+@external
+def get_profit_history(index: uint128) -> Profit:
+    """
+    Returns Profit for given index. If array is empty it will revert. 
+    If index not present, it returns a Profit with all values set to 0.
+    
+    Implemented because since commit 
+    https://github.com/vyperlang/vyper/commit/be2c59a604070c75212dca90beb4c33fed908c8b#diff-8afc0c14609045bfe2ec50a38af63606500ad18edae6cef864ee28d2e1a5e41a
+    DynArrays cannot be 'public'. Can be deleted if Vyper behaviour changes and DynArrays come with built-in getters.
+    """
+    assert len(self.profit_history) > 0, "empty array"
+    i: uint128 = 0
+    profit: Profit = Profit({end_time: 0, distribution_rate: 0})
+    for e in self.profit_history:
+        if i == index:
+            profit = e
+            return e
+        i += 1
+    return profit
