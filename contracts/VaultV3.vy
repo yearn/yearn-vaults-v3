@@ -86,7 +86,7 @@ event UpdateMinimumTotalIdle:
     minimum_total_idle: uint256
 
 event UpdateProfitUnlockTime:
-    profit_unlock_time: uint256
+    profit_max_unlock_time: uint256
 
 event Shutdown:
     pass
@@ -104,15 +104,10 @@ struct StrategyParams:
     total_gain: uint256
     total_loss: uint256
 
-struct Profit:
-    end_time: uint256  # Timestamp where unlocking should end (no more profit to unlock)
-    distribution_rate: uint256  # Rate at which profit is being unlock per sec. Scaled by MAX_BPS
-
-
 # CONSTANTS #
 MAX_BPS: constant(uint256) = 10_000
 MAX_PROFITS_HISTORY: constant(uint256) = 100
-DEFAULT_PROFIT_UNLOCK_TIME: constant(uint256) = 7 * 24 * 60 * 60  # 7 days
+DEFAULT_profit_max_unlock_time: constant(uint256) = 7 * 24 * 60 * 60  # 7 days
 
 # ENUMS #
 enum Roles:
@@ -135,7 +130,6 @@ allowance: public(HashMap[address, HashMap[address, uint256]])
 
 total_supply: uint256
 total_debt: uint256
-# TODO: should we create external method to get total_idle as totalIdle? (as with totalDebt)
 total_idle: public(uint256)
 minimum_total_idle: public(uint256)
 roles: public(HashMap[address, Roles])
@@ -155,10 +149,10 @@ DOMAIN_SEPARATOR: public(bytes32)
 DOMAIN_TYPE_HASH: constant(bytes32) = keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)')
 PERMIT_TYPE_HASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
 
-last_profit_buffer_update: public(uint256)  # Timestamp where profit buffer was last updated    
-profit_buffer: uint256  # Total amount of profits locked. It is updated till 'last_profit_buffer_update'. See 'profitBuffer()' for up to date value
-profit_history: DynArray[Profit, MAX_PROFITS_HISTORY]  # History of all active profits
-profit_unlock_time: public(uint256)  # Time profits need to be locked for
+profit_end_date: public(uint256)  # Timestamp when profits are fully unlocked. Type uint256, as we are making comparison with block.timestamp (uint256)
+profit_last_update: public(uint256)  # Last time buffer values were updated
+profit_distribution_rate: uint256  # Assets per second in which profits are being unlocked (assets/second)
+profit_max_unlock_time: public(uint256)  # Max time profits need to be locked for (seconds) 
 
 @external
 def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: address):
@@ -179,8 +173,8 @@ def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: a
     )
     self.shutdown = False
 
-    self.profit_unlock_time = DEFAULT_PROFIT_UNLOCK_TIME
-    self.last_profit_buffer_update = block.timestamp
+    self.profit_max_unlock_time = DEFAULT_profit_max_unlock_time
+    self.profit_last_update = block.timestamp
 
 ## SHARE MANAGEMENT ##
 ## ERC20 ##
@@ -360,7 +354,7 @@ def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256
         assets = ASSET.balanceOf(_sender)
 
     # Let´s update locked profit values to work with most up to date data
-    self._update_profit_buffer()
+    self._update_profit_distribution()
    
     assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
     assert assets > 0, "cannot deposit zero"
@@ -389,7 +383,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
     assert shares > 0, "no shares to withdraw"
     
     # Let´s update locked profit values to work with most up to date data
-    self._update_profit_buffer()
+    self._update_profit_distribution()
 
     assets: uint256 = self._convert_to_assets(shares)
 
@@ -579,25 +573,16 @@ def _update_debt(strategy: address) -> uint256:
 ## ACCOUNTING MANAGEMENT ##
 
 @internal
-def _update_profit_buffer():
-    unlocked_profit: uint256 = 0
-    profit_history_updated: DynArray[Profit, MAX_PROFITS_HISTORY] = []
-    for e in self.profit_history:
-        if e.end_time > block.timestamp:
-            unlocked_profit += (block.timestamp - self.last_profit_buffer_update) * e.distribution_rate / MAX_BPS
-            profit_history_updated.append(e)
+def _update_profit_distribution():
+    if self.profit_distribution_rate != 0:
+        unlocked_profit: uint256 = 0 
+        if block.timestamp > self.profit_end_date:
+            unlocked_profit = (self.profit_end_date - self.profit_last_update) * self.profit_distribution_rate / MAX_BPS
+            self.profit_distribution_rate = 0
         else:
-          unlocked_profit += (e.end_time - self.last_profit_buffer_update) * e.distribution_rate / MAX_BPS
-
-    # Hack to save gas
-    profit_buffer: uint256 = self.profit_buffer
-    if unlocked_profit > profit_buffer:
-        unlocked_profit = profit_buffer
-
-    self.total_debt += unlocked_profit
-    self.profit_buffer -= unlocked_profit
-    self.last_profit_buffer_update = block.timestamp
-    self.profit_history = profit_history_updated
+            unlocked_profit = (block.timestamp - self.profit_last_update) * self.profit_distribution_rate / MAX_BPS
+        self.total_debt += unlocked_profit
+        self.profit_last_update = block.timestamp
 
 
 @internal
@@ -605,7 +590,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     assert self.strategies[strategy].activation != 0, "inactive strategy"
 
     # Let´s update locked profit values to work with most up to date data
-    self._update_profit_buffer()
+    self._update_profit_distribution()
 
     total_assets: uint256 = IStrategy(strategy).totalAssets()
     current_debt: uint256 = self.strategies[strategy].current_debt
@@ -621,23 +606,24 @@ def _process_report(strategy: address) -> (uint256, uint256):
     else:
         loss = current_debt - total_assets
 
+    remaining_time: uint256 = 0
+    if block.timestamp >= self.profit_end_date:
+        remaining_time = 0
+    else:
+        remaining_time = self.profit_end_date - block.timestamp
+    pending_profit: uint256 = self.profit_distribution_rate * remaining_time / MAX_BPS
+
     if loss > 0:
         self.strategies[strategy].total_loss += loss
         self.strategies[strategy].current_debt -= loss
 
-        if self.profit_buffer <= loss:
-            # If loss is too big for the profit buffer, we set buffer to zero and delete all profits
-            self.total_debt -= loss - self.profit_buffer
-            self.profit_buffer = 0
-            self.profit_history = []
+        if loss >= pending_profit:
+            # If loss is too big for the profit buffer, we set distribution rate to zero
+            self.total_debt -= loss - pending_profit
+            self.profit_distribution_rate = 0
+            self.profit_end_date = 0
         else:
-            loss_factor: uint256 = MAX_BPS - (loss * MAX_BPS / self.profit_buffer)
-            profit_history_updated: DynArray[Profit, MAX_PROFITS_HISTORY] = []
-            for e in self.profit_history:
-                e.distribution_rate = e.distribution_rate * loss_factor / MAX_BPS
-                profit_history_updated.append(e)
-            self.profit_history = profit_history_updated
-            self.profit_buffer -= loss
+            self.profit_distribution_rate = (pending_profit - loss) * MAX_BPS / remaining_time
 
     total_fees: uint256 = 0
     if gain > 0:
@@ -653,13 +639,13 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self.strategies[strategy].total_gain += gain
         # update current debt after processing management fee
         self.strategies[strategy].current_debt += gain
-        self.profit_history.append(
-            Profit({
-                end_time: block.timestamp + self.profit_unlock_time, 
-                distribution_rate: (gain - total_fees) * MAX_BPS / self.profit_unlock_time
-                })
-        )
-        self.profit_buffer += (gain - total_fees)
+
+        gain_without_fees: uint256 = gain - total_fees
+        new_profit_end_date: uint256 = block.timestamp + (pending_profit * remaining_time + gain_without_fees * self.profit_max_unlock_time) / (pending_profit + gain_without_fees)
+        self.profit_distribution_rate = (pending_profit + gain_without_fees) * MAX_BPS / (new_profit_end_date - block.timestamp)
+        self.profit_end_date = new_profit_end_date
+        self.profit_last_update = block.timestamp
+
     
     self.strategies[strategy].last_report = block.timestamp
 
@@ -679,25 +665,29 @@ def _process_report(strategy: address) -> (uint256, uint256):
 @internal
 def _estimate_unlocked_profit() -> uint256:
     """
-    If there is at least one profit on 'profit_history' and profit locking values are 
-    not up to date, it will return the unlocked profit since profit locking values where last updated.
+    If profit_distribution_rate is equal to zero, there is no profit to unlock, otherwise we estimate it
     """
-    if self.last_profit_buffer_update != block.timestamp and len(self.profit_history) > 0:
-        unlocked_profit: uint256 = 0
-        for e in self.profit_history:
-            if e.end_time > block.timestamp:
-                unlocked_profit += (block.timestamp - self.last_profit_buffer_update) * e.distribution_rate / MAX_BPS
-            else:
-                unlocked_profit += (e.end_time - self.last_profit_buffer_update) * e.distribution_rate / MAX_BPS
-        if unlocked_profit > self.profit_buffer:
-            unlocked_profit = self.profit_buffer
-        return unlocked_profit
+    if self.profit_distribution_rate != 0:
+        if self.profit_end_date >= block.timestamp:
+            return (block.timestamp - self.profit_last_update) * self.profit_distribution_rate / MAX_BPS
+        else:
+            return (self.profit_end_date - self.profit_last_update) * self.profit_distribution_rate / MAX_BPS
     return 0
 
 @view
 @internal
 def _total_debt() -> uint256:
     return self.total_debt + self._estimate_unlocked_profit()
+
+
+@view
+@internal
+def _profit_distribution_rate() -> uint256:
+    if self.profit_end_date >= block.timestamp:
+        return self.profit_distribution_rate
+    # If we are past profit_end_date, it means profit is fully unlocked (rate=0) but we haven´t yet updated state on contract
+    return 0
+
 
 
 # # EMERGENCY FUNCTIONS #
@@ -727,10 +717,10 @@ def set_minimum_total_idle(minimum_total_idle: uint256):
 
 
 @external
-def set_profit_unlock_time(profit_unlock_time: uint256):
+def set_profit_max_unlock_time(profit_max_unlock_time: uint256):
     self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
-    self.profit_unlock_time = profit_unlock_time
-    log UpdateProfitUnlockTime(profit_unlock_time)
+    self.profit_max_unlock_time = profit_max_unlock_time
+    log UpdateProfitUnlockTime(profit_max_unlock_time)
 
 
 # ROLE MANAGEMENT #
@@ -770,8 +760,8 @@ def available_deposit_limit() -> uint256:
 ## ACCOUNTING MANAGEMENT ##
 
 @external
-def update_profit_buffer():
-    self._update_profit_buffer()
+def update_profit_distribution():
+    self._update_profit_distribution()
 
 @external
 def process_report(strategy: address) -> (uint256, uint256):
@@ -908,6 +898,11 @@ def totalDebt() -> uint256:
 
 @view
 @external
+def profitDistributionRate() -> uint256:
+    return self._profit_distribution_rate()
+
+@view
+@external
 def totalAssets() -> uint256:
     return self._total_assets()
 
@@ -971,29 +966,3 @@ def previewRedeem(shares: uint256) -> uint256:
 @external
 def api_version() -> String[28]:
     return API_VERSION
-
-@view
-@external
-def profitBuffer() -> uint256:
-    return self.profit_buffer - self._estimate_unlocked_profit()
-
-@view
-@external
-def get_profit_history(index: uint128) -> Profit:
-    """
-    Returns Profit for given index. If array is empty it will revert. 
-    If index not present, it returns a Profit with all values set to 0.
-    
-    Implemented because since commit 
-    https://github.com/vyperlang/vyper/commit/be2c59a604070c75212dca90beb4c33fed908c8b#diff-8afc0c14609045bfe2ec50a38af63606500ad18edae6cef864ee28d2e1a5e41a
-    DynArrays cannot be 'public'. Can be deleted if Vyper behaviour changes and DynArrays come with built-in getters.
-    """
-    assert len(self.profit_history) > 0, "empty array"
-    i: uint128 = 0
-    profit: Profit = Profit({end_time: 0, distribution_rate: 0})
-    for e in self.profit_history:
-        if i == index:
-            profit = e
-            return e
-        i += 1
-    return profit

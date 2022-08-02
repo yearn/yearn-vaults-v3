@@ -220,12 +220,14 @@ def test_sweep__accounting_manager(
     assert event[0].amount == asset_airdrop
 
 
-def test_set_profit_unlock_time__no_accounting_manager__reverts(vault, strategy, bunny):
+def test_set_profit_max_unlock_time__no_accounting_manager__reverts(
+    vault, strategy, bunny
+):
     with ape.reverts():
-        vault.set_profit_unlock_time(24 * 60 * 60 * 8, sender=bunny)
+        vault.set_profit_max_unlock_time(24 * 60 * 60 * 8, sender=bunny)
 
 
-def test_set_profit_unlock_time__accounting_manager(
+def test_set_profit_max_unlock_time__accounting_manager(
     gov,
     vault,
     bunny,
@@ -233,12 +235,12 @@ def test_set_profit_unlock_time__accounting_manager(
     # We temporarily give bunny the role of ACCOUNTING_MANAGER
     vault.set_role(bunny.address, ROLES.ACCOUNTING_MANAGER, sender=gov)
 
-    assert vault.profit_unlock_time() == days_to_secs(7)  # Default value
+    assert vault.profit_max_unlock_time() == days_to_secs(7)  # Default value
 
-    new_profit_unlock_time = days_to_secs(8)
-    tx = vault.set_profit_unlock_time(new_profit_unlock_time, sender=bunny)
+    new_profit_max_unlock_time = days_to_secs(8)
+    tx = vault.set_profit_max_unlock_time(new_profit_max_unlock_time, sender=bunny)
     event = list(tx.decode_logs(vault.UpdateProfitUnlockTime))
     assert len(event) == 1
-    assert event[0].profit_unlock_time == new_profit_unlock_time
+    assert event[0].profit_max_unlock_time == new_profit_max_unlock_time
 
-    assert vault.profit_unlock_time() == new_profit_unlock_time
+    assert vault.profit_max_unlock_time() == new_profit_max_unlock_time
