@@ -85,9 +85,6 @@ event UpdateDepositLimit:
 event UpdateMinimumTotalIdle:
     minimum_total_idle: uint256
 
-event UpdateProfitUnlockTime:
-    profit_max_unlock_time: uint256
-
 event Shutdown:
     pass
 
@@ -106,8 +103,6 @@ struct StrategyParams:
 
 # CONSTANTS #
 MAX_BPS: constant(uint256) = 10_000
-MAX_PROFITS_HISTORY: constant(uint256) = 100
-DEFAULT_profit_max_unlock_time: constant(uint256) = 7 * 24 * 60 * 60  # 7 days
 
 # ENUMS #
 enum Roles:
@@ -129,7 +124,7 @@ balance_of: HashMap[address, uint256]
 allowance: public(HashMap[address, HashMap[address, uint256]])
 
 total_supply: uint256
-total_debt: uint256
+total_debt_: uint256
 total_idle: public(uint256)
 minimum_total_idle: public(uint256)
 roles: public(HashMap[address, Roles])
@@ -151,11 +146,11 @@ PERMIT_TYPE_HASH: constant(bytes32) = keccak256("Permit(address owner,address sp
 
 profit_end_date: public(uint256)  # Timestamp when profits are fully unlocked. Type uint256, as we are making comparison with block.timestamp (uint256)
 profit_last_update: public(uint256)  # Last time buffer values were updated
-profit_distribution_rate: uint256  # Assets per second in which profits are being unlocked (assets/second)
-profit_max_unlock_time: public(uint256)  # Max time profits need to be locked for (seconds) 
+profit_distribution_rate_: uint256  # Assets per second in which profits are being unlocked (assets/second)
+PROFIT_MAX_UNLOCK_TIME: immutable(uint256)  # Max time profits need to be locked for (seconds) 
 
 @external
-def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: address):
+def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: address, profit_max_unlock_time: uint256):
     ASSET = asset
     DECIMALS = convert(ERC20Detailed(asset.address).decimals(), uint256)
     self.name = name
@@ -173,7 +168,7 @@ def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: a
     )
     self.shutdown = False
 
-    self.profit_max_unlock_time = DEFAULT_profit_max_unlock_time
+    PROFIT_MAX_UNLOCK_TIME = profit_max_unlock_time
     self.profit_last_update = block.timestamp
 
 ## SHARE MANAGEMENT ##
@@ -353,9 +348,6 @@ def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256
     if assets == MAX_UINT256:
         assets = ASSET.balanceOf(_sender)
 
-    # Let´s update locked profit values to work with most up to date data
-    self._update_profit_distribution()
-   
     assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
     assert assets > 0, "cannot deposit zero"
 
@@ -381,9 +373,6 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
 
     assert shares_balance >= shares, "insufficient shares to withdraw"
     assert shares > 0, "no shares to withdraw"
-    
-    # Let´s update locked profit values to work with most up to date data
-    self._update_profit_distribution()
 
     assets: uint256 = self._convert_to_assets(shares)
 
@@ -392,7 +381,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
 
     if assets > curr_total_idle:
         # load to memory to save gas
-        curr_total_debt: uint256 = self.total_debt
+        curr_total_debt: uint256 = self.total_debt_
 
         # withdraw from strategies if insufficient total idle
         assets_needed: uint256 = assets - curr_total_idle
@@ -422,7 +411,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
         # if we exhaust the queue and still have insufficient total idle, revert
         assert curr_total_idle >= assets, "insufficient total idle"
         # commit memory to storage
-        self.total_debt = curr_total_debt
+        self.total_debt_ = curr_total_debt
 
     self._burn_shares(shares, owner)
     self.total_idle = curr_total_idle - assets
@@ -544,7 +533,7 @@ def _update_debt(strategy: address) -> uint256:
 	# TODO: is it worth it to transfer the max_amount between assets_to_withdraw and balance?
         ASSET.transferFrom(strategy, self, assets_to_withdraw)
         self.total_idle += assets_to_withdraw
-        self.total_debt -= assets_to_withdraw
+        self.total_debt_ -= assets_to_withdraw
     else:
         # increase debt
         assets_to_transfer: uint256 = new_debt - current_debt
@@ -563,7 +552,7 @@ def _update_debt(strategy: address) -> uint256:
         if assets_to_transfer > 0:
             ASSET.transfer(strategy, assets_to_transfer)
             self.total_idle -= assets_to_transfer
-            self.total_debt += assets_to_transfer
+            self.total_debt_ += assets_to_transfer
 
     self.strategies[strategy].current_debt = new_debt
 
@@ -573,25 +562,8 @@ def _update_debt(strategy: address) -> uint256:
 ## ACCOUNTING MANAGEMENT ##
 
 @internal
-def _update_profit_distribution():
-    if self.profit_distribution_rate != 0:
-        unlocked_profit: uint256 = 0 
-        if block.timestamp > self.profit_end_date:
-            unlocked_profit = (self.profit_end_date - self.profit_last_update) * self.profit_distribution_rate / MAX_BPS
-            self.profit_distribution_rate = 0
-        else:
-            unlocked_profit = (block.timestamp - self.profit_last_update) * self.profit_distribution_rate / MAX_BPS
-        self.total_debt += unlocked_profit
-        self.profit_last_update = block.timestamp
-
-
-@internal
 def _process_report(strategy: address) -> (uint256, uint256):
     assert self.strategies[strategy].activation != 0, "inactive strategy"
-
-    # Let´s update locked profit values to work with most up to date data
-    self._update_profit_distribution()
-
     total_assets: uint256 = IStrategy(strategy).totalAssets()
     current_debt: uint256 = self.strategies[strategy].current_debt
     assert total_assets != current_debt, "nothing to report"
@@ -606,12 +578,20 @@ def _process_report(strategy: address) -> (uint256, uint256):
     else:
         loss = current_debt - total_assets
 
+    # We compute unlocked_profit
+    profit_end_date: uint256 = self.profit_end_date
+    unlocked_profit: uint256 = 0 
+    if self.profit_distribution_rate_ != 0:
+        if block.timestamp > profit_end_date:
+            unlocked_profit = (profit_end_date - self.profit_last_update) * self.profit_distribution_rate_ / MAX_BPS
+            self.profit_distribution_rate_ = 0
+        else:
+            unlocked_profit = (block.timestamp - self.profit_last_update) * self.profit_distribution_rate_ / MAX_BPS
+
     remaining_time: uint256 = 0
-    if block.timestamp >= self.profit_end_date:
-        remaining_time = 0
-    else:
-        remaining_time = self.profit_end_date - block.timestamp
-    pending_profit: uint256 = self.profit_distribution_rate * remaining_time / MAX_BPS
+    if block.timestamp < profit_end_date:
+        remaining_time = profit_end_date - block.timestamp
+    pending_profit: uint256 = self.profit_distribution_rate_ * remaining_time / MAX_BPS
 
     if loss > 0:
         self.strategies[strategy].total_loss += loss
@@ -619,11 +599,12 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
         if loss >= pending_profit:
             # If loss is too big for the profit buffer, we set distribution rate to zero
-            self.total_debt -= loss - pending_profit
-            self.profit_distribution_rate = 0
-            self.profit_end_date = 0
+            self.total_debt_ = self.total_debt_ - (loss - pending_profit) + unlocked_profit
+            self.profit_distribution_rate_ = 0
         else:
-            self.profit_distribution_rate = (pending_profit - loss) * MAX_BPS / remaining_time
+            self.profit_distribution_rate_ = (pending_profit - loss) * MAX_BPS / remaining_time
+            self.total_debt_ += unlocked_profit
+            self.profit_last_update = block.timestamp
 
     total_fees: uint256 = 0
     if gain > 0:
@@ -641,11 +622,16 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self.strategies[strategy].current_debt += gain
 
         gain_without_fees: uint256 = gain - total_fees
-        new_profit_end_date: uint256 = block.timestamp + (pending_profit * remaining_time + gain_without_fees * self.profit_max_unlock_time) / (pending_profit + gain_without_fees)
-        self.profit_distribution_rate = (pending_profit + gain_without_fees) * MAX_BPS / (new_profit_end_date - block.timestamp)
-        self.profit_end_date = new_profit_end_date
-        self.profit_last_update = block.timestamp
-
+        if PROFIT_MAX_UNLOCK_TIME == 0:
+            self.total_debt_ += gain_without_fees  + unlocked_profit
+        else:
+            # The new locking period is the weighted average between the remaining time and the profit_max_unlock_time. 
+            # The weight used is the profit (pending_profit vs new_profit)
+            new_profit_locking_period: uint256 = (pending_profit * remaining_time + gain_without_fees * PROFIT_MAX_UNLOCK_TIME) / (pending_profit + gain_without_fees)
+            self.profit_distribution_rate_ = (pending_profit + gain_without_fees) * MAX_BPS / new_profit_locking_period
+            self.profit_end_date =  block.timestamp + new_profit_locking_period
+            self.profit_last_update = block.timestamp
+            self.total_debt_ += unlocked_profit
     
     self.strategies[strategy].last_report = block.timestamp
 
@@ -663,28 +649,31 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
 @view
 @internal
-def _estimate_unlocked_profit() -> uint256:
+def _compute_unlocked_profit() -> uint256:
     """
-    If profit_distribution_rate is equal to zero, there is no profit to unlock, otherwise we estimate it
+    If profit_distribution_rate is equal to zero, there is no profit to unlock, otherwise we compute it
     """
-    if self.profit_distribution_rate != 0:
+    # Hack: to save gas
+    profit_distribution_rate: uint256 = self.profit_distribution_rate_
+    profit_last_update: uint256 = self.profit_last_update
+    if profit_distribution_rate != 0:
         if self.profit_end_date >= block.timestamp:
-            return (block.timestamp - self.profit_last_update) * self.profit_distribution_rate / MAX_BPS
+            return (block.timestamp - profit_last_update) * profit_distribution_rate / MAX_BPS
         else:
-            return (self.profit_end_date - self.profit_last_update) * self.profit_distribution_rate / MAX_BPS
+            return (self.profit_end_date - profit_last_update) * profit_distribution_rate / MAX_BPS
     return 0
 
 @view
 @internal
 def _total_debt() -> uint256:
-    return self.total_debt + self._estimate_unlocked_profit()
+    return self.total_debt_ + self._compute_unlocked_profit()
 
 
 @view
 @internal
 def _profit_distribution_rate() -> uint256:
     if self.profit_end_date >= block.timestamp:
-        return self.profit_distribution_rate
+        return self.profit_distribution_rate_
     # If we are past profit_end_date, it means profit is fully unlocked (rate=0) but we haven´t yet updated state on contract
     return 0
 
@@ -714,14 +703,6 @@ def set_minimum_total_idle(minimum_total_idle: uint256):
     self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
     self.minimum_total_idle = minimum_total_idle
     log UpdateMinimumTotalIdle(minimum_total_idle)
-
-
-@external
-def set_profit_max_unlock_time(profit_max_unlock_time: uint256):
-    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
-    self.profit_max_unlock_time = profit_max_unlock_time
-    log UpdateProfitUnlockTime(profit_max_unlock_time)
-
 
 # ROLE MANAGEMENT #
 @internal
@@ -758,11 +739,6 @@ def available_deposit_limit() -> uint256:
     return 0
 
 ## ACCOUNTING MANAGEMENT ##
-
-@external
-def update_profit_distribution():
-    self._update_profit_distribution()
-
 @external
 def process_report(strategy: address) -> (uint256, uint256):
     # TODO: should it be open?
@@ -893,12 +869,12 @@ def decimals() -> uint256:
 
 @view
 @external
-def totalDebt() -> uint256:
+def total_debt() -> uint256:
     return self._total_debt()
 
 @view
 @external
-def profitDistributionRate() -> uint256:
+def profit_distribution_rate() -> uint256:
     return self._profit_distribution_rate()
 
 @view
