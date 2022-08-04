@@ -578,20 +578,20 @@ def _process_report(strategy: address) -> (uint256, uint256):
     else:
         loss = current_debt - total_assets
 
-    # We compute unlocked_profit
-    profit_end_date: uint256 = self.profit_end_date
+    # We compute unlocked_profit and aux vars for profit locking
+    remaining_time: uint256 = 0
     unlocked_profit: uint256 = 0 
-    if self.profit_distribution_rate_ != 0:
+    pending_profit: uint256 = 0
+    profit_distribution_rate_: uint256 = self.profit_distribution_rate_
+    if profit_distribution_rate_ != 0:
+        profit_end_date: uint256 = self.profit_end_date
         if block.timestamp > profit_end_date:
-            unlocked_profit = (profit_end_date - self.profit_last_update) * self.profit_distribution_rate_ / MAX_BPS
+            unlocked_profit = (profit_end_date - self.profit_last_update) * profit_distribution_rate_ / MAX_BPS
             self.profit_distribution_rate_ = 0
         else:
-            unlocked_profit = (block.timestamp - self.profit_last_update) * self.profit_distribution_rate_ / MAX_BPS
-
-    remaining_time: uint256 = 0
-    if block.timestamp < profit_end_date:
-        remaining_time = profit_end_date - block.timestamp
-    pending_profit: uint256 = self.profit_distribution_rate_ * remaining_time / MAX_BPS
+            unlocked_profit = (block.timestamp - self.profit_last_update) * profit_distribution_rate_ / MAX_BPS
+            remaining_time = profit_end_date - block.timestamp
+            pending_profit = profit_distribution_rate_ * remaining_time / MAX_BPS
 
     if loss > 0:
         self.strategies[strategy].total_loss += loss
@@ -599,7 +599,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
         if loss >= pending_profit:
             # If loss is too big for the profit buffer, we set distribution rate to zero
-            self.total_debt_ = self.total_debt_ - (loss - pending_profit) + unlocked_profit
+            self.total_debt_ = self.total_debt_ + unlocked_profit - (loss - pending_profit) 
             self.profit_distribution_rate_ = 0
         else:
             self.profit_distribution_rate_ = (pending_profit - loss) * MAX_BPS / remaining_time
@@ -653,14 +653,13 @@ def _compute_unlocked_profit() -> uint256:
     """
     If profit_distribution_rate is equal to zero, there is no profit to unlock, otherwise we compute it
     """
-    # Hack: to save gas
     profit_distribution_rate: uint256 = self.profit_distribution_rate_
-    profit_last_update: uint256 = self.profit_last_update
     if profit_distribution_rate != 0:
+        # Not caching `profit_end_date` as positive scenario should be a lot more common, and would add 6 gas each time
         if self.profit_end_date >= block.timestamp:
-            return (block.timestamp - profit_last_update) * profit_distribution_rate / MAX_BPS
+            return (block.timestamp - self.profit_last_update) * profit_distribution_rate / MAX_BPS
         else:
-            return (self.profit_end_date - profit_last_update) * profit_distribution_rate / MAX_BPS
+            return (self.profit_end_date - self.profit_last_update) * profit_distribution_rate / MAX_BPS
     return 0
 
 @view
