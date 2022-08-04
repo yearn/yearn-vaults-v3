@@ -31,3 +31,7 @@ def from_units(token, amount):
 def sleep(seconds: int = 6 * 60 * 60):
     chain.pending_timestamp += seconds
     chain.mine(1)
+
+
+def days_to_secs(days: int) -> int:
+    return 60 * 60 * 24 * days

@@ -1,5 +1,6 @@
 import ape
 from utils.constants import ROLES
+from utils.utils import days_to_secs
 
 
 # STRATEGY_MANAGER
@@ -12,7 +13,6 @@ def test_add_strategy__no_strategy_manager__reverts(vault, create_strategy, bunn
 
 
 def test_add_strategy__strategy_manager(vault, create_strategy, gov, bunny):
-
     # We temporarily give bunny the role of STRATEGY_MANAGER
     vault.set_role(bunny.address, ROLES.STRATEGY_MANAGER, sender=gov)
 
@@ -29,7 +29,6 @@ def test_revoke_strategy__no_strategy_manager__reverts(vault, strategy, bunny):
 
 
 def test_revoke_strategy__strategy_manager(vault, strategy, gov, bunny):
-
     # We temporarily give bunny the role of STRATEGY_MANAGER
     vault.set_role(bunny.address, ROLES.STRATEGY_MANAGER, sender=gov)
 
@@ -50,7 +49,6 @@ def test_migrate_strategy__no_strategy_manager__reverts(
 def test_migrate_strategy__strategy_manager(
     vault, strategy, create_strategy, gov, bunny
 ):
-
     # We temporarily give bunny the role of STRATEGY_MANAGER
     vault.set_role(bunny.address, ROLES.STRATEGY_MANAGER, sender=gov)
 
@@ -72,14 +70,12 @@ def test_migrate_strategy__strategy_manager(
 
 
 def test_set_minimum_total_idle__no_debt_manager__reverts(bunny, vault):
-
     minimum_total_idle = 1
     with ape.reverts():
         vault.set_minimum_total_idle(minimum_total_idle, sender=bunny)
 
 
 def test_set_minimum_total_idle__debt_manager(gov, vault, bunny):
-
     # We temporarily give bunny the role of DEBT_MANAGER
     vault.set_role(bunny.address, ROLES.DEBT_MANAGER, sender=gov)
 
@@ -90,7 +86,6 @@ def test_set_minimum_total_idle__debt_manager(gov, vault, bunny):
 
 
 def test_update_max_debt__no_debt_manager__reverts(vault, strategy, bunny):
-
     assert vault.strategies(strategy).max_debt == 0
     max_debt_for_strategy = 1
     with ape.reverts():
@@ -100,7 +95,6 @@ def test_update_max_debt__no_debt_manager__reverts(vault, strategy, bunny):
 
 
 def test_update_max_debt__debt_manager(gov, vault, strategy, bunny):
-
     # We temporarily give bunny the role of DEBT_MANAGER
     vault.set_role(bunny.address, ROLES.DEBT_MANAGER, sender=gov)
 
@@ -111,7 +105,6 @@ def test_update_max_debt__debt_manager(gov, vault, strategy, bunny):
 
 
 def test_update_debt__no_debt_manager__reverts(vault, strategy, bunny):
-
     with ape.reverts():
         vault.update_debt(strategy, sender=bunny)
 
@@ -119,7 +112,6 @@ def test_update_debt__no_debt_manager__reverts(vault, strategy, bunny):
 def test_update_debt__debt_manager(
     gov, mint_and_deposit_into_vault, vault, strategy, bunny
 ):
-
     # We temporarily give bunny the role of DEBT_MANAGER
     vault.set_role(bunny.address, ROLES.DEBT_MANAGER, sender=gov)
 
@@ -142,13 +134,11 @@ def test_update_debt__debt_manager(
 
 
 def test_shutdown_vault__no_emergency_manager__reverts(vault, bunny):
-
     with ape.reverts():
         vault.shutdown_vault(sender=bunny)
 
 
 def test_shutdown_vault__emergency_manager(gov, vault, bunny):
-
     # We temporarily give bunny the role of EMERGENCY_MANAGER
     vault.set_role(bunny.address, ROLES.EMERGENCY_MANAGER, sender=gov)
 
@@ -167,7 +157,6 @@ def test_shutdown_vault__emergency_manager(gov, vault, bunny):
 
 
 def test_process_report__no_accounting_manager__reverts(vault, strategy, bunny):
-
     with ape.reverts():
         vault.process_report(strategy, sender=bunny)
 
@@ -182,7 +171,6 @@ def test_process_report__accounting_manager(
     bunny,
     mint_and_deposit_into_vault,
 ):
-
     # We temporarily give bunny the role of ACCOUNTING_MANAGER
     vault.set_role(bunny.address, ROLES.ACCOUNTING_MANAGER, sender=gov)
 
