@@ -606,6 +606,9 @@ def _process_report(strategy: address) -> (uint256, uint256):
             self.total_debt_ += unlocked_profit
             self.profit_last_update = block.timestamp
 
+            
+            self.total_debt -= loss
+
     total_fees: uint256 = 0
     if gain > 0:
         fee_manager: address = self.fee_manager
