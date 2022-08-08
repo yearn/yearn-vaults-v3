@@ -3,18 +3,18 @@ import ape
 
 
 def test_lossy_strategy_flow(
-        asset,
-        gov,
-        fish,
-        bunny,
-        fish_amount,
-        create_vault,
-        create_lossy_strategy,
-        strategist,
-        user_deposit,
-        add_debt_to_strategy,
-        add_strategy_to_vault,
-        airdrop_asset,
+    asset,
+    gov,
+    fish,
+    bunny,
+    fish_amount,
+    create_vault,
+    create_lossy_strategy,
+    strategist,
+    user_deposit,
+    add_debt_to_strategy,
+    add_strategy_to_vault,
+    airdrop_asset,
 ):
     vault = create_vault(asset)
     strategy = create_lossy_strategy(vault)
@@ -77,8 +77,8 @@ def test_lossy_strategy_flow(
     assert event[0].total_loss == first_loss + second_loss
 
     assert (
-            vault.strategies(strategy).current_debt
-            == 2 * deposit_amount - first_loss - second_loss
+        vault.strategies(strategy).current_debt
+        == 2 * deposit_amount - first_loss - second_loss
     )
     assert vault.totalAssets() == 2 * deposit_amount - first_loss - second_loss
     assert vault.total_idle() == 0
@@ -91,7 +91,10 @@ def test_lossy_strategy_flow(
     add_debt_to_strategy(gov, strategy, vault, deposit_amount)
 
     assert vault.total_idle() == 3 * deposit_amount // 4
-    assert strategy.totalAssets() == 2 * deposit_amount - first_loss - second_loss - vault.total_idle()
+    assert (
+        strategy.totalAssets()
+        == 2 * deposit_amount - first_loss - second_loss - vault.total_idle()
+    )
     assert vault.strategies(strategy)
 
     # user_1 withdraws all his shares in `vault.total_idle`. Due to the lossy strategy, his shares have less value
