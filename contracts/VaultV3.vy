@@ -519,6 +519,8 @@ def _update_debt(strategy: address) -> uint256:
 
         if total_idle + assets_to_withdraw < minimum_total_idle:
             assets_to_withdraw = minimum_total_idle - total_idle
+            if assets_to_withdraw > current_debt:
+                assets_to_withdraw = current_debt
             new_debt = current_debt - assets_to_withdraw
 
         withdrawable: uint256 = IStrategy(strategy).withdrawable()
