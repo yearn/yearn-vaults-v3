@@ -144,6 +144,9 @@ def test_profit_distribution__one_gain(
     add_debt_to_strategy(gov, strategy, vault, amount)
     assert strategy.totalAssets() == amount
 
+    assert vault.price_per_share() / 10 ** vault.decimals() == 1.0
+    pps_before_profit = vault.price_per_share()
+
     # We create a virtual profit
     asset.transfer(strategy, first_profit, sender=fish)
 
@@ -166,6 +169,7 @@ def test_profit_distribution__one_gain(
     assert vault.totalAssets() == amount
     assert vault.total_debt() == amount
     assert vault.total_idle() == 0
+    assert vault.price_per_share() == pps_before_profit
 
     assert vault.profit_distribution_rate() == int(first_profit / WEEK * MAX_BPS)
     assert vault.profit_last_update() == pytest.approx(chain.pending_timestamp, abs=5)
@@ -434,7 +438,7 @@ def test_profit_distribution__one_gain_with_fees(
     """
 
     amount = 10**9
-    first_profit = 10**9
+    profit = 10**9
 
     # We reset time to 1 to facilitate reporting
     chain.pending_timestamp = 1
@@ -454,12 +458,16 @@ def test_profit_distribution__one_gain_with_fees(
 
     assert strategy.totalAssets() == amount
 
+    assert vault.price_per_share() / 10 ** vault.decimals() == 1.0
+    pps_before_profit = vault.price_per_share()
+
     # We create a virtual profit
-    asset.transfer(strategy, first_profit, sender=fish)
+    asset.transfer(strategy, profit, sender=fish)
 
     assert vault.totalAssets() == amount
     assert vault.total_debt() == amount
     assert vault.total_idle() == 0
+    assert vault.price_per_share() / 10 ** vault.decimals() == 1.0
 
     assert vault.profit_distribution_rate() == 0
 
@@ -471,13 +479,18 @@ def test_profit_distribution__one_gain_with_fees(
 
     event = list(tx.decode_logs(vault.StrategyReported))
     assert len(event) == 1
-    assert event[0].gain == first_profit
+    assert event[0].gain == profit
 
-    assert vault.totalAssets() == amount
-    assert vault.total_debt() == amount
+    assert vault.totalAssets() == amount + profit * performance_fee / MAX_BPS
+    assert vault.total_debt() == amount + profit * performance_fee / MAX_BPS
     assert vault.total_idle() == 0
 
-    profit_without_fees = first_profit * (MAX_BPS - performance_fee) / MAX_BPS
+    assert vault.price_per_share() == pps_before_profit
+    assert vault.balanceOf(fee_manager) == vault.convertToShares(
+        int(profit * performance_fee / MAX_BPS)
+    )
+
+    profit_without_fees = profit * (MAX_BPS - performance_fee) / MAX_BPS
     assert vault.profit_distribution_rate() / MAX_BPS == pytest.approx(
         profit_without_fees / WEEK, 1e-5
     )

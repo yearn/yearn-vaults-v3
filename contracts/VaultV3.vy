@@ -612,6 +612,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         # if fee manager is not set, fees are zero
         if fee_manager != ZERO_ADDRESS:
             total_fees = IFeeManager(fee_manager).assess_fees(strategy, gain)
+            assert total_fees <= gain, "fees greater than gain"
             # if fees are non-zero, issue shares
             if total_fees > 0:
                 self._issue_shares_for_amount(total_fees, fee_manager)
@@ -621,17 +622,23 @@ def _process_report(strategy: address) -> (uint256, uint256):
         # update current debt after processing management fee
         self.strategies[strategy].current_debt += gain
 
-        gain_without_fees: uint256 = gain - total_fees
+
         if PROFIT_MAX_UNLOCK_TIME == 0:
-            self.total_debt_ += gain_without_fees  + unlocked_profit
+            self.total_debt_ += gain + unlocked_profit
         else:
-            # The new locking period is the weighted average between the remaining time and the profit_max_unlock_time. 
-            # The weight used is the profit (pending_profit vs new_profit)
-            new_profit_locking_period: uint256 = (pending_profit * remaining_time + gain_without_fees * PROFIT_MAX_UNLOCK_TIME) / (pending_profit + gain_without_fees)
-            self.profit_distribution_rate_ = (pending_profit + gain_without_fees) * MAX_BPS / new_profit_locking_period
-            self.profit_end_date =  block.timestamp + new_profit_locking_period
-            self.profit_last_update = block.timestamp
-            self.total_debt_ += unlocked_profit
+            gain_without_fees: uint256 = gain - total_fees    
+            new_profit_locking_period: uint256 = 0           
+            if pending_profit != 0 or gain_without_fees != 0:
+                # The new locking period is the weighted average between the remaining time and the profit_max_unlock_time. 
+                # The weight used is the profit (pending_profit vs new_profit)
+                new_profit_locking_period = (pending_profit * remaining_time + gain_without_fees * PROFIT_MAX_UNLOCK_TIME) / (pending_profit + gain_without_fees)
+                self.profit_distribution_rate_ = (pending_profit + gain_without_fees) * MAX_BPS / new_profit_locking_period
+                self.profit_end_date =  block.timestamp + new_profit_locking_period
+                self.profit_last_update = block.timestamp
+            else:
+                # To avoid division by 0
+                self.profit_distribution_rate_ = 0
+            self.total_debt_ += unlocked_profit + total_fees
     
     self.strategies[strategy].last_report = block.timestamp
 
