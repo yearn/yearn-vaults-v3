@@ -144,6 +144,9 @@ def test_profit_distribution__one_gain(
     add_debt_to_strategy(gov, strategy, vault, amount)
     assert strategy.totalAssets() == amount
 
+    assert vault.price_per_share() / 10 ** vault.decimals() == 1.0
+    pps_before_profit = vault.price_per_share()
+
     # We create a virtual profit
     asset.transfer(strategy, first_profit, sender=fish)
 
@@ -166,6 +169,7 @@ def test_profit_distribution__one_gain(
     assert vault.totalAssets() == amount
     assert vault.total_debt() == amount
     assert vault.total_idle() == 0
+    assert vault.price_per_share() == pps_before_profit
 
     assert vault.profit_distribution_rate() == int(first_profit / WEEK * MAX_BPS)
     assert vault.profit_last_update() == pytest.approx(chain.pending_timestamp, abs=5)
@@ -434,7 +438,7 @@ def test_profit_distribution__one_gain_with_fees(
     """
 
     amount = 10**9
-    first_profit = 10**9
+    profit = 10**9
 
     # We reset time to 1 to facilitate reporting
     chain.pending_timestamp = 1
@@ -449,10 +453,232 @@ def test_profit_distribution__one_gain_with_fees(
     add_debt_to_strategy(gov, strategy, vault, amount)
     # set up fee manager and fees
     management_fee = 0
-    performance_fee = 1000
+    performance_fee = 1_000
     set_fees_for_strategy(gov, strategy, fee_manager, management_fee, performance_fee)
 
     assert strategy.totalAssets() == amount
+
+    assert vault.price_per_share() / 10 ** vault.decimals() == 1.0
+    pps_before_profit = vault.price_per_share()
+
+    # We create a virtual profit
+    asset.transfer(strategy, profit, sender=fish)
+
+    assert vault.totalAssets() == amount
+    assert vault.total_debt() == amount
+    assert vault.total_idle() == 0
+    assert vault.price_per_share() / 10 ** vault.decimals() == 1.0
+
+    assert vault.profit_distribution_rate() == 0
+
+    # We call process_report at t_1
+    chain.pending_timestamp = days_to_secs(1)
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    tx = vault.process_report(strategy, sender=gov)
+
+    event = list(tx.decode_logs(vault.StrategyReported))
+    assert len(event) == 1
+    assert event[0].gain == profit
+
+    assert vault.totalAssets() == amount + profit * performance_fee / MAX_BPS
+    assert vault.total_debt() == amount + profit * performance_fee / MAX_BPS
+    assert vault.total_idle() == 0
+
+    assert vault.price_per_share() == pps_before_profit
+    assert vault.balanceOf(fee_manager) == vault.convertToShares(
+        int(profit * performance_fee / MAX_BPS)
+    )
+
+    profit_without_fees = profit * (MAX_BPS - performance_fee) / MAX_BPS
+    assert vault.profit_distribution_rate() / MAX_BPS == pytest.approx(
+        profit_without_fees / WEEK, 1e-5
+    )
+
+
+def test_profit_distribution__one_gain_with_100_percent_fees(
+    gov,
+    fish,
+    asset,
+    create_vault,
+    create_strategy,
+    user_deposit,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    set_fees_for_strategy,
+    flexible_fee_manager,
+):
+    """
+    Scenario where there is a gain on day 1 of 1000 assets and there are performance fees of 100% of profit.
+    Initially we have 1000 assets and therefore 1000 shares (1:1).
+    """
+
+    amount = 10**9
+    profit = 10**9
+
+    # We reset time to 1 to facilitate reporting
+    chain.pending_timestamp = 1
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    vault = create_vault(asset, fee_manager=flexible_fee_manager)
+    strategy = create_strategy(vault)
+
+    # deposit assets to vault and prepare strategy
+    user_deposit(fish, vault, asset, amount)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, amount)
+    # set up fee manager and fees
+    management_fee = 0
+    performance_fee = 10_000
+    set_fees_for_strategy(
+        gov, strategy, flexible_fee_manager, management_fee, performance_fee
+    )
+
+    assert strategy.totalAssets() == amount
+
+    assert vault.price_per_share() / 10 ** vault.decimals() == 1.0
+    pps_before_profit = vault.price_per_share()
+
+    # We create a virtual profit
+    asset.transfer(strategy, profit, sender=fish)
+
+    assert vault.totalAssets() == amount
+    assert vault.total_debt() == amount
+    assert vault.total_idle() == 0
+    assert vault.price_per_share() / 10 ** vault.decimals() == 1.0
+
+    assert vault.profit_distribution_rate() == 0
+
+    # We call process_report at t_1
+    chain.pending_timestamp = days_to_secs(1)
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    tx = vault.process_report(strategy, sender=gov)
+
+    event = list(tx.decode_logs(vault.StrategyReported))
+    assert len(event) == 1
+    assert event[0].gain == profit
+
+    assert vault.totalAssets() == amount + profit
+    assert vault.total_debt() == amount + profit
+    assert vault.total_idle() == 0
+
+    assert vault.price_per_share() == pps_before_profit
+    assert vault.balanceOf(flexible_fee_manager) == vault.convertToShares(profit)
+    assert vault.profit_distribution_rate() == 0
+
+
+def test_profit_distribution__one_gain_with_200_percent_fees(
+    gov,
+    fish,
+    asset,
+    create_vault,
+    create_strategy,
+    user_deposit,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    set_fees_for_strategy,
+    flexible_fee_manager,
+):
+    """
+    Scenario where there is a gain on day 1 of 1000 assets and there are performance fees of 200% of profit.
+    Initially we have 1000 assets and therefore 1000 shares (1:1).
+    """
+
+    amount = 10**9
+    profit = 10**9
+
+    # We reset time to 1 to facilitate reporting
+    chain.pending_timestamp = 1
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    vault = create_vault(asset, fee_manager=flexible_fee_manager)
+    strategy = create_strategy(vault)
+
+    # deposit assets to vault and prepare strategy
+    user_deposit(fish, vault, asset, amount)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, amount)
+    # set up fee manager and fees
+    management_fee = 0
+    performance_fee = 20_000
+    set_fees_for_strategy(
+        gov, strategy, flexible_fee_manager, management_fee, performance_fee
+    )
+
+    assert strategy.totalAssets() == amount
+
+    assert vault.price_per_share() / 10 ** vault.decimals() == 1.0
+    pps_before_profit = vault.price_per_share()
+
+    # We create a virtual profit
+    asset.transfer(strategy, profit, sender=fish)
+
+    assert vault.totalAssets() == amount
+    assert vault.total_debt() == amount
+    assert vault.total_idle() == 0
+    assert vault.price_per_share() / 10 ** vault.decimals() == 1.0
+
+    assert vault.profit_distribution_rate() == 0
+
+    # We call process_report at t_1
+    chain.pending_timestamp = days_to_secs(1)
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    tx = vault.process_report(strategy, sender=gov)
+
+    event = list(tx.decode_logs(vault.StrategyReported))
+    assert len(event) == 1
+    assert event[0].gain == profit
+
+    assert vault.totalAssets() == amount + profit
+    assert vault.total_debt() == amount + profit
+    assert vault.total_idle() == 0
+
+    # Due to the fact that we were unable to pay fees with profit, pps its lowered
+    assert vault.price_per_share() < pps_before_profit
+    # Fee Managers gets shares at 1:1 price
+    assert vault.balanceOf(flexible_fee_manager) == int(2 * profit)
+    assert vault.profit_distribution_rate() == 0
+
+
+def test_profit_distribution__one_gain_with_200_percent_fees_and_enough_pending_profit(
+    gov,
+    fish,
+    asset,
+    create_vault,
+    create_strategy,
+    user_deposit,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    set_fees_for_strategy,
+    flexible_fee_manager,
+):
+    """
+    Scenario where there is a gain on day 1 of 1000 assets without fees. After there is another profit
+    and there are performance fees of 200% of profit.
+    Initially we have 1000 assets and therefore 1000 shares (1:1).
+    """
+
+    amount = 10**9
+    first_profit = int(5 * 10**9)
+    second_profit = int(10**9)
+
+    # We reset time to 1 to facilitate reporting
+    chain.pending_timestamp = 1
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    vault = create_vault(asset, fee_manager=flexible_fee_manager)
+    strategy = create_strategy(vault)
+
+    # deposit assets to vault and prepare strategy
+    user_deposit(fish, vault, asset, amount)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, amount)
+
+    assert strategy.totalAssets() == amount
+
+    assert vault.price_per_share() / 10 ** vault.decimals() == 1.0
 
     # We create a virtual profit
     asset.transfer(strategy, first_profit, sender=fish)
@@ -460,6 +686,7 @@ def test_profit_distribution__one_gain_with_fees(
     assert vault.totalAssets() == amount
     assert vault.total_debt() == amount
     assert vault.total_idle() == 0
+    assert vault.price_per_share() / 10 ** vault.decimals() == 1.0
 
     assert vault.profit_distribution_rate() == 0
 
@@ -473,14 +700,35 @@ def test_profit_distribution__one_gain_with_fees(
     assert len(event) == 1
     assert event[0].gain == first_profit
 
-    assert vault.totalAssets() == amount
-    assert vault.total_debt() == amount
-    assert vault.total_idle() == 0
-
-    profit_without_fees = first_profit * (MAX_BPS - performance_fee) / MAX_BPS
-    assert vault.profit_distribution_rate() / MAX_BPS == pytest.approx(
-        profit_without_fees / WEEK, 1e-5
+    # set up fee manager and fees
+    management_fee = 0
+    performance_fee = 20_000
+    set_fees_for_strategy(
+        gov, strategy, flexible_fee_manager, management_fee, performance_fee
     )
+
+    chain.pending_timestamp = days_to_secs(3)
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    dist_rate_before_fees = vault.profit_distribution_rate()
+    pps_before_fees = vault.price_per_share()
+
+    # We create a virtual profit
+    asset.transfer(strategy, second_profit, sender=fish)
+    tx = vault.process_report(strategy, sender=gov)
+
+    event = list(tx.decode_logs(vault.StrategyReported))
+    assert len(event) == 1
+    assert event[0].gain == second_profit
+
+    # Due to the fact that we were able to pay fees with profit, pps remains
+    assert vault.price_per_share() == pytest.approx(pps_before_fees, 1e-5)
+    # Fee Managers gets shares at pps price without affecting it
+    assert vault.balanceOf(flexible_fee_manager) == int(
+        vault.convertToShares(second_profit * 2)
+    )
+    # dist rate gets lowered, but there are still profits being distributed
+    assert vault.profit_distribution_rate() < dist_rate_before_fees
 
 
 def test_profit_distribution__one_gain_one_deposit_one_withdraw(
