@@ -121,7 +121,7 @@ def test_lossy_strategy_flow(
     assert vault.strategies(strategy).max_debt == deposit_amount // 4
 
     # user_2 withdraws everything else
-    with ape.reverts("insufficient shares to withdraw"):
+    with ape.reverts("insufficient shares to redeem"):
         # user_2 has now less assets, because strategy was lossy.
         vault.withdraw(deposit_amount, user_2, user_2, sender=user_2)
     vault.redeem(vault.balanceOf(user_2), user_2, user_2, sender=user_2)

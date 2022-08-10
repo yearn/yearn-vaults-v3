@@ -182,6 +182,7 @@ def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: a
 
     PROFIT_MAX_UNLOCK_TIME = profit_max_unlock_time
     self.profit_last_update = block.timestamp
+    self.profit_end_date = block.timestamp
 
     # EIP-712
     self.DOMAIN_SEPARATOR = keccak256(
@@ -424,10 +425,19 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
     
     # If there are not enough assets in the Vault contract, we try to free funds from strategies specified above
     if requested_assets > curr_total_idle:
-        # Load to memory to save gas
-        # TODO: should we replace this with the version including unlocked_profit?
-        # take into account that a withdrawing taping onto unlocked profit might break things
-        curr_total_debt: uint256 = self.total_debt_
+        unlocked_profit: uint256 = 0
+        # If there is not enough debt on storage and there is profit being unlocked, we need to compute unlocked profit till now to fullfil requested_assets
+        if requested_assets > self.total_debt_:
+            if self.profit_end_date > block.timestamp:
+                unlocked_profit = (block.timestamp - self.profit_last_update) * self.profit_distribution_rate_ / MAX_BPS
+                # we update last update time as profit is unlocked and will be added to storage debt afterwards
+                self.profit_last_update = block.timestamp
+            else:
+                unlocked_profit = (self.profit_end_date - self.profit_last_update) * self.profit_distribution_rate_ / MAX_BPS
+                self.profit_distribution_rate_ = 0
+
+        # load to memory to save gas
+        curr_total_debt: uint256 = self.total_debt_ + unlocked_profit
 
         # Withdraw from strategies if insufficient total idle
         assets_needed: uint256 = requested_assets - curr_total_idle
@@ -595,7 +605,10 @@ def _update_debt(strategy: address) -> uint256:
 	      # TODO: is it worth it to transfer the max_amount between assets_to_withdraw and balance?
         ASSET.transferFrom(strategy, self, assets_to_withdraw)
         self.total_idle += assets_to_withdraw
-        self.total_debt_ -= assets_to_withdraw
+        if assets_to_withdraw >= self.total_debt_:
+            self.total_debt_ = 0
+        else:
+            self.total_debt_ -= assets_to_withdraw
     else:
         # Vault is increasing debt with the strategy by sending more funds
         assets_to_transfer: uint256 = new_debt - current_debt
@@ -741,7 +754,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         strategy_params.total_loss,
         total_fees
     )
-    return (gain, loss)    
+    return (gain, loss)
 
 @view
 @internal
