@@ -105,10 +105,10 @@ def test_lossy_strategy_flow(
     assert vault.balanceOf(user_1) == 0
 
     # seconds loss affects user1 in relation to the shares he has within the vault
-    ratio = (deposit_amount - first_loss) / (2 * deposit_amount - first_loss)
+    shares_ratio = (deposit_amount - first_loss) / (2 * deposit_amount - first_loss)
     assert asset.balanceOf(user_1) < user_1_initial_balance
     assert asset.balanceOf(user_1) == pytest.approx(
-        user_1_initial_balance - first_loss - second_loss * ratio, 1e-5
+        user_1_initial_balance - first_loss - second_loss * shares_ratio, 1e-5
     )
 
     assert vault.total_idle() < vault.minimum_total_idle()
