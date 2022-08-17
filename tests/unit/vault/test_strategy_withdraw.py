@@ -59,7 +59,7 @@ def test_withdraw__with_insufficient_funds_in_strategies__reverts(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, amount)
 
-    with ape.reverts("insufficient total idle"):
+    with ape.reverts("insufficient assets in vault"):
         vault.withdraw(
             shares,
             fish.address,

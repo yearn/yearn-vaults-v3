@@ -18,7 +18,7 @@ def test_deposit__with_zero_funds__reverts(fish, asset, create_vault):
     vault = create_vault(asset)
     amount = 0
 
-    with ape.reverts("cannot deposit zero"):
+    with ape.reverts("cannot mint zero"):
         vault.deposit(amount, fish.address, sender=fish)
 
 
@@ -135,7 +135,7 @@ def test_mint__with_zero_funds__reverts(fish, asset, create_vault):
     vault = create_vault(asset)
     shares = 0
 
-    with ape.reverts("cannot deposit zero"):
+    with ape.reverts("cannot mint zero"):
         vault.mint(shares, fish.address, sender=fish)
 
 
@@ -234,7 +234,7 @@ def test_withdraw__with_insufficient_shares__reverts(
 
     user_deposit(fish, vault, asset, amount)
 
-    with ape.reverts("insufficient shares to withdraw"):
+    with ape.reverts("insufficient shares to redeem"):
         vault.withdraw(shares, fish.address, fish.address, sender=fish)
 
 
@@ -242,7 +242,7 @@ def test_withdraw__with_no_shares__reverts(fish, asset, create_vault):
     vault = create_vault(asset)
     shares = 0
 
-    with ape.reverts("no shares to withdraw"):
+    with ape.reverts("no shares to redeem"):
         vault.withdraw(shares, fish.address, fish.address, sender=fish)
 
 
@@ -361,7 +361,7 @@ def test_redeem__with_insufficient_shares__reverts(
 
     user_deposit(fish, vault, asset, amount)
 
-    with ape.reverts("insufficient shares to withdraw"):
+    with ape.reverts("insufficient shares to redeem"):
         vault.redeem(redemption_amount, fish.address, fish.address, sender=fish)
 
 
@@ -369,7 +369,7 @@ def test_redeem__with_no_shares__reverts(fish, asset, create_vault):
     vault = create_vault(asset)
     amount = 0
 
-    with ape.reverts("no shares to withdraw"):
+    with ape.reverts("no shares to redeem"):
         vault.withdraw(amount, fish.address, fish.address, sender=fish)
 
 
