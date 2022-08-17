@@ -1,5 +1,6 @@
 from utils.constants import MAX_INT
 import ape
+import pytest
 
 
 def test_lossy_strategy_flow(
@@ -98,11 +99,17 @@ def test_lossy_strategy_flow(
     assert vault.strategies(strategy)
 
     # user_1 withdraws all his shares in `vault.total_idle`. Due to the lossy strategy, his shares have less value
-    # and therefore he ends up with less money than before
+    # and therefore he ends up with less assets than before
     vault.redeem(MAX_INT, user_1, user_1, sender=user_1)
 
     assert vault.balanceOf(user_1) == 0
+
+    # seconds loss affects user1 in relation to the shares he has within the vault
+    ratio = (deposit_amount - first_loss) / (2 * deposit_amount - first_loss)
     assert asset.balanceOf(user_1) < user_1_initial_balance
+    assert asset.balanceOf(user_1) == pytest.approx(
+        user_1_initial_balance - first_loss - second_loss * ratio, 1e-5
+    )
 
     assert vault.total_idle() < vault.minimum_total_idle()
 
