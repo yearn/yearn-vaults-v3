@@ -101,7 +101,7 @@ def test_multiple_strategy_withdraw_flow(
 
     # attempt to withdraw remaining amount from only liquid strategy but revert
     whale_balance = vault.balanceOf(whale) - amount_to_lock  # exclude locked amount
-    with ape.reverts("insufficient total idle"):
+    with ape.reverts("insufficient assets in vault"):
         vault.withdraw(
             whale_balance,
             whale.address,

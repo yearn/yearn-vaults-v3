@@ -423,7 +423,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
     curr_total_idle: uint256 = self.total_idle
     
     # If there are not enough assets in the Vault contract, we try to free funds from strategies specified above
-    if requested_assets > curr_total_idle and len(strategies) > 0:
+    if requested_assets > curr_total_idle:
         # Load to memory to save gas
         # TODO: should we replace this with the version including unlocked_profit?
         # take into account that a withdrawing taping onto unlocked profit might break things
