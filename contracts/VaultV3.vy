@@ -60,8 +60,6 @@ event StrategyReported:
     gain: uint256
     loss: uint256
     current_debt: uint256
-    total_gain: uint256
-    total_loss: uint256
     total_fees: uint256
 
 # DEBT MANAGEMENT EVENTS
@@ -98,8 +96,6 @@ struct StrategyParams:
     last_report: uint256
     current_debt: uint256
     max_debt: uint256
-    total_gain: uint256
-    total_loss: uint256
 
 # CONSTANTS #
 MAX_BPS: constant(uint256) = 10_000
@@ -490,10 +486,8 @@ def _add_strategy(new_strategy: address):
       activation: block.timestamp,
       last_report: block.timestamp,
       current_debt: 0,
-      max_debt: 0,
-      total_gain: 0,
-      total_loss: 0
-   })
+      max_debt: 0
+      })
 
    log StrategyAdded(new_strategy)
 
@@ -508,10 +502,8 @@ def _revoke_strategy(old_strategy: address):
       activation: 0,
       last_report: 0,
       current_debt: 0,
-      max_debt: 0,
-      total_gain: 0,
-      total_loss: 0
-   })
+      max_debt: 0
+      })
 
    log StrategyRevoked(old_strategy)
 
@@ -531,10 +523,8 @@ def _migrate_strategy(new_strategy: address, old_strategy: address):
        activation: block.timestamp,
        last_report: block.timestamp,
        current_debt: migrated_strategy.current_debt,
-       max_debt: migrated_strategy.max_debt,
-       total_gain: 0,
-       total_loss: 0
-    })
+       max_debt: migrated_strategy.max_debt
+       })
 
     self._revoke_strategy(old_strategy)
 
@@ -683,7 +673,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     # Strategy is reporting a loss
     if loss > 0:
-        self.strategies[strategy].total_loss += loss
         self.strategies[strategy].current_debt -= loss
 
         if loss >= pending_profit:
@@ -706,8 +695,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
             if total_fees > 0:
                 self._issue_shares_for_amount(total_fees, fee_manager)
 
-        # gains are always realized pnl (i.e. not upnl)
-        self.strategies[strategy].total_gain += gain
         # update current debt after processing management fee
         self.strategies[strategy].current_debt += gain
         
@@ -745,15 +732,11 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     self.strategies[strategy].last_report = block.timestamp
 
-    strategy_params: StrategyParams = self.strategies[strategy]
-    # TODO: replace strategy_params.current_debt with current_debt read above to avoid loading the stuct (when/if we remove total_gain and total_loss)
     log StrategyReported(
         strategy,
         gain,
         loss,
-        strategy_params.current_debt,
-        strategy_params.total_gain,
-        strategy_params.total_loss,
+        self.strategies[strategy].current_debt,
         total_fees
     )
     return (gain, loss)

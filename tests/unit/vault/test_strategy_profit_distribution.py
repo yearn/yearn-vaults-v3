@@ -257,7 +257,6 @@ def test_profit_distribution__two_gain(
     event = list(tx.decode_logs(vault.StrategyReported))
     assert len(event) == 1
     assert event[0].gain == second_profit
-    assert event[0].total_gain == first_profit + second_profit
 
     assert vault.totalAssets() == pytest.approx(
         amount + first_profit / WEEK * days_to_secs(2), 1e-5
@@ -345,8 +344,6 @@ def test_profit_distribution__one_gain_one_loss(
     event = list(tx.decode_logs(vault.StrategyReported))
     assert len(event) == 1
     assert event[0].loss == loss
-    assert event[0].total_loss == loss
-    assert event[0].total_gain == profit
 
     assert vault.profit_distribution_rate() < dist_rate_profit_1_before_loss
 
@@ -412,8 +409,6 @@ def test_profit_distribution__one_gain_one_big_loss(
     event = list(tx.decode_logs(vault.StrategyReported))
     assert len(event) == 1
     assert event[0].loss == big_loss
-    assert event[0].total_gain == first_profit
-    assert event[0].total_loss == big_loss
 
     # There should not be any profit on the history
     assert vault.profit_distribution_rate() == 0
