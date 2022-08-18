@@ -1,6 +1,7 @@
 # @version 0.3.4
 
 from vyper.interfaces import ERC20
+from vyper.interfaces import ERC4626
 from vyper.interfaces import ERC20Detailed
 
 # TODO: external contract: factory
@@ -10,10 +11,14 @@ from vyper.interfaces import ERC20Detailed
 interface IStrategy:
     def asset() -> address: view
     def vault() -> address: view
-    def investable() -> (uint256, uint256): view
-    def withdrawable() -> uint256: view
-    def freeFunds(amount: uint256) -> uint256: nonpayable
+    def balanceOf(owner: address) -> uint256: view
+    def maxDeposit(receiver: address) -> uint256: view
+    def maxWithdraw(owner: address) -> uint256: view
+    def withdraw(amount: uint256, receiver: address, owner: address) -> uint256: nonpayable
+    def deposit(assets: uint256, receiver: address) -> uint256: nonpayable
     def totalAssets() -> (uint256): view
+    def convertToAssets(shares: uint256) -> (uint256): view
+    def convertToShares(assets: uint256) -> (uint256): view
 
 interface IFeeManager:
     def assess_fees(strategy: address, gain: uint256) -> uint256: view
@@ -204,7 +209,7 @@ def _spend_allowance(owner: address, spender: address, amount: uint256):
 @internal
 def _transfer(sender: address, receiver: address, amount: uint256):
     # Protect people from accidentally sending their shares to bad places
-    assert receiver not in [self, ZERO_ADDRESS]
+    assert receiver not in [self, empty(address)]
     assert self.balance_of[sender] >= amount, "insufficient funds"
     self.balance_of[sender] -= amount
     self.balance_of[receiver] += amount
@@ -237,7 +242,7 @@ def _decrease_allowance(owner: address, spender: address, amount: uint256) -> bo
 # TODO: review correct implementation
 @internal
 def _permit(owner: address, spender: address, amount: uint256, expiry: uint256, signature: Bytes[65]) -> bool:
-    assert owner != ZERO_ADDRESS, "invalid owner"
+    assert owner != empty(address), "invalid owner"
     assert expiry == 0 or expiry >= block.timestamp, "permit expired"
     nonce: uint256 = self.nonces[owner]
     digest: bytes32 = keccak256(
@@ -278,7 +283,7 @@ def _total_assets() -> uint256:
 def _burn_shares(shares: uint256, owner: address):
     self.balance_of[owner] -= shares
     self.total_supply -= shares
-    log Transfer(owner, ZERO_ADDRESS, shares)
+    log Transfer(owner, empty(address), shares)
 
 @view
 @internal
@@ -357,7 +362,7 @@ def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
     self.balance_of[recipient] += new_shares
     self.total_supply += new_shares
 
-    log Transfer(ZERO_ADDRESS, recipient, new_shares)
+    log Transfer(empty(address), recipient, new_shares)
     return new_shares
 
 ## ERC4626 ##
@@ -381,7 +386,7 @@ def _max_redeem(owner: address) -> uint256:
 @internal
 def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256:
     assert self.shutdown == False # dev: shutdown
-    assert _recipient not in [self, ZERO_ADDRESS], "invalid recipient"
+    assert _recipient not in [self, empty(address)], "invalid recipient"
     assets: uint256 = _assets
 
     # If the amount is MAX_UINT256 we assume the user wants to deposit their whole balance
@@ -441,16 +446,13 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
         for strategy in strategies:
             assert self.strategies[strategy].activation != 0, "inactive strategy"
 
-            assets_to_withdraw = min(assets_needed, IStrategy(strategy).withdrawable())
+            assets_to_withdraw = min(assets_needed, IStrategy(strategy).maxWithdraw(self))
             # continue if nothing to withdraw
             if assets_to_withdraw == 0:
                 continue
-
-            # Vault requests some funds to be fred, for it to be able to pick them back
-            IStrategy(strategy).freeFunds(assets_to_withdraw)
-	          # TODO: should the vault check that the strategy has unlocked requested funds?
-	          # if so, should it just withdraw the unlocked funds and just assume the rest are lost?
-            ASSET.transferFrom(strategy, self, assets_to_withdraw)
+            
+            # TODO: warning! if there are losses, the user withdrawing will not get them
+            IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
             curr_total_idle += assets_to_withdraw
             curr_total_debt -= assets_to_withdraw
             self.strategies[strategy].current_debt -= assets_to_withdraw
@@ -477,7 +479,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
 ## STRATEGY MANAGEMENT ##
 @internal
 def _add_strategy(new_strategy: address):
-   assert new_strategy != ZERO_ADDRESS, "strategy cannot be zero address"
+   assert new_strategy != empty(address), "strategy cannot be zero address"
    assert IStrategy(new_strategy).asset() == ASSET.address, "invalid asset"
    assert IStrategy(new_strategy).vault() == self, "invalid vault"
    assert self.strategies[new_strategy].activation == 0, "strategy already active"
@@ -511,7 +513,7 @@ def _revoke_strategy(old_strategy: address):
 def _migrate_strategy(new_strategy: address, old_strategy: address):
     assert self.strategies[old_strategy].activation != 0, "old strategy not active"
     assert self.strategies[old_strategy].current_debt == 0, "old strategy has debt"
-    assert new_strategy != ZERO_ADDRESS, "strategy cannot be zero address"
+    assert new_strategy != empty(address), "strategy cannot be zero address"
     assert IStrategy(new_strategy).asset() == ASSET.address, "invalid asset"
     assert IStrategy(new_strategy).vault() == self, "invalid vault"
     assert self.strategies[new_strategy].activation == 0, "strategy already active"
@@ -554,21 +556,8 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
     # TODO: evaluate consequences of a strategy returning all the funds (including last reported profit) when the profit is not unlocked yet
     current_debt: uint256 = self.strategies[strategy].current_debt
 
-    min_desired_debt: uint256 = 0
-    max_desired_debt: uint256 = 0
-    min_desired_debt, max_desired_debt = IStrategy(strategy).investable()
-
     if self.shutdown:
         new_debt = 0
-
-    if new_debt > current_debt:
-        # only check if debt is increasing
-        # if debt is decreasing, we ignore strategy min debt
-        assert (new_debt >= min_desired_debt), "new debt less than min debt"
-
-    if new_debt > max_desired_debt:
-        # if the strategy can't take that much debt, reduce to the max amount it can take
-        new_debt = max_desired_debt
 
     assert new_debt != current_debt, "new debt equals current debt"
 
@@ -587,7 +576,7 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
                 assets_to_withdraw = current_debt
             new_debt = current_debt - assets_to_withdraw
 
-        withdrawable: uint256 = IStrategy(strategy).withdrawable()
+        withdrawable: uint256 = IStrategy(strategy).maxWithdraw(self)
         assert withdrawable != 0, "nothing to withdraw"
 
         # if insufficient withdrawable, withdraw what we can
@@ -595,9 +584,9 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
             assets_to_withdraw = withdrawable
             new_debt = current_debt - withdrawable
 
-        IStrategy(strategy).freeFunds(assets_to_withdraw)
-	      # TODO: is it worth it to transfer the max_amount between assets_to_withdraw and balance?
-        ASSET.transferFrom(strategy, self, assets_to_withdraw)
+        # TODO: check if ERC4626 reverts if not enough assets
+        IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
+
         self.total_idle += assets_to_withdraw
         # TODO: WARNING: we do this because there are rounding errors due to gradual profit unlocking
         if assets_to_withdraw >= self.total_debt_:
@@ -606,7 +595,12 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
             self.total_debt_ -= assets_to_withdraw
     else:
         # Vault is increasing debt with the strategy by sending more funds
+        max_deposit: uint256 = IStrategy(strategy).maxDeposit(self)
+
         assets_to_transfer: uint256 = new_debt - current_debt
+        if max_deposit < assets_to_transfer:
+            # TODO: should we revert?
+            assets_to_transfer = max_deposit
         # take into consideration minimum_total_idle
         # HACK: to save gas
         minimum_total_idle: uint256 = self.minimum_total_idle
@@ -620,7 +614,7 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
             assets_to_transfer = available_idle
             new_debt = current_debt + assets_to_transfer
         if assets_to_transfer > 0:
-            ASSET.transfer(strategy, assets_to_transfer)
+            IStrategy(strategy).deposit(assets_to_transfer, self)
             self.total_idle -= assets_to_transfer
             self.total_debt_ += assets_to_transfer
 
@@ -644,7 +638,9 @@ def _process_report(strategy: address) -> (uint256, uint256):
     Losses will be taken immediately
     """
     assert self.strategies[strategy].activation != 0, "inactive strategy"
-    total_assets: uint256 = IStrategy(strategy).totalAssets()
+    # Vault needs to assess 
+    strategy_shares: uint256 = IStrategy(strategy).balanceOf(self)
+    total_assets: uint256 = IStrategy(strategy).convertToAssets(strategy_shares)
     current_debt: uint256 = self.strategies[strategy].current_debt
     # TODO: do we want to revert or we prefer to return?
     assert total_assets != current_debt, "nothing to report"
@@ -693,7 +689,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if gain > 0:
         fee_manager: address = self.fee_manager
         # if fee manager is not set, fees are zero
-        if fee_manager != ZERO_ADDRESS:
+        if fee_manager != empty(address):
             total_fees = IFeeManager(fee_manager).assess_fees(strategy, gain)
             # if fees are non-zero, issue shares
             if total_fees > 0:
@@ -815,7 +811,7 @@ def transfer_role_manager(role_manager: address):
 def accept_role_manager():
     assert msg.sender == self.future_role_manager
     self.role_manager = msg.sender
-    self.future_role_manager = ZERO_ADDRESS
+    self.future_role_manager = empty(address)
 
 # VAULT STATUS VIEWS
 @view
