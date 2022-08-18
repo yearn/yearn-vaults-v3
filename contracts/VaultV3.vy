@@ -600,7 +600,7 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         max_deposit: uint256 = IStrategy(strategy).maxDeposit(self)
 
         assets_to_transfer: uint256 = new_debt - current_debt
-        if assets_to_transfer > max_deposit:
+        if max_deposit < assets_to_transfer:
             # TODO: should we revert?
             assets_to_transfer = max_deposit
         # take into consideration minimum_total_idle
@@ -618,6 +618,7 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         if assets_to_transfer > 0:
             ASSET.approve(strategy, assets_to_transfer)
             IStrategy(strategy).deposit(assets_to_transfer, self)
+            ASSET.approve(strategy, 0)
             self.total_idle -= assets_to_transfer
             self.total_debt_ += assets_to_transfer
 
