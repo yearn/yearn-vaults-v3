@@ -605,6 +605,7 @@ def _update_debt(strategy: address) -> uint256:
 	      # TODO: is it worth it to transfer the max_amount between assets_to_withdraw and balance?
         ASSET.transferFrom(strategy, self, assets_to_withdraw)
         self.total_idle += assets_to_withdraw
+        # TODO: WARNING: we do this because there are rounding errors due to gradual profit unlocking
         if assets_to_withdraw >= self.total_debt_:
             self.total_debt_ = 0
         else:
@@ -721,6 +722,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
                 # NOTE: The new locking period is the weighted average between the remaining time and the PROFIT_MAX_UNLOCK_TIME. 
                 # The weight used is the profit (pending_profit vs new_profit)
                 new_profit_locking_period: uint256 = (pending_profit * remaining_time + gain_without_fees * PROFIT_MAX_UNLOCK_TIME) / (pending_profit + gain_without_fees)
+                # TODO: WARNING: this will most probably lead to rounding errors. We need a way to mitigate this as much as possible
                 self.profit_distribution_rate_ = (pending_profit + gain_without_fees) * MAX_BPS / new_profit_locking_period
                 self.profit_end_date =  block.timestamp + new_profit_locking_period
                 self.profit_last_update = block.timestamp
