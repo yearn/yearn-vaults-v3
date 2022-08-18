@@ -69,14 +69,10 @@ def test_process_report__with_gain_and_zero_fees(
     assert event[0].strategy == strategy.address
     assert event[0].gain == gain
     assert event[0].loss == 0
-    assert event[0].total_gain == gain
-    assert event[0].total_loss == 0
     assert event[0].current_debt == initial_debt + gain
     assert event[0].total_fees == 0
 
     strategy_params = vault.strategies(strategy.address)
-    assert strategy_params.total_gain == gain
-    assert strategy_params.total_loss == 0
     assert strategy_params.current_debt == initial_debt + gain
     assert vault.profit_distribution_rate() * WEEK / MAX_BPS == pytest.approx(
         profit_buffer + gain, 1e-5
@@ -123,14 +119,10 @@ def test_process_report__with_gain_and_zero_management_fees(
     assert event[0].strategy == strategy.address
     assert event[0].gain == gain
     assert event[0].loss == 0
-    assert event[0].total_gain == gain
-    assert event[0].total_loss == 0
     assert event[0].current_debt == initial_debt + gain
     assert event[0].total_fees == total_fee
 
     strategy_params = vault.strategies(strategy.address)
-    assert strategy_params.total_gain == gain
-    assert strategy_params.total_loss == 0
     assert strategy_params.current_debt == initial_debt + gain
     assert vault.profit_distribution_rate() * WEEK / MAX_BPS == pytest.approx(
         profit_buffer + gain - total_fee, 1e-5
@@ -179,14 +171,10 @@ def test_process_report__with_gain_and_zero_performance_fees(
     assert event[0].strategy == strategy.address
     assert event[0].gain == gain
     assert event[0].loss == 0
-    assert event[0].total_gain == gain
-    assert event[0].total_loss == 0
     assert event[0].current_debt == initial_debt + gain
     assert event[0].total_fees == pytest.approx(total_fee, rel=1e-4)
 
     strategy_params = vault.strategies(strategy.address)
-    assert strategy_params.total_gain == gain
-    assert strategy_params.total_loss == 0
     assert strategy_params.current_debt == initial_debt + gain
     assert vault.profit_distribution_rate() * WEEK / MAX_BPS == pytest.approx(
         profit_buffer + gain - total_fee, rel=1e-4
@@ -234,14 +222,10 @@ def test_process_report__with_gain_and_both_fees(
     assert event[0].strategy == strategy.address
     assert event[0].gain == gain
     assert event[0].loss == 0
-    assert event[0].total_gain == gain
-    assert event[0].total_loss == 0
     assert event[0].current_debt == initial_debt + gain
     assert event[0].total_fees == pytest.approx(total_fee, rel=1e-4)
 
     strategy_params = vault.strategies(strategy.address)
-    assert strategy_params.total_gain == gain
-    assert strategy_params.total_loss == 0
     assert strategy_params.current_debt == initial_debt + gain
     assert vault.profit_distribution_rate() * WEEK / MAX_BPS == pytest.approx(
         profit_buffer + gain - total_fee, rel=1e-4
@@ -291,14 +275,10 @@ def test_process_report__with_fees_exceeding_fee_cap(
     assert event[0].strategy == strategy.address
     assert event[0].gain == gain
     assert event[0].loss == 0
-    assert event[0].total_gain == gain
-    assert event[0].total_loss == 0
     assert event[0].current_debt == initial_debt + gain
     assert event[0].total_fees == max_fee
 
     strategy_params = vault.strategies(strategy.address)
-    assert strategy_params.total_gain == gain
-    assert strategy_params.total_loss == 0
     assert strategy_params.current_debt == initial_debt + gain
     assert vault.profit_distribution_rate() * WEEK / MAX_BPS == pytest.approx(
         profit_buffer + gain - max_fee, 1e-5
@@ -331,14 +311,10 @@ def test_process_report__with_loss(
     assert event[0].strategy == lossy_strategy.address
     assert event[0].gain == 0
     assert event[0].loss == loss
-    assert event[0].total_gain == 0
-    assert event[0].total_loss == loss
     assert event[0].current_debt == initial_debt - loss
     assert event[0].total_fees == 0
 
     strategy_params = vault.strategies(lossy_strategy.address)
-    assert strategy_params.total_gain == 0
-    assert strategy_params.total_loss == loss
     assert strategy_params.current_debt == initial_debt - loss
     assert vault.profit_distribution_rate() == 0
     assert vault.strategies(lossy_strategy.address).last_report == pytest.approx(
