@@ -75,7 +75,6 @@ def test_lossy_strategy_flow(
     tx = vault.process_report(strategy, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].loss == second_loss
-    assert event[0].total_loss == first_loss + second_loss
 
     assert (
         vault.strategies(strategy).current_debt

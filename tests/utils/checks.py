@@ -10,5 +10,3 @@ def check_revoked_strategy(strategy_params):
     assert strategy_params.last_report == 0
     assert strategy_params.current_debt == 0
     assert strategy_params.max_debt == 0
-    assert strategy_params.total_gain == 0
-    assert strategy_params.total_loss == 0
