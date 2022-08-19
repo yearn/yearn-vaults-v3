@@ -19,8 +19,6 @@ def test_add_strategy__with_valid_strategy(chain, gov, vault, create_strategy):
     assert strategy_params.activation == pytest.approx(snapshot, abs=1)
     assert strategy_params.current_debt == 0
     assert strategy_params.max_debt == 0
-    assert strategy_params.total_gain == 0
-    assert strategy_params.total_loss == 0
     assert strategy_params.last_report == pytest.approx(snapshot, abs=1)
 
 
@@ -108,8 +106,6 @@ def test_migrate_strategy__with_no_debt(chain, gov, vault, strategy, create_stra
     assert new_strategy_params.activation == pytest.approx(snapshot, abs=1)
     assert new_strategy_params.current_debt == old_current_debt
     assert new_strategy_params.max_debt == old_max_debt
-    assert new_strategy_params.total_gain == 0
-    assert new_strategy_params.total_loss == 0
     assert new_strategy_params.last_report == pytest.approx(snapshot, abs=1)
 
     old_strategy_params = vault.strategies(old_strategy)

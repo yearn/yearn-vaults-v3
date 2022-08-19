@@ -10,8 +10,6 @@ struct StrategyParams:
     last_report: uint256
     current_debt: uint256
     max_debt: uint256
-    total_gain: uint256
-    total_loss: uint256
 
 interface IVault:
     def strategies(strategy: address) -> StrategyParams: view
