@@ -203,7 +203,11 @@ def test_update_debt__with_new_debt_greater_than_max_desired_debt(
 #     with ape.reverts("new debt less than min debt"):
 #         vault.update_debt(strategy.address, sender=gov)
 #
+<<<<<<< HEAD
  
+=======
+
+>>>>>>> 74d7b0b (fix: formatting)
 
 @pytest.mark.parametrize("minimum_total_idle", [0, 10**21])
 def test_set_minimum_total_idle__with_minimum_total_idle(
