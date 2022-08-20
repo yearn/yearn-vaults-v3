@@ -2,7 +2,9 @@ from ape import chain
 
 
 # placeholder tests for test mocks
-def test_liquid_strategy__with_fee(gov, asset, vault, create_strategy, mint_and_deposit_into_strategy):
+def test_liquid_strategy__with_fee(
+    gov, asset, vault, create_strategy, mint_and_deposit_into_strategy
+):
     strategy = create_strategy(vault)
     amount = 10**18
 
@@ -45,7 +47,7 @@ def test_locked_strategy__with_locked_asset(
 
 
 def test_lossy_strategy__with_multiple_losses(
-    gov, fish, asset, vault, create_lossy_strategy, mint_and_deposit_into_strategy 
+    gov, fish, asset, vault, create_lossy_strategy, mint_and_deposit_into_strategy
 ):
     strategy = create_lossy_strategy(vault)
     amount = 10 * 10**18

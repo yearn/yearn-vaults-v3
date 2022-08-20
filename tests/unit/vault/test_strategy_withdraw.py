@@ -96,7 +96,6 @@ def test_withdraw__with_liquid_strategy_only__withdraws(
     )
     event = list(tx.decode_logs(vault.Withdraw))
 
-    
     assert len(event) >= 1
     n = len(event) - 1
     assert event[n].sender == fish

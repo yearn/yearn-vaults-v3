@@ -200,6 +200,7 @@ def flexible_fee_manager(project, gov):
     flexible_fee_manager = gov.deploy(project.FlexibleFeeManager)
     yield flexible_fee_manager
 
+
 @pytest.fixture(scope="session")
 def mint_and_deposit_into_strategy(project, gov):
     def mint_and_deposit_into_strategy(
@@ -214,7 +215,6 @@ def mint_and_deposit_into_strategy(project, gov):
         strategy.deposit(amount_to_deposit, account.address, sender=account)
 
     yield mint_and_deposit_into_strategy
-
 
 
 @pytest.fixture(scope="session")
