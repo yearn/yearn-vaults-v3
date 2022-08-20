@@ -185,25 +185,24 @@ def test_update_debt__with_new_debt_greater_than_max_desired_debt(
     assert vault.total_idle() == initial_idle - difference
     assert vault.total_debt() == initial_debt + difference
 
-
-def test_update_debt__with_new_debt_less_than_min_desired_debt__reverts(
-    gov, asset, vault, strategy, add_debt_to_strategy
-):
-    vault_balance = asset.balanceOf(vault)
-    current_debt = vault_balance // 2
-    new_debt = vault_balance
-    min_desired_debt = vault_balance * 2
-
-    # set existing debt
-    add_debt_to_strategy(gov, strategy, vault, current_debt)
-
-    # set new max debt lower than min debt
-    vault.update_max_debt_for_strategy(strategy.address, new_debt, sender=gov)
-    strategy.setMinDebt(min_desired_debt, sender=gov)
-
-    with ape.reverts("new debt less than min debt"):
-        vault.update_debt(strategy.address, new_debt, sender=gov)
-
+# def test_update_debt__with_new_debt_less_than_min_desired_debt__reverts(
+#     gov, asset, vault, strategy, add_debt_to_strategy
+# ):
+#     vault_balance = asset.balanceOf(vault)
+#     current_debt = vault_balance // 2
+#     new_debt = vault_balance
+#     min_desired_debt = vault_balance * 2
+# 
+#     # set existing debt
+#     add_debt_to_strategy(gov, strategy, vault, current_debt)
+# 
+#     # set new max debt lower than min debt
+#     vault.update_max_debt_for_strategy(strategy.address, new_debt, sender=gov)
+#     strategy.setMinDebt(min_desired_debt, sender=gov)
+# 
+#     with ape.reverts("new debt less than min debt"):
+#         vault.update_debt(strategy.address, sender=gov)
+# 
 
 @pytest.mark.parametrize("minimum_total_idle", [0, 10**21])
 def test_set_minimum_total_idle__with_minimum_total_idle(

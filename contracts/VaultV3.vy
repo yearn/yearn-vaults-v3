@@ -201,7 +201,7 @@ def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: a
 @internal
 def _spend_allowance(owner: address, spender: address, amount: uint256):
     # Unlimited approval does nothing (saves an SSTORE)
-    if (self.allowance[owner][spender] < MAX_UINT256):
+    if (self.allowance[owner][spender] < max_value(uint256)):
         current_allowance: uint256 = self.allowance[owner][spender]
         assert current_allowance >= amount, "insufficient allowance"
         self._approve(owner, spender, current_allowance - amount)
@@ -389,8 +389,8 @@ def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256
     assert _recipient not in [self, empty(address)], "invalid recipient"
     assets: uint256 = _assets
 
-    # If the amount is MAX_UINT256 we assume the user wants to deposit their whole balance
-    if assets == MAX_UINT256:
+    # If the amount is max_value(uint256) we assume the user wants to deposit their whole balance
+    if assets == max_value(uint256):
         assets = ASSET.balanceOf(_sender)
 
     assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
@@ -413,7 +413,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
 
-    if shares == MAX_UINT256:
+    if shares == max_value(uint256):
         shares = shares_balance
 
     assert shares_balance >= shares, "insufficient shares to redeem"
@@ -586,19 +586,21 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
 
         # TODO: check if ERC4626 reverts if not enough assets
         IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
-
+        # TODO: verify that the assets where sent?
         self.total_idle += assets_to_withdraw
         # TODO: WARNING: we do this because there are rounding errors due to gradual profit unlocking
         if assets_to_withdraw >= self.total_debt_:
             self.total_debt_ = 0
         else:
             self.total_debt_ -= assets_to_withdraw
+
+        new_debt = current_debt - assets_to_withdraw
     else:
         # Vault is increasing debt with the strategy by sending more funds
         max_deposit: uint256 = IStrategy(strategy).maxDeposit(self)
 
         assets_to_transfer: uint256 = new_debt - current_debt
-        if max_deposit < assets_to_transfer:
+        if assets_to_transfer > max_deposit:
             # TODO: should we revert?
             assets_to_transfer = max_deposit
         # take into consideration minimum_total_idle
@@ -614,10 +616,13 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
             assets_to_transfer = available_idle
             new_debt = current_debt + assets_to_transfer
         if assets_to_transfer > 0:
+            ASSET.approve(strategy, assets_to_transfer)
             IStrategy(strategy).deposit(assets_to_transfer, self)
             self.total_idle -= assets_to_transfer
             self.total_debt_ += assets_to_transfer
 
+        new_debt = current_debt + assets_to_transfer
+    
     self.strategies[strategy].current_debt = new_debt
 
     log DebtUpdated(strategy, current_debt, new_debt)

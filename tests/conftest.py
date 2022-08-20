@@ -135,7 +135,7 @@ def create_vault(project, gov, fee_manager, flexible_fee_manager):
 @pytest.fixture(scope="session")
 def create_strategy(project, strategist):
     def create_strategy(vault):
-        return strategist.deploy(project.LiquidStrategy, vault)
+        return strategist.deploy(project.ERC4626LiquidStrategy, vault, vault.asset())
 
     yield create_strategy
 
@@ -144,7 +144,7 @@ def create_strategy(project, strategist):
 @pytest.fixture(scope="session")
 def create_locked_strategy(project, strategist):
     def create_locked_strategy(vault):
-        return strategist.deploy(project.LockedStrategy, vault)
+        return strategist.deploy(project.ERC4626LockedStrategy, vault, vault.asset())
 
     yield create_locked_strategy
 
@@ -153,7 +153,7 @@ def create_locked_strategy(project, strategist):
 @pytest.fixture(scope="session")
 def create_lossy_strategy(project, strategist):
     def create_lossy_strategy(vault):
-        return strategist.deploy(project.LossyStrategy, vault)
+        return strategist.deploy(project.ERC4626LossyStrategy, vault, vault.asset())
 
     yield create_lossy_strategy
 
@@ -169,7 +169,6 @@ def vault(gov, asset, create_vault):
 def strategy(gov, vault, create_strategy):
     strategy = create_strategy(vault)
     vault.add_strategy(strategy.address, sender=gov)
-    strategy.setMinDebt(0, sender=gov)
     strategy.setMaxDebt(MAX_INT, sender=gov)
     yield strategy
 
@@ -178,7 +177,6 @@ def strategy(gov, vault, create_strategy):
 def locked_strategy(gov, vault, create_locked_strategy):
     strategy = create_locked_strategy(vault)
     vault.add_strategy(strategy.address, sender=gov)
-    strategy.setMinDebt(0, sender=gov)
     strategy.setMaxDebt(MAX_INT, sender=gov)
     yield strategy
 
@@ -187,7 +185,6 @@ def locked_strategy(gov, vault, create_locked_strategy):
 def lossy_strategy(gov, vault, create_lossy_strategy):
     strategy = create_lossy_strategy(vault)
     vault.add_strategy(strategy.address, sender=gov)
-    strategy.setMinDebt(0, sender=gov)
     strategy.setMaxDebt(MAX_INT, sender=gov)
     yield strategy
 
@@ -202,6 +199,22 @@ def fee_manager(project, gov):
 def flexible_fee_manager(project, gov):
     flexible_fee_manager = gov.deploy(project.FlexibleFeeManager)
     yield flexible_fee_manager
+
+@pytest.fixture(scope="session")
+def mint_and_deposit_into_strategy(project, gov):
+    def mint_and_deposit_into_strategy(
+        strategy, account=gov, amount_to_mint=10**18, amount_to_deposit=None
+    ):
+        if amount_to_deposit == None:
+            amount_to_deposit = amount_to_mint
+
+        asset = project.Token.at(strategy.asset())
+        asset.mint(account.address, amount_to_mint, sender=account)
+        asset.approve(strategy.address, amount_to_deposit, sender=account)
+        strategy.deposit(amount_to_deposit, account.address, sender=account)
+
+    yield mint_and_deposit_into_strategy
+
 
 
 @pytest.fixture(scope="session")
@@ -299,7 +312,6 @@ def add_strategy_to_vault():
     # used for new adding a new strategy to vault with unlimited max debt settings
     def add_strategy_to_vault(user, strategy, vault):
         vault.add_strategy(strategy.address, sender=user)
-        strategy.setMinDebt(0, sender=user)
         strategy.setMaxDebt(MAX_INT, sender=user)
 
     return add_strategy_to_vault
