@@ -200,6 +200,22 @@ def flexible_fee_manager(project, gov):
     flexible_fee_manager = gov.deploy(project.FlexibleFeeManager)
     yield flexible_fee_manager
 
+@pytest.fixture(scope="session")
+def mint_and_deposit_into_strategy(project, gov):
+    def mint_and_deposit_into_strategy(
+        strategy, account=gov, amount_to_mint=10**18, amount_to_deposit=None
+    ):
+        if amount_to_deposit == None:
+            amount_to_deposit = amount_to_mint
+
+        asset = project.Token.at(strategy.asset())
+        asset.mint(account.address, amount_to_mint, sender=account)
+        asset.approve(strategy.address, amount_to_deposit, sender=account)
+        strategy.deposit(amount_to_deposit, account.address, sender=account)
+
+    yield mint_and_deposit_into_strategy
+
+
 
 @pytest.fixture(scope="session")
 def mint_and_deposit_into_strategy(project, gov):

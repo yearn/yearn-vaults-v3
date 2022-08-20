@@ -35,7 +35,6 @@ def test_lossy_strategy_flow(
     assert vault.price_per_share() / 10 ** asset.decimals() == 1.0
 
     add_debt_to_strategy(gov, strategy, vault, deposit_amount)
-
     assert strategy.totalSupply() == deposit_amount
     assert strategy.totalAssets() == deposit_amount
     assert strategy.balanceOf(vault) == deposit_amount
