@@ -443,20 +443,46 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
         # Withdraw from strategies if insufficient total idle
         assets_needed: uint256 = requested_assets - curr_total_idle
         assets_to_withdraw: uint256 = 0
+
+        # NOTE: to compare against real withdrawals from strategies
+        previous_balance: uint256 = ASSET.balanceOf(self)
         for strategy in strategies:
             assert self.strategies[strategy].activation != 0, "inactive strategy"
+            strategy_current_debt: uint256 = self.strategies[strategy].current_debt
+            # TODO: assert if the strategy has no debt?
 
             assets_to_withdraw = min(assets_needed, IStrategy(strategy).maxWithdraw(self))
-            # continue if nothing to withdraw
+
+            # CHECK FOR UNREALISED LOSSES
+            one_strategy_share: uint256 = 10 ** strategy.decimals()
+            strategy_pps: uint256 = strategy.convertToAssets(one_strategy_share)
+            strategy_assets: uint256 = strategy.balanceOf(self) * strategy_pps / one_strategy_share
+            # NOTE: if there are unrealised losses, the user will take his share
+            if strategy_current_debt > strategy_assets:
+                diff: uint256 = assets_to_withdraw * assets_to_withdraw / (strategy_current_debt - strategy_assets)
+                assets_to_withdraw = assets_to_withdraw - diff
+                requested_assets -= diff
+
+            # continue to next strategy if nothing to withdraw
             if assets_to_withdraw == 0:
                 continue
             
-            # TODO: warning! if there are losses, the user withdrawing will not get them
+            # WITHDRAW FROM STRATEGY
             IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
-            curr_total_idle += assets_to_withdraw
+            post_balance: uint256 = ASSET.balanceOf(self)
+            # If we have not received what we expected, we consider the difference a loss
+            loss: uint256 = previous_balance + assets_to_withdraw - post_balance
+
+            # NOTE: we update the previous_balance variable here to save gas in next iteration
+            previous_balance = post_balance
+ 
+            # TODO: what are the considerations re locked profit?
+            # NOTE: strategy's debt decreases by the full amount but the total idle increases by the actual amount only (as the difference is considered lost)
+            curr_total_idle += assets_to_withdraw - loss
             curr_total_debt -= assets_to_withdraw
             self.strategies[strategy].current_debt -= assets_to_withdraw
-
+            # NOTE: the user will receive less tokens (as the rest were lost)
+            requested_assets -= loss
             # break if we have enough total idle to serve initial request 
             if requested_assets <= curr_total_idle:
                 break
@@ -469,7 +495,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
         self.total_debt_ = curr_total_debt
 
     self._burn_shares(shares, owner)
-    self.total_idle = curr_total_idle - requested_assets 
+    self.total_idle = curr_total_idle - requested_assets
     self.erc20_safe_transfer(ASSET.address, receiver, requested_assets)
 
     log Withdraw(sender, receiver, owner, requested_assets, shares)
