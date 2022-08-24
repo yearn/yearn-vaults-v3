@@ -533,10 +533,11 @@ def _migrate_strategy(new_strategy: address, old_strategy: address):
 # DEBT MANAGEMENT #
 # TODO: allow the caller to specify the debt for the strategy, enforcing max_debt
 @internal
-def _update_debt(strategy: address) -> uint256:
+def _update_debt(strategy: address, target_debt: uint256) -> uint256:
     """
-    The vault will rebalance the debt vs its target debt (max_debt). This function will compare the current debt with 
-    the target debt and will take funds or deposit new funds to the strategy. 
+    The vault will rebalance the debt vs target debt. Target debt must be smaller or equal strategy max_debt.
+    This function will compare the current debt with the target debt and will take funds or deposit new 
+    funds to the strategy. 
 
     The strategy can require a minimum (or a maximum) amount of funds that it wants to receive to invest. 
     The strategy can also reject freeing funds if they are locked.
@@ -545,14 +546,17 @@ def _update_debt(strategy: address) -> uint256:
     """
 
     self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
+
+    new_debt: uint256 = target_debt
+    # Revert if target_debt cannot be achieved due to configured max_debt for given strategy
+    assert new_debt <= self.strategies[strategy].max_debt, "target debt higher than max debt"
+
     # TODO: evaluate consequences of a strategy returning all the funds (including last reported profit) when the profit is not unlocked yet
     current_debt: uint256 = self.strategies[strategy].current_debt
 
     min_desired_debt: uint256 = 0
     max_desired_debt: uint256 = 0
     min_desired_debt, max_desired_debt = IStrategy(strategy).investable()
-
-    new_debt: uint256 = self.strategies[strategy].max_debt
 
     if self.shutdown:
         new_debt = 0
@@ -872,9 +876,9 @@ def update_max_debt_for_strategy(strategy: address, new_max_debt: uint256):
     log UpdatedMaxDebtForStrategy(msg.sender, strategy, new_max_debt)
 
 @external
-def update_debt(strategy: address) -> uint256:
+def update_debt(strategy: address, target_debt: uint256) -> uint256:
     self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
-    return self._update_debt(strategy)
+    return self._update_debt(strategy, target_debt)
 
 ## EMERGENCY MANAGEMENT ##
 @external

@@ -106,7 +106,7 @@ def test_update_max_debt__debt_manager(gov, vault, strategy, bunny):
 
 def test_update_debt__no_debt_manager__reverts(vault, strategy, bunny):
     with ape.reverts():
-        vault.update_debt(strategy, sender=bunny)
+        vault.update_debt(strategy, 10**18, sender=bunny)
 
 
 def test_update_debt__debt_manager(
@@ -121,7 +121,7 @@ def test_update_debt__debt_manager(
     max_debt_for_strategy = 1
     vault.update_max_debt_for_strategy(strategy, max_debt_for_strategy, sender=bunny)
 
-    tx = vault.update_debt(strategy, sender=bunny)
+    tx = vault.update_debt(strategy, max_debt_for_strategy, sender=bunny)
 
     event = list(tx.decode_logs(vault.DebtUpdated))
     assert len(event) == 1

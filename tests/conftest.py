@@ -308,9 +308,9 @@ def add_strategy_to_vault():
 # used to add debt to a strategy
 @pytest.fixture(scope="session")
 def add_debt_to_strategy():
-    def add_debt_to_strategy(user, strategy, vault, max_debt: int):
-        vault.update_max_debt_for_strategy(strategy.address, max_debt, sender=user)
-        vault.update_debt(strategy.address, sender=user)
+    def add_debt_to_strategy(user, strategy, vault, target_debt: int):
+        vault.update_max_debt_for_strategy(strategy.address, target_debt, sender=user)
+        vault.update_debt(strategy.address, target_debt, sender=user)
 
     return add_debt_to_strategy
 
