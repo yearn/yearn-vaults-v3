@@ -3,23 +3,23 @@ import pytest
 from utils.constants import ZERO_ADDRESS
 
 
-def test_deploy_fee_manager(project, gov):
-    fee_manager = gov.deploy(project.FeeManager)
+def test_deploy_accountant(project, gov, asset):
+    accountant = gov.deploy(project.Accountant, asset)
 
-    assert fee_manager.fee_manager() == gov
+    assert accountant.fee_manager() == gov
 
 
-def test_distribute(gov, bunny, vault, fee_manager):
+def test_distribute(gov, bunny, vault, accountant):
     with ape.reverts("not fee manager"):
-        fee_manager.distribute(vault.address, sender=bunny)
+        accountant.distribute(vault.address, sender=bunny)
 
     rewards = vault.balanceOf(gov)
     # give fee manager vault shares
-    vault.transfer(fee_manager.address, rewards, sender=gov)
-    assert vault.balanceOf(fee_manager) == rewards
+    vault.transfer(accountant.address, rewards, sender=gov)
+    assert vault.balanceOf(accountant) == rewards
 
-    tx = fee_manager.distribute(vault.address, sender=gov)
-    event = list(tx.decode_logs(fee_manager.DistributeRewards))
+    tx = accountant.distribute(vault.address, sender=gov)
+    event = list(tx.decode_logs(accountant.DistributeRewards))
 
     assert len(event) == 1
     assert event[0].rewards == rewards
@@ -29,92 +29,99 @@ def test_distribute(gov, bunny, vault, fee_manager):
 
 @pytest.mark.parametrize("performance_fee", [0, 2500, 5000])
 def test_set_performance_fee__with_valid_performance_fee(
-    gov, vault, fee_manager, performance_fee
+    gov, vault, accountant, performance_fee
 ):
-    tx = fee_manager.set_performance_fee(vault.address, performance_fee, sender=gov)
-    event = list(tx.decode_logs(fee_manager.UpdatePerformanceFee))
+    tx = accountant.set_performance_fee(vault.address, performance_fee, sender=gov)
+    event = list(tx.decode_logs(accountant.UpdatePerformanceFee))
 
     assert len(event) == 1
     assert event[0].performance_fee == performance_fee
 
-    assert fee_manager.fees(vault).performance_fee == performance_fee
+    assert accountant.fees(vault).performance_fee == performance_fee
 
 
 def test_set_performance_fee_with_invalid_performance_fee_reverts(
-    gov, bunny, vault, fee_manager
+    gov, bunny, vault, accountant
 ):
     valid_performance_fee = 5000
     invalid_performance_fee = 5001
 
     with ape.reverts("not fee manager"):
-        fee_manager.set_performance_fee(
+        accountant.set_performance_fee(
             vault.address, valid_performance_fee, sender=bunny
         )
 
     with ape.reverts("exceeds performance fee threshold"):
-        fee_manager.set_performance_fee(
+        accountant.set_performance_fee(
             vault.address, invalid_performance_fee, sender=gov
         )
 
 
 @pytest.mark.parametrize("management_fee", [0, 5000, 10000])
 def test_management_fee__with_valid_management_fee(
-    gov, vault, fee_manager, management_fee
+    gov, vault, accountant, management_fee
 ):
-    tx = fee_manager.set_management_fee(vault.address, management_fee, sender=gov)
-    event = list(tx.decode_logs(fee_manager.UpdateManagementFee))
+    tx = accountant.set_management_fee(vault.address, management_fee, sender=gov)
+    event = list(tx.decode_logs(accountant.UpdateManagementFee))
 
     assert len(event) == 1
     assert event[0].management_fee == management_fee
 
-    assert fee_manager.fees(vault).management_fee == management_fee
+    assert accountant.fees(vault).management_fee == management_fee
 
 
 def test_management_fee__with_invalid_management_fee_reverts(
-    gov, bunny, vault, fee_manager
+    gov, bunny, vault, accountant
 ):
     valid_management_fee = 10000
     invalid_management_fee = 10001
 
     with ape.reverts("not fee manager"):
-        fee_manager.set_management_fee(
-            vault.address, valid_management_fee, sender=bunny
-        )
+        accountant.set_management_fee(vault.address, valid_management_fee, sender=bunny)
 
     with ape.reverts("exceeds management fee threshold"):
-        fee_manager.set_management_fee(
-            vault.address, invalid_management_fee, sender=gov
-        )
+        accountant.set_management_fee(vault.address, invalid_management_fee, sender=gov)
 
 
-def test_commit_fee_manager__with_new_fee_manager(gov, bunny, fee_manager):
+def test_commit_fee_manager__with_new_fee_manager(gov, bunny, accountant):
     with ape.reverts("not fee manager"):
-        fee_manager.commit_fee_manager(bunny.address, sender=bunny)
+        accountant.commit_fee_manager(bunny.address, sender=bunny)
 
-    tx = fee_manager.commit_fee_manager(bunny.address, sender=gov)
-    event = list(tx.decode_logs(fee_manager.CommitFeeManager))
+    tx = accountant.commit_fee_manager(bunny.address, sender=gov)
+    event = list(tx.decode_logs(accountant.CommitFeeManager))
 
     assert len(event) == 1
     assert event[0].fee_manager == bunny.address
 
-    assert fee_manager.future_fee_manager() == bunny.address
+    assert accountant.future_fee_manager() == bunny.address
 
 
-def test_apply_fee_manager__with_new_fee_manager(gov, bunny, fee_manager):
-    fee_manager.commit_fee_manager(ZERO_ADDRESS, sender=gov)
+def test_apply_fee_manager__with_new_fee_manager(gov, bunny, accountant):
+    accountant.commit_fee_manager(ZERO_ADDRESS, sender=gov)
 
     with ape.reverts("not fee manager"):
-        fee_manager.apply_fee_manager(sender=bunny)
+        accountant.apply_fee_manager(sender=bunny)
 
     with ape.reverts("future fee manager != zero address"):
-        fee_manager.apply_fee_manager(sender=gov)
+        accountant.apply_fee_manager(sender=gov)
 
-    fee_manager.commit_fee_manager(bunny.address, sender=gov)
+    accountant.commit_fee_manager(bunny.address, sender=gov)
 
-    tx = fee_manager.apply_fee_manager(sender=gov)
-    event = list(tx.decode_logs(fee_manager.ApplyFeeManager))
+    tx = accountant.apply_fee_manager(sender=gov)
+    event = list(tx.decode_logs(accountant.ApplyFeeManager))
 
     assert len(event) == 1
     assert event[0].fee_manager == bunny.address
 
-    assert fee_manager.fee_manager() == bunny.address
+    assert accountant.fee_manager() == bunny.address
+
+
+@pytest.mark.parametrize("refund_ratio", [0, 5_000, 10_000])
+def test_set_refund_ratio(gov, vault, accountant, refund_ratio):
+    tx = accountant.set_refund_ratio(vault.address, refund_ratio, sender=gov)
+    event = list(tx.decode_logs(accountant.UpdateRefundRatio))
+
+    assert len(event) == 1
+    assert event[0].refund_ratio == refund_ratio
+
+    assert accountant.refund_ratios(vault) == refund_ratio

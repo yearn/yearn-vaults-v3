@@ -28,6 +28,9 @@ event UpdatePerformanceFee:
 event UpdateManagementFee:
     management_fee: uint256
 
+event UpdateRefundRatio:
+    refund_ratio: uint256
+
 event DistributeRewards:
     rewards: uint256
 
@@ -54,40 +57,54 @@ SECS_PER_YEAR: constant(uint256) = 31_556_952  # 365.2425 days
 fee_manager: public(address)
 future_fee_manager: public(address)
 fees: public(HashMap[address, Fee])
+refund_ratios: public(HashMap[address, uint256])
+asset: public(address)
 
 
 @external
-def __init__():
+def __init__(asset: address):
     self.fee_manager = msg.sender
+    self.asset = asset
 
 
-@view
 @external
-def assess_fees(strategy: address, gain: uint256) -> uint256:
-    """
-    @dev assumes gain > 0
-    """
+def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256):
+    """ """
+    total_refunds: uint256 = 0
+
+    # management_fee is charged in both profit and loss scenarios
     strategy_params: StrategyParams = IVault(msg.sender).strategies(strategy)
     fee: Fee = self.fees[strategy]
     duration: uint256 = block.timestamp - strategy_params.last_report
 
-    management_fee: uint256 = (
-        ((strategy_params.current_debt - IStrategy(strategy).delegatedAssets()))
+    #management_fee
+    total_fees: uint256 = (
+        (strategy_params.current_debt - IStrategy(strategy).delegatedAssets())
         * duration
         * fee.management_fee
         / MAX_BPS
         / SECS_PER_YEAR
     )
-    performance_fee: uint256 = (gain * fee.performance_fee) / MAX_BPS
-    total_fee: uint256 = management_fee + performance_fee
 
-    # ensure fee does not exceed more than 75% of gain
-    maximum_fee: uint256 = (gain * MAX_SHARE) / MAX_BPS
-    # test with min?
-    if total_fee > maximum_fee:
-        total_fee = maximum_fee
-
-    return total_fee
+    if gain > 0:
+        total_fees += (gain * fee.performance_fee) / MAX_BPS
+        # ensure fee does not exceed more than 75% of gain
+        maximum_fee: uint256 = (gain * MAX_SHARE) / MAX_BPS
+        # test with min?
+        if total_fees > maximum_fee:
+            return (maximum_fee, 0)
+    else:
+        # Now taking loss from its own funds. In the future versions could be from different mecanisms
+        asset_balance: uint256= ERC20(self.asset).balanceOf(self)
+        refund_ratio: uint256 = self.refund_ratios[strategy]
+        total_refunds = loss * refund_ratio / MAX_BPS
+        if total_refunds > asset_balance:
+            total_refunds = asset_balance
+        if total_refunds > 0:
+            # TODO: permissions implications. msg.sender should only be vault
+            ERC20(self.asset).approve(msg.sender, total_refunds)
+        
+    return (total_fees, total_refunds)
 
 
 @external
@@ -99,19 +116,26 @@ def distribute(vault: ERC20):
 
 
 @external
-def set_performance_fee(vault: address, performance_fee: uint256):
+def set_performance_fee(strategy: address, performance_fee: uint256):
     assert msg.sender == self.fee_manager, "not fee manager"
     assert performance_fee <= self._performance_fee_threshold(), "exceeds performance fee threshold"
-    self.fees[vault].performance_fee = performance_fee
+    self.fees[strategy].performance_fee = performance_fee
     log UpdatePerformanceFee(performance_fee)
 
 
 @external
-def set_management_fee(vault: address, management_fee: uint256):
+def set_management_fee(strategy: address, management_fee: uint256):
     assert msg.sender == self.fee_manager, "not fee manager"
     assert management_fee <= self._management_fee_threshold(), "exceeds management fee threshold"
-    self.fees[vault].management_fee = management_fee
+    self.fees[strategy].management_fee = management_fee
     log UpdateManagementFee(management_fee)
+
+
+@external
+def set_refund_ratio(strategy: address, refund_ratio: uint256):
+    assert msg.sender == self.fee_manager, "not fee manager"
+    self.refund_ratios[strategy] = refund_ratio
+    log UpdateRefundRatio(refund_ratio)
 
 
 @external

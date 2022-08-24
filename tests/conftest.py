@@ -104,10 +104,10 @@ def create_token(project, gov):
 
 
 @pytest.fixture(scope="session")
-def create_vault(project, gov, fee_manager, flexible_fee_manager):
+def create_vault(project, gov, accountant, flexible_accountant):
     def create_vault(
         asset,
-        fee_manager=fee_manager,
+        accountant=accountant,
         governance=gov,
         deposit_limit=MAX_INT,
         max_profit_locking_time=WEEK,
@@ -118,7 +118,7 @@ def create_vault(project, gov, fee_manager, flexible_fee_manager):
         # set vault deposit
         vault.set_deposit_limit(deposit_limit, sender=gov)
         # set up fee manager
-        vault.set_fee_manager(fee_manager.address, sender=gov)
+        vault.set_accountant(accountant.address, sender=gov)
 
         vault.set_role(
             gov.address,
@@ -190,15 +190,15 @@ def lossy_strategy(gov, vault, create_lossy_strategy):
 
 
 @pytest.fixture(scope="session")
-def fee_manager(project, gov):
-    fee_manager = gov.deploy(project.FeeManager)
-    yield fee_manager
+def accountant(project, gov, asset):
+    accountant = gov.deploy(project.Accountant, asset)
+    yield accountant
 
 
 @pytest.fixture(scope="session")
-def flexible_fee_manager(project, gov):
-    flexible_fee_manager = gov.deploy(project.FlexibleFeeManager)
-    yield flexible_fee_manager
+def flexible_accountant(project, gov, asset):
+    flexible_accountant = gov.deploy(project.FlexibleAccountant, asset)
+    yield flexible_accountant
 
 
 @pytest.fixture(scope="session")
@@ -346,9 +346,10 @@ def add_debt_to_strategy():
 @pytest.fixture(scope="session")
 def set_fees_for_strategy():
     def set_fees_for_strategy(
-        gov, strategy, fee_manager, management_fee, performance_fee
+        gov, strategy, accountant, management_fee, performance_fee, refund_ratio=0
     ):
-        fee_manager.set_management_fee(strategy.address, management_fee, sender=gov)
-        fee_manager.set_performance_fee(strategy.address, performance_fee, sender=gov)
+        accountant.set_management_fee(strategy.address, management_fee, sender=gov)
+        accountant.set_performance_fee(strategy.address, performance_fee, sender=gov)
+        accountant.set_refund_ratio(strategy.address, refund_ratio, sender=gov)
 
     return set_fees_for_strategy

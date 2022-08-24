@@ -1,8 +1,7 @@
 from hashlib import new
 import ape
 import pytest
-from ape import chain
-from utils.constants import YEAR, ROLES, MAX_BPS, WEEK
+from utils.constants import YEAR, DAY, ROLES, MAX_BPS, WEEK, MAX_INT
 
 
 @pytest.fixture(autouse=True)
@@ -88,7 +87,7 @@ def test_process_report__with_gain_and_zero_management_fees(
     asset,
     vault,
     strategy,
-    fee_manager,
+    accountant,
     airdrop_asset,
     set_fees_for_strategy,
     add_debt_to_strategy,
@@ -104,8 +103,8 @@ def test_process_report__with_gain_and_zero_management_fees(
     add_debt_to_strategy(gov, strategy, vault, new_debt)
     # airdrop gain to strategy
     airdrop_asset(gov, asset, strategy, gain)
-    # set up fee manager
-    set_fees_for_strategy(gov, strategy, fee_manager, management_fee, performance_fee)
+    # set up accountant
+    set_fees_for_strategy(gov, strategy, accountant, management_fee, performance_fee)
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
@@ -130,7 +129,7 @@ def test_process_report__with_gain_and_zero_management_fees(
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
-    assert vault.balanceOf(fee_manager) == total_fee
+    assert vault.balanceOf(accountant) == total_fee
 
 
 def test_process_report__with_gain_and_zero_performance_fees(
@@ -139,7 +138,7 @@ def test_process_report__with_gain_and_zero_performance_fees(
     asset,
     vault,
     strategy,
-    fee_manager,
+    accountant,
     airdrop_asset,
     set_fees_for_strategy,
     add_debt_to_strategy,
@@ -155,8 +154,8 @@ def test_process_report__with_gain_and_zero_performance_fees(
     add_debt_to_strategy(gov, strategy, vault, new_debt)
     # airdrop gain to strategy
     airdrop_asset(gov, asset, strategy, gain)
-    # set up fee manager
-    set_fees_for_strategy(gov, strategy, fee_manager, management_fee, performance_fee)
+    # set up accountant
+    set_fees_for_strategy(gov, strategy, accountant, management_fee, performance_fee)
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
@@ -182,7 +181,7 @@ def test_process_report__with_gain_and_zero_performance_fees(
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
-    assert vault.balanceOf(fee_manager) == pytest.approx(total_fee, rel=1e-4)
+    assert vault.balanceOf(accountant) == pytest.approx(total_fee, rel=1e-4)
 
 
 def test_process_report__with_gain_and_both_fees(
@@ -191,7 +190,7 @@ def test_process_report__with_gain_and_both_fees(
     asset,
     vault,
     strategy,
-    fee_manager,
+    accountant,
     airdrop_asset,
     set_fees_for_strategy,
     add_debt_to_strategy,
@@ -207,8 +206,8 @@ def test_process_report__with_gain_and_both_fees(
     add_debt_to_strategy(gov, strategy, vault, new_debt)
     # airdrop gain to strategy
     airdrop_asset(gov, asset, strategy, gain)
-    # set up fee manager
-    set_fees_for_strategy(gov, strategy, fee_manager, management_fee, performance_fee)
+    # set up accountant
+    set_fees_for_strategy(gov, strategy, accountant, management_fee, performance_fee)
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
@@ -233,7 +232,7 @@ def test_process_report__with_gain_and_both_fees(
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
-    assert vault.balanceOf(fee_manager) == pytest.approx(total_fee, rel=1e-4)
+    assert vault.balanceOf(accountant) == pytest.approx(total_fee, rel=1e-4)
 
 
 def test_process_report__with_fees_exceeding_fee_cap(
@@ -242,7 +241,7 @@ def test_process_report__with_fees_exceeding_fee_cap(
     asset,
     vault,
     strategy,
-    fee_manager,
+    accountant,
     airdrop_asset,
     set_fees_for_strategy,
     add_debt_to_strategy,
@@ -259,8 +258,8 @@ def test_process_report__with_fees_exceeding_fee_cap(
     add_debt_to_strategy(gov, strategy, vault, new_debt)
     # airdrop gain to strategy
     airdrop_asset(gov, asset, strategy, gain)
-    # set up fee manager
-    set_fees_for_strategy(gov, strategy, fee_manager, management_fee, performance_fee)
+    # set up accountant
+    set_fees_for_strategy(gov, strategy, accountant, management_fee, performance_fee)
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
@@ -286,7 +285,7 @@ def test_process_report__with_fees_exceeding_fee_cap(
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
-    assert vault.balanceOf(fee_manager) == max_fee
+    assert vault.balanceOf(accountant) == max_fee
 
 
 def test_process_report__with_loss(
@@ -320,13 +319,194 @@ def test_process_report__with_loss(
     assert vault.strategies(lossy_strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
+    assert vault.price_per_share() / 10 ** vault.decimals() == 0.5
 
 
-def test_set_fee_manager__with_fee_manager(gov, vault, fee_manager):
-    tx = vault.set_fee_manager(fee_manager.address, sender=gov)
-    event = list(tx.decode_logs(vault.UpdateFeeManager))
+def test_process_report__with_loss_and_management_fees(
+    chain,
+    gov,
+    asset,
+    vault,
+    lossy_strategy,
+    add_debt_to_strategy,
+    set_fees_for_strategy,
+    accountant,
+):
+    vault_balance = asset.balanceOf(vault)
+    new_debt = vault_balance
+    loss = new_debt // 2
+    management_fee = 1000
+    performance_fee = 0
+    refund_ratio = 0
+
+    # set up accountant
+    set_fees_for_strategy(
+        gov, lossy_strategy, accountant, management_fee, performance_fee, refund_ratio
+    )
+
+    # add debt to strategy and incur loss
+    add_debt_to_strategy(gov, lossy_strategy, vault, new_debt)
+    lossy_strategy.setLoss(gov.address, loss, sender=gov)
+
+    strategy_params = vault.strategies(lossy_strategy.address)
+    initial_debt = strategy_params.current_debt
+
+    # Management fees relay on duration of invest, so we need to advance in time to see results
+    initial_timestamp = chain.pending_timestamp
+    initial_pps = vault.price_per_share()
+    chain.mine(timestamp=initial_timestamp + YEAR)
+    initial_total_assets = vault.totalAssets()
+
+    expected_management_fees = vault_balance // 10
+    expected_management_shares = vault.convertToShares(expected_management_fees)
+    snapshot = chain.pending_timestamp
+
+    tx = vault.process_report(lossy_strategy.address, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyReported))
 
     assert len(event) == 1
-    assert event[0].fee_manager == fee_manager.address
+    assert event[0].strategy == lossy_strategy.address
+    assert event[0].gain == 0
+    assert event[0].loss == loss
+    assert event[0].current_debt == initial_debt - loss
+    assert event[0].total_fees == pytest.approx(expected_management_fees, rel=1e-5)
 
-    assert vault.fee_manager() == fee_manager.address
+    strategy_params = vault.strategies(lossy_strategy.address)
+
+    assert strategy_params.current_debt == initial_debt - loss
+    assert vault.strategies(lossy_strategy.address).last_report == pytest.approx(
+        snapshot, abs=1
+    )
+    assert vault.balanceOf(accountant) == pytest.approx(
+        expected_management_shares, rel=1e-5
+    )
+
+    # Without fees, pps would be 0.5, as loss is half of debt, but with fees pps should be even lower
+    assert vault.price_per_share() / 10 ** vault.decimals() < initial_pps / 2
+    assert vault.totalAssets() == pytest.approx(initial_total_assets - loss, 1e-5)
+
+
+def test_process_report__with_loss_and_refunds(
+    chain,
+    gov,
+    asset,
+    vault,
+    lossy_strategy,
+    add_debt_to_strategy,
+    set_fees_for_strategy,
+    accountant,
+):
+    vault_balance = asset.balanceOf(vault)
+    new_debt = vault_balance
+    loss = new_debt // 2
+    management_fee = 0
+    performance_fee = 0
+    refund_ratio = 10_000
+
+    # set up accountant
+    asset.mint(accountant, loss, sender=gov)
+    set_fees_for_strategy(
+        gov, lossy_strategy, accountant, management_fee, performance_fee, refund_ratio
+    )
+
+    # add debt to strategy and incur loss
+    add_debt_to_strategy(gov, lossy_strategy, vault, new_debt)
+    lossy_strategy.setLoss(gov.address, loss, sender=gov)
+
+    strategy_params = vault.strategies(lossy_strategy.address)
+    initial_debt = strategy_params.current_debt
+
+    pps_before_loss = vault.price_per_share()
+    assets_before_loss = vault.totalAssets()
+
+    tx = vault.process_report(lossy_strategy.address, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyReported))
+
+    assert len(event) == 1
+    assert event[0].strategy == lossy_strategy.address
+    assert event[0].gain == 0
+    assert event[0].loss == loss
+    assert event[0].current_debt == initial_debt - loss
+    assert event[0].total_fees == 0
+    assert event[0].total_refunds == loss
+
+    # Due to refunds, pps should be the same as before the loss
+    assert vault.price_per_share() == pps_before_loss
+    assert vault.totalAssets() == assets_before_loss
+
+
+def test_process_report__with_loss_management_fees_and_refunds(
+    chain,
+    gov,
+    asset,
+    vault,
+    create_lossy_strategy,
+    add_debt_to_strategy,
+    set_fees_for_strategy,
+    accountant,
+):
+    vault_balance = asset.balanceOf(vault)
+    new_debt = vault_balance
+    loss = new_debt // 2
+    management_fee = 10_000
+    performance_fee = 0
+    refund_ratio = 10_000
+
+    lossy_strategy = create_lossy_strategy(vault)
+    vault.add_strategy(lossy_strategy.address, sender=gov)
+    initial_timestamp = chain.pending_timestamp
+    lossy_strategy.setMaxDebt(MAX_INT, sender=gov)
+
+    # set up accountant
+    asset.mint(accountant, loss, sender=gov)
+    set_fees_for_strategy(
+        gov, lossy_strategy, accountant, management_fee, performance_fee, refund_ratio
+    )
+
+    # add debt to strategy and incur loss
+    add_debt_to_strategy(gov, lossy_strategy, vault, new_debt)
+
+    lossy_strategy.setLoss(gov.address, loss, sender=gov)
+
+    strategy_params = vault.strategies(lossy_strategy.address)
+    initial_debt = strategy_params.current_debt
+    pps_before_loss = vault.price_per_share()
+    assets_before_loss = vault.totalAssets()
+
+    # let one day pass
+    chain.pending_timestamp = initial_timestamp + DAY
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    expected_management_fees = (
+        new_debt
+        * (chain.pending_timestamp - vault.strategies(lossy_strategy).last_report)
+        * management_fee
+        / MAX_BPS
+        / YEAR
+    )
+
+    tx = vault.process_report(lossy_strategy.address, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyReported))
+
+    assert len(event) == 1
+    assert event[0].strategy == lossy_strategy.address
+    assert event[0].gain == 0
+    assert event[0].loss == loss
+    assert event[0].current_debt == initial_debt - loss
+    assert event[0].total_fees == pytest.approx(expected_management_fees, 1e-4)
+    assert event[0].total_refunds == loss
+
+    # Due to fees, pps should be slightly below 1
+    assert vault.price_per_share() < pps_before_loss
+    # Shares were minted at 1:1
+    assert vault.balanceOf(accountant) == pytest.approx(expected_management_fees, 1e-4)
+
+
+def test_set_accountant__with_accountant(gov, vault, accountant):
+    tx = vault.set_accountant(accountant.address, sender=gov)
+    event = list(tx.decode_logs(vault.UpdateAccountant))
+
+    assert len(event) == 1
+    assert event[0].accountant == accountant.address
+
+    assert vault.accountant() == accountant.address

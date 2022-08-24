@@ -20,7 +20,7 @@ def test_profitable_strategy_flow(
     add_strategy_to_vault,
     airdrop_asset,
     set_fees_for_strategy,
-    fee_manager,
+    accountant,
 ):
     performance_fee = 1_000  # 10%
 
@@ -37,7 +37,7 @@ def test_profitable_strategy_flow(
     vault = create_vault(asset)
     # We use lossy strategy as it allows us to create losses
     strategy = create_lossy_strategy(vault)
-    set_fees_for_strategy(gov, strategy, fee_manager, 0, performance_fee)
+    set_fees_for_strategy(gov, strategy, accountant, 0, performance_fee)
     add_strategy_to_vault(gov, strategy, vault)
 
     user_1_initial_balance = asset.balanceOf(user_1)
@@ -197,7 +197,7 @@ def test_profitable_strategy_flow(
     assert asset.balanceOf(user_2) > user_2_initial_balance
 
     assert vault.totalAssets() == pytest.approx(
-        vault.convertToAssets(vault.balanceOf(fee_manager)), 1e-5
+        vault.convertToAssets(vault.balanceOf(accountant)), 1e-5
     )
     assert vault.totalAssets() == pytest.approx(strategy.totalAssets(), 1e-5)
 
