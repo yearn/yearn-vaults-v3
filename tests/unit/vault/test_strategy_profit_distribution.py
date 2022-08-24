@@ -104,7 +104,7 @@ def test_profit_distribution_rate(
     chain.pending_timestamp = initial_timestamp + days_to_secs(10)
     chain.mine(timestamp=chain.pending_timestamp)
 
-    assert vault.profit_end_date() < initial_timestamp + days_to_secs(10)
+    assert vault.profit_end_date() < days_to_secs(10) + initial_timestamp
     assert vault.profit_distribution_rate() == 0
 
 
@@ -238,7 +238,7 @@ def test_profit_distribution__two_gain(
     assert vault.profit_distribution_rate() == int(first_profit / WEEK * MAX_BPS)
     dist_rate_before_second_profit = vault.profit_distribution_rate()
     assert vault.profit_end_date() == pytest.approx(
-        initial_timestamp + days_to_secs(8), abs=5
+        days_to_secs(8) + initial_timestamp, abs=5
     )
     profit_end_date_before_second_profit = vault.profit_end_date()
 
