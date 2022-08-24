@@ -32,9 +32,7 @@ def test_profitable_strategy_flow(
 
     first_loss = deposit_amount // 4
 
-    # we reset timestamp to facilitate reporting
-    chain.pending_timestamp = 1
-    chain.mine(timestamp=chain.pending_timestamp)
+    initial_timestamp = chain.pending_timestamp
 
     vault = create_vault(asset)
     # We use lossy strategy as it allows us to create losses
@@ -74,7 +72,7 @@ def test_profitable_strategy_flow(
     pps = vault.price_per_share()
 
     # let one day pass
-    chain.pending_timestamp = days_to_secs(1)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(1)
     chain.mine(timestamp=chain.pending_timestamp)
 
     # total_assets and pps should increase due to unlocking profit. Distribution rate should not change
@@ -152,7 +150,7 @@ def test_profitable_strategy_flow(
     assert vault.strategies(strategy).current_debt != new_debt
 
     # Lets let time pass to empty profit buffer
-    chain.pending_timestamp = days_to_secs(10)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(10)
     chain.mine(timestamp=chain.pending_timestamp)
 
     with ape.reverts("nothing to report"):

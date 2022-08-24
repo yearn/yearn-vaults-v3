@@ -22,9 +22,7 @@ def test_total_debt(
     amount = 10**9
     first_profit = 10**9
 
-    # We reset time to 1 to facilitate reporting
-    chain.pending_timestamp = 1
-    chain.mine(timestamp=chain.pending_timestamp)
+    initial_timestamp = chain.pending_timestamp
 
     vault = create_vault(asset)
     strategy = create_strategy(vault)
@@ -46,7 +44,7 @@ def test_total_debt(
     assert vault.total_debt() == amount
 
     # We increase time and check estimation
-    chain.pending_timestamp = days_to_secs(4)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(4)
     chain.mine(timestamp=chain.pending_timestamp)
 
     # There are profits, and values are not updated. We need to estimate
@@ -57,7 +55,7 @@ def test_total_debt(
     )
 
     # We increase time after profit has been released and check estimation
-    chain.pending_timestamp = days_to_secs(10)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(10)
     chain.mine(timestamp=chain.pending_timestamp)
     assert vault.totalAssets() == vault.total_debt()
     assert vault.total_debt() == pytest.approx(amount + first_profit, rel=1e-5)
@@ -76,9 +74,7 @@ def test_profit_distribution_rate(
     amount = 10**9
     first_profit = 10**9
 
-    # We reset time to 1 to facilitate reporting
-    chain.pending_timestamp = 1
-    chain.mine(timestamp=chain.pending_timestamp)
+    initial_timestamp = chain.pending_timestamp
 
     vault = create_vault(asset)
     strategy = create_strategy(vault)
@@ -99,16 +95,16 @@ def test_profit_distribution_rate(
     assert vault.profit_distribution_rate() == int(first_profit / WEEK * MAX_BPS)
 
     # We increase time and check estimation
-    chain.pending_timestamp = days_to_secs(4)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(4)
     chain.mine(timestamp=chain.pending_timestamp)
 
     assert vault.profit_distribution_rate() == int(first_profit / WEEK * MAX_BPS)
 
     # We increase time after profit has been released and check estimation
-    chain.pending_timestamp = days_to_secs(10)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(10)
     chain.mine(timestamp=chain.pending_timestamp)
 
-    assert vault.profit_end_date() < days_to_secs(10)
+    assert vault.profit_end_date() < initial_timestamp + days_to_secs(10)
     assert vault.profit_distribution_rate() == 0
 
 
@@ -131,9 +127,7 @@ def test_profit_distribution__one_gain(
     amount = 10**9
     first_profit = 10**9
 
-    # We reset time to 1 to facilitate reporting
-    chain.pending_timestamp = 1
-    chain.mine(timestamp=chain.pending_timestamp)
+    initial_timestamp = chain.pending_timestamp
 
     vault = create_vault(asset)
     strategy = create_strategy(vault)
@@ -157,7 +151,7 @@ def test_profit_distribution__one_gain(
     assert vault.profit_distribution_rate() == 0
 
     # We call process_report at t_1 (days)
-    chain.pending_timestamp = days_to_secs(1)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(1)
     chain.mine(timestamp=chain.pending_timestamp)
 
     tx = vault.process_report(strategy, sender=gov)
@@ -175,7 +169,7 @@ def test_profit_distribution__one_gain(
     assert vault.profit_last_update() == pytest.approx(chain.pending_timestamp, abs=5)
 
     # We move in time and we keep checking values
-    chain.pending_timestamp = days_to_secs(3)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(3)
     chain.mine(timestamp=chain.pending_timestamp)
 
     assert vault.totalAssets() == pytest.approx(
@@ -183,7 +177,7 @@ def test_profit_distribution__one_gain(
         1e-5,
     )
 
-    chain.pending_timestamp = days_to_secs(8) + 15
+    chain.pending_timestamp = initial_timestamp + days_to_secs(8) + 15
     chain.mine(timestamp=chain.pending_timestamp)
 
     assert vault.totalAssets() == pytest.approx(amount + first_profit, 1e-5)
@@ -211,9 +205,7 @@ def test_profit_distribution__two_gain(
     first_profit = 10**9
     second_profit = 10**9
 
-    # We reset time to 1 to facilitate reporting
-    chain.pending_timestamp = 1
-    chain.mine(timestamp=chain.pending_timestamp)
+    initial_timestamp = chain.pending_timestamp
 
     vault = create_vault(asset)
     strategy = create_strategy(vault)
@@ -228,7 +220,7 @@ def test_profit_distribution__two_gain(
 
     assert vault.profit_distribution_rate() == 0
 
-    chain.pending_timestamp = days_to_secs(1)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(1)
     chain.mine(timestamp=chain.pending_timestamp)
 
     # We create a virtual profit
@@ -245,10 +237,12 @@ def test_profit_distribution__two_gain(
 
     assert vault.profit_distribution_rate() == int(first_profit / WEEK * MAX_BPS)
     dist_rate_before_second_profit = vault.profit_distribution_rate()
-    assert vault.profit_end_date() == pytest.approx(days_to_secs(8), abs=5)
+    assert vault.profit_end_date() == pytest.approx(
+        initial_timestamp + days_to_secs(8), abs=5
+    )
     profit_end_date_before_second_profit = vault.profit_end_date()
 
-    chain.pending_timestamp = days_to_secs(3)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(3)
     chain.mine(timestamp=chain.pending_timestamp)
 
     # We create second virtual profit
@@ -272,9 +266,9 @@ def test_profit_distribution__two_gain(
 
     # Same as before applies on profit_end_date
     assert vault.profit_end_date() > profit_end_date_before_second_profit
-    assert vault.profit_end_date() < days_to_secs(3) + WEEK
+    assert vault.profit_end_date() < initial_timestamp + days_to_secs(3) + WEEK
 
-    chain.pending_timestamp = days_to_secs(10) + 15
+    chain.pending_timestamp = initial_timestamp + days_to_secs(10) + 15
     chain.mine(timestamp=chain.pending_timestamp)
 
     assert vault.totalAssets() == pytest.approx(
@@ -304,9 +298,7 @@ def test_profit_distribution__one_gain_one_loss(
     profit = 10**9
     loss = int(10**9 / 2)
 
-    # We reset time to 1 to facilitate reporting
-    chain.pending_timestamp = 1
-    chain.mine(timestamp=chain.pending_timestamp)
+    initial_timestamp = chain.pending_timestamp
 
     vault = create_vault(asset)
     strategy = create_lossy_strategy(vault)
@@ -319,8 +311,8 @@ def test_profit_distribution__one_gain_one_loss(
     # We create a virtual profit
     asset.transfer(strategy, profit, sender=fish)
 
-    chain.pending_timestamp = days_to_secs(1)
-    chain.mine(timestamp=days_to_secs(1))
+    chain.pending_timestamp = initial_timestamp + days_to_secs(1)
+    chain.mine(timestamp=chain.pending_timestamp)
 
     tx = vault.process_report(strategy, sender=gov)
 
@@ -330,7 +322,7 @@ def test_profit_distribution__one_gain_one_loss(
 
     assert strategy.totalAssets() == amount + profit
 
-    chain.pending_timestamp = days_to_secs(4)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(4)
     chain.mine(timestamp=chain.pending_timestamp)
 
     strategy.setLoss(fish, loss, sender=gov)
@@ -347,7 +339,7 @@ def test_profit_distribution__one_gain_one_loss(
 
     assert vault.profit_distribution_rate() < dist_rate_profit_1_before_loss
 
-    chain.pending_timestamp = days_to_secs(10) + 15
+    chain.pending_timestamp = initial_timestamp + days_to_secs(10) + 15
     chain.mine(timestamp=chain.pending_timestamp)
 
     assert vault.totalAssets() == pytest.approx(amount + profit - loss, 1e-5)
@@ -376,9 +368,7 @@ def test_profit_distribution__one_gain_one_big_loss(
     first_profit = int(10**9 / 2)
     big_loss = 10**9
 
-    # We reset time to 1 to facilitate reporting
-    chain.pending_timestamp = 1
-    chain.mine(timestamp=chain.pending_timestamp)
+    initial_timestamp = chain.pending_timestamp
 
     vault = create_vault(asset)
     strategy = create_lossy_strategy(vault)
@@ -391,8 +381,8 @@ def test_profit_distribution__one_gain_one_big_loss(
     # We create a virtual profit
     asset.transfer(strategy, first_profit, sender=fish)
 
-    chain.pending_timestamp = days_to_secs(1)
-    chain.mine(timestamp=days_to_secs(1))
+    chain.pending_timestamp = initial_timestamp + days_to_secs(1)
+    chain.mine(timestamp=chain.pending_timestamp)
 
     tx = vault.process_report(strategy, sender=gov)
 
@@ -400,8 +390,8 @@ def test_profit_distribution__one_gain_one_big_loss(
     assert len(event) == 1
     assert event[0].gain == first_profit
 
-    chain.pending_timestamp = days_to_secs(2)
-    chain.mine(timestamp=days_to_secs(2))
+    chain.pending_timestamp = initial_timestamp + days_to_secs(2)
+    chain.mine(timestamp=chain.pending_timestamp)
 
     strategy.setLoss(fish, big_loss, sender=gov)
     tx = vault.process_report(strategy, sender=gov)
@@ -435,9 +425,7 @@ def test_profit_distribution__one_gain_with_fees(
     amount = 10**9
     profit = 10**9
 
-    # We reset time to 1 to facilitate reporting
-    chain.pending_timestamp = 1
-    chain.mine(timestamp=chain.pending_timestamp)
+    initial_timestamp = chain.pending_timestamp
 
     vault = create_vault(asset)
     strategy = create_strategy(vault)
@@ -467,7 +455,7 @@ def test_profit_distribution__one_gain_with_fees(
     assert vault.profit_distribution_rate() == 0
 
     # We call process_report at t_1
-    chain.pending_timestamp = days_to_secs(1)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(1)
     chain.mine(timestamp=chain.pending_timestamp)
 
     tx = vault.process_report(strategy, sender=gov)
@@ -511,9 +499,7 @@ def test_profit_distribution__one_gain_with_100_percent_fees(
     amount = 10**9
     profit = 10**9
 
-    # We reset time to 1 to facilitate reporting
-    chain.pending_timestamp = 1
-    chain.mine(timestamp=chain.pending_timestamp)
+    initial_timestamp = chain.pending_timestamp
 
     vault = create_vault(asset, fee_manager=flexible_fee_manager)
     strategy = create_strategy(vault)
@@ -545,7 +531,7 @@ def test_profit_distribution__one_gain_with_100_percent_fees(
     assert vault.profit_distribution_rate() == 0
 
     # We call process_report at t_1
-    chain.pending_timestamp = days_to_secs(1)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(1)
     chain.mine(timestamp=chain.pending_timestamp)
 
     tx = vault.process_report(strategy, sender=gov)
@@ -583,9 +569,7 @@ def test_profit_distribution__one_gain_with_200_percent_fees(
     amount = 10**9
     profit = 10**9
 
-    # We reset time to 1 to facilitate reporting
-    chain.pending_timestamp = 1
-    chain.mine(timestamp=chain.pending_timestamp)
+    initial_timestamp = chain.pending_timestamp
 
     vault = create_vault(asset, fee_manager=flexible_fee_manager)
     strategy = create_strategy(vault)
@@ -617,7 +601,7 @@ def test_profit_distribution__one_gain_with_200_percent_fees(
     assert vault.profit_distribution_rate() == 0
 
     # We call process_report at t_1
-    chain.pending_timestamp = days_to_secs(1)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(1)
     chain.mine(timestamp=chain.pending_timestamp)
 
     tx = vault.process_report(strategy, sender=gov)
@@ -659,9 +643,7 @@ def test_profit_distribution__one_gain_with_200_percent_fees_and_enough_pending_
     first_profit = int(5 * 10**9)
     second_profit = int(10**9)
 
-    # We reset time to 1 to facilitate reporting
-    chain.pending_timestamp = 1
-    chain.mine(timestamp=chain.pending_timestamp)
+    initial_timestamp = chain.pending_timestamp
 
     vault = create_vault(asset, fee_manager=flexible_fee_manager)
     strategy = create_strategy(vault)
@@ -686,7 +668,7 @@ def test_profit_distribution__one_gain_with_200_percent_fees_and_enough_pending_
     assert vault.profit_distribution_rate() == 0
 
     # We call process_report at t_1
-    chain.pending_timestamp = days_to_secs(1)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(1)
     chain.mine(timestamp=chain.pending_timestamp)
 
     tx = vault.process_report(strategy, sender=gov)
@@ -702,7 +684,7 @@ def test_profit_distribution__one_gain_with_200_percent_fees_and_enough_pending_
         gov, strategy, flexible_fee_manager, management_fee, performance_fee
     )
 
-    chain.pending_timestamp = days_to_secs(3)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(3)
     chain.mine(timestamp=chain.pending_timestamp)
 
     dist_rate_before_fees = vault.profit_distribution_rate()
@@ -747,9 +729,7 @@ def test_profit_distribution__one_gain_one_deposit_one_withdraw(
     deposit = 10**9
     withdraw = deposit
 
-    # We reset time to 1 to facilitate reporting
-    chain.pending_timestamp = 1
-    chain.mine(timestamp=chain.pending_timestamp)
+    initial_timestamp = chain.pending_timestamp
 
     vault = create_vault(asset)
     strategy = create_strategy(vault)
@@ -771,13 +751,13 @@ def test_profit_distribution__one_gain_one_deposit_one_withdraw(
     assert vault.profit_distribution_rate() == 0
 
     # We call process_report at t_1
-    chain.pending_timestamp = days_to_secs(1)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(1)
     chain.mine(timestamp=chain.pending_timestamp)
 
     vault.process_report(strategy, sender=gov)
 
     # We move in time and we keep checking values
-    chain.pending_timestamp = days_to_secs(2)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(2)
     chain.mine(timestamp=chain.pending_timestamp)
 
     # pps should be higher than 1 (already some profits have been unlocked), but lower
@@ -797,7 +777,7 @@ def test_profit_distribution__one_gain_one_deposit_one_withdraw(
     assert balance_before_deposit > (vault.balanceOf(fish) - balance_before_deposit)
 
     # We move in time and we keep checking values
-    chain.pending_timestamp = days_to_secs(3)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(3)
     chain.mine(timestamp=chain.pending_timestamp)
 
     balance_before_withdraw = vault.balanceOf(fish)
@@ -823,9 +803,7 @@ def test_unlocking_time_to_zero_days(
     amount = 10**9
     profit = 10**9
 
-    # We reset time to 1 to facilitate reporting
-    chain.pending_timestamp = 1
-    chain.mine(timestamp=chain.pending_timestamp)
+    initial_timestamp = chain.pending_timestamp
 
     vault = create_vault(asset, max_profit_locking_time=0)
     strategy = create_lossy_strategy(vault)
@@ -838,7 +816,7 @@ def test_unlocking_time_to_zero_days(
     asset.transfer(strategy, profit, sender=fish)
     vault.process_report(strategy, sender=gov)
 
-    chain.pending_timestamp = days_to_secs(3)
+    chain.pending_timestamp = initial_timestamp + days_to_secs(3)
     chain.mine(timestamp=chain.pending_timestamp)
 
     assert vault.profit_distribution_rate() == 0
