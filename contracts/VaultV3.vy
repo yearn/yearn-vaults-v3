@@ -549,7 +549,7 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
 
     new_debt: uint256 = target_debt
     # Revert if target_debt cannot be achieved due to configured max_debt for given strategy
-    assert new_debt <= self.strategies[strategy].max_debt, "new debt higher than max debt"
+    assert new_debt <= self.strategies[strategy].max_debt, "target debt higher than max debt"
 
     # TODO: evaluate consequences of a strategy returning all the funds (including last reported profit) when the profit is not unlocked yet
     current_debt: uint256 = self.strategies[strategy].current_debt

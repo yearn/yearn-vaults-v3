@@ -36,7 +36,7 @@ def test_update_debt__with_strategy_max_debt_less_than_new_debt__reverts(
 
     vault.update_max_debt_for_strategy(strategy.address, new_debt, sender=gov)
 
-    with ape.reverts("new debt higher than max debt"):
+    with ape.reverts("target debt higher than max debt"):
         vault.update_debt(strategy.address, new_debt + 1, sender=gov)
 
 
