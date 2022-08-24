@@ -54,6 +54,6 @@ def test_strategy_return_funds(
     assert asset.balanceOf(strategy) == vault_balance
     assert asset.balanceOf(vault) == 0
     vault.shutdown_vault(sender=gov)
-    vault.update_debt(strategy.address, sender=gov)
+    vault.update_debt(strategy.address, 0, sender=gov)
     assert asset.balanceOf(strategy) == 0
     assert asset.balanceOf(vault) == vault_balance
