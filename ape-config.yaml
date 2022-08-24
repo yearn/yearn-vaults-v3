@@ -4,16 +4,17 @@ plugins:
   - name: solidity
   - name: vyper
   - name: hardhat
+    version: 0.4.2
 
 default_ecosystem: ethereum
 dependencies:
   - name: openzeppelin
     github: OpenZeppelin/openzeppelin-contracts
-    version: 4.6.0
+    version: 4.7.3
 
 solidity:
   import_remapping:
-    - "@openzeppelin/contracts=openzeppelin/v4.6.0"
+    - "@openzeppelin/contracts=openzeppelin/v4.7.3"
 
 ethereum:
   local:

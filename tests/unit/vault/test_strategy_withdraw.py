@@ -96,12 +96,13 @@ def test_withdraw__with_liquid_strategy_only__withdraws(
     )
     event = list(tx.decode_logs(vault.Withdraw))
 
-    assert len(event) == 1
-    assert event[0].sender == fish
-    assert event[0].receiver == fish
-    assert event[0].owner == fish
-    assert event[0].shares == shares
-    assert event[0].assets == amount
+    assert len(event) >= 1
+    n = len(event) - 1
+    assert event[n].sender == fish
+    assert event[n].receiver == fish
+    assert event[n].owner == fish
+    assert event[n].shares == shares
+    assert event[n].assets == amount
 
     checks.check_vault_empty(vault)
     assert asset.balanceOf(vault) == 0
@@ -142,12 +143,13 @@ def test_withdraw__with_multiple_liquid_strategies__withdraws(
     )
     event = list(tx.decode_logs(vault.Withdraw))
 
-    assert len(event) == 1
-    assert event[0].sender == fish
-    assert event[0].receiver == fish
-    assert event[0].owner == fish
-    assert event[0].shares == shares
-    assert event[0].assets == amount
+    assert len(event) >= 1
+    n = len(event) - 1
+    assert event[n].sender == fish
+    assert event[n].receiver == fish
+    assert event[n].owner == fish
+    assert event[n].shares == shares
+    assert event[n].assets == amount
 
     checks.check_vault_empty(vault)
     assert asset.balanceOf(vault) == 0
@@ -195,12 +197,13 @@ def test_withdraw__with_locked_and_liquid_strategy__withdraws(
     )
     event = list(tx.decode_logs(vault.Withdraw))
 
-    assert len(event) == 1
-    assert event[0].sender == fish
-    assert event[0].receiver == fish
-    assert event[0].owner == fish
-    assert event[0].shares == shares
-    assert event[0].assets == amount_to_withdraw
+    assert len(event) >= 1
+    n = len(event) - 1
+    assert event[n].sender == fish
+    assert event[n].receiver == fish
+    assert event[n].owner == fish
+    assert event[n].shares == shares
+    assert event[n].assets == amount_to_withdraw
 
     assert vault.totalAssets() == amount_to_lock
     assert vault.totalSupply() == amount_to_lock

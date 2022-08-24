@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.14;
 
-import {BaseStrategyMock, IERC20} from "./BaseStrategyMock.sol";
+import {ERC4626BaseStrategyMock, IERC20} from "./BaseStrategyMock.sol";
 
-contract LockedStrategy is BaseStrategyMock {
+contract ERC4626LockedStrategy is ERC4626BaseStrategyMock {
 
   // error for test function setLockedFunds
   error InsufficientFunds();
@@ -11,12 +11,12 @@ contract LockedStrategy is BaseStrategyMock {
   uint256 public lockedBalance;
   uint256 public lockedUntil;
 
-  constructor(address _vault) BaseStrategyMock(_vault) {}
+  constructor(address _vault, address _asset) ERC4626BaseStrategyMock(_vault, _asset) {}
 
   // only used during testing
   // locks funds for duration _lockTime
   function setLockedFunds(uint256 _amount, uint256 _lockTime) external {
-    uint256 balance = IERC20(asset).balanceOf(address(this));
+    uint256 balance = IERC20(asset()).balanceOf(address(this));
     if (_amount > balance) revert InsufficientFunds();
     lockedBalance = _amount;
     lockedUntil = block.timestamp + _lockTime;
@@ -33,13 +33,13 @@ contract LockedStrategy is BaseStrategyMock {
 
   function _freeFunds(uint256 _amount) internal override returns (uint256 _amountFreed) {}
 
-  function withdrawable() external view override returns (uint256 _withdrawable) {
-    uint256 balance = IERC20(asset).balanceOf(address(this));
+  function maxWithdraw(address) public view override returns (uint256) {
+    uint256 balance = IERC20(asset()).balanceOf(address(this));
     if (block.timestamp < lockedUntil) {
-      _withdrawable = balance - lockedBalance;
+      return balance - lockedBalance;
     } else {
       // no locked assets, withdraw all
-      _withdrawable = balance;
+      return balance;
     }
   }
 }
