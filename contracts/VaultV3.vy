@@ -157,7 +157,6 @@ symbol: public(String[32])
 
 # `nonces` track `permit` approvals with signature.
 nonces: public(HashMap[address, uint256])
-DOMAIN_SEPARATOR: public(bytes32)
 DOMAIN_TYPE_HASH: constant(bytes32) = keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)')
 PERMIT_TYPE_HASH: constant(bytes32) = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)")
 # Timestamp when profits are fully unlocked. Type uint256, as we are making comparison with block.timestamp (uint256)
@@ -184,17 +183,6 @@ def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: a
     PROFIT_MAX_UNLOCK_TIME = profit_max_unlock_time
     self.profit_last_update = block.timestamp
     self.profit_end_date = block.timestamp
-
-    # EIP-712
-    self.DOMAIN_SEPARATOR = keccak256(
-        concat(
-            DOMAIN_TYPE_HASH,
-            keccak256(convert("Yearn Vault", Bytes[11])),
-            keccak256(convert(API_VERSION, Bytes[28])),
-            convert(chain.id, bytes32),
-            convert(self, bytes32)
-        )
-    )
 
 ## SHARE MANAGEMENT ##
 ## ERC20 ##
@@ -248,7 +236,7 @@ def _permit(owner: address, spender: address, amount: uint256, expiry: uint256, 
     digest: bytes32 = keccak256(
         concat(
             b'\x19\x01',
-            self.DOMAIN_SEPARATOR,
+            self.domain_separator(),
             keccak256(
                 concat(
                     PERMIT_TYPE_HASH,
@@ -1035,3 +1023,22 @@ def previewRedeem(shares: uint256) -> uint256:
 @external
 def api_version() -> String[28]:
     return API_VERSION
+
+#eip-1344
+@view
+@internal
+def domain_separator() -> bytes32:
+    return keccak256(
+        concat(
+            DOMAIN_TYPE_HASH,
+            keccak256(convert("Yearn Vault", Bytes[11])),
+            keccak256(convert(API_VERSION, Bytes[28])),
+            convert(chain.id, bytes32),
+            convert(self, bytes32)
+        )
+    )
+
+@view
+@external
+def DOMAIN_SEPARATOR() -> bytes32:
+    return self.domain_separator()
