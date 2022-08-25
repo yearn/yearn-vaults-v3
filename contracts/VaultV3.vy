@@ -623,11 +623,13 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
             assets_to_withdraw = withdrawable
             new_debt = current_debt - withdrawable
 
-        # TODO: what happens with unrealised losses?
-        
+        # TODO: should we allow taking losses if we report them?
+        # If there are unrealised losses we don't let the vault reduce its debt
+        unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_to_withdraw)
+        assert unrealised_losses_share == 0, "strategy has unrealised losses"
+
         # TODO: check if ERC4626 reverts if not enough assets
         IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
-        # TODO: verify that the assets where sent?
         self.total_idle += assets_to_withdraw
         # TODO: WARNING: we do this because there are rounding errors due to gradual profit unlocking
         if assets_to_withdraw >= self.total_debt_:
