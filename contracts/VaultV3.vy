@@ -1024,7 +1024,7 @@ def previewRedeem(shares: uint256) -> uint256:
 def api_version() -> String[28]:
     return API_VERSION
 
-#eip-1344
+# eip-1344
 @view
 @internal
 def domain_separator() -> bytes32:
