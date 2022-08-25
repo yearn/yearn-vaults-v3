@@ -406,6 +406,22 @@ def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256
     return shares
 
 @internal
+def _assess_share_of_unrealised_losses(strategy: address, assets_to_withdraw: uint256) -> uint256:
+    # NOTE: these are the ASSET decimals (which should be the same than the strategy decimals) but if the strategy doesn't comply with ERC4626 in that regard, it will break
+    strategy_current_debt: uint256 = self.strategies[strategy].current_debt
+    one_strategy_share: uint256 = 10 ** DECIMALS
+    strategy_assets: uint256 = IStrategy(strategy).convertToAssets(IStrategy(strategy).balanceOf(self))
+
+    if (strategy_assets < strategy_current_debt) and (strategy_current_debt > 0):
+        unrealised_losses: uint256 = strategy_current_debt - strategy_assets
+        # NOTE: if there are unrealised losses, the user will take his share
+        losses_user_share: uint256 = assets_to_withdraw * unrealised_losses / strategy_current_debt 
+        return losses_user_share
+    
+    return 0 
+
+
+@internal
 def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: uint256, strategies: DynArray[address, 10] = []) -> uint256:
     if sender != owner:
         self._spend_allowance(owner, sender, shares_to_burn)
@@ -448,21 +464,16 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
         previous_balance: uint256 = ASSET.balanceOf(self)
         for strategy in strategies:
             assert self.strategies[strategy].activation != 0, "inactive strategy"
-            strategy_current_debt: uint256 = self.strategies[strategy].current_debt
             # TODO: assert if the strategy has no debt?
 
             assets_to_withdraw = min(assets_needed, IStrategy(strategy).maxWithdraw(self))
 
             # CHECK FOR UNREALISED LOSSES
-            one_strategy_share: uint256 = 10 ** strategy.decimals()
-            strategy_pps: uint256 = strategy.convertToAssets(one_strategy_share)
-            strategy_assets: uint256 = strategy.balanceOf(self) * strategy_pps / one_strategy_share
-            # NOTE: if there are unrealised losses, the user will take his share
-            if strategy_current_debt > strategy_assets:
-                diff: uint256 = assets_to_withdraw * assets_to_withdraw / (strategy_current_debt - strategy_assets)
-                assets_to_withdraw = assets_to_withdraw - diff
-                requested_assets -= diff
-
+            unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_to_withdraw)
+            if unrealised_losses_share > 0:
+                assets_to_withdraw -= unrealised_losses_share 
+                requested_assets -= unrealised_losses_share
+            
             # continue to next strategy if nothing to withdraw
             if assets_to_withdraw == 0:
                 continue
@@ -470,6 +481,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
             # WITHDRAW FROM STRATEGY
             IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
             post_balance: uint256 = ASSET.balanceOf(self)
+
             # If we have not received what we expected, we consider the difference a loss
             loss: uint256 = previous_balance + assets_to_withdraw - post_balance
 
@@ -595,7 +607,8 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         # HACK: to save gas
         minimum_total_idle: uint256 = self.minimum_total_idle
         total_idle: uint256 = self.total_idle
-
+        
+        # Respect minimum total idle in vault
         if total_idle + assets_to_withdraw < minimum_total_idle:
             assets_to_withdraw = minimum_total_idle - total_idle
             if assets_to_withdraw > current_debt:
@@ -610,6 +623,8 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
             assets_to_withdraw = withdrawable
             new_debt = current_debt - withdrawable
 
+        # TODO: what happens with unrealised losses?
+        
         # TODO: check if ERC4626 reverts if not enough assets
         IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
         # TODO: verify that the assets where sent?
