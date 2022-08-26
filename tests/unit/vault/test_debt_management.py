@@ -93,9 +93,10 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_zero_withdrawa
     with ape.reverts("nothing to withdraw"):
         vault.update_debt(locked_strategy.address, new_debt, sender=gov)
 
+
 def test_update_debt__with_current_debt_greater_than_new_debt_and_strategy_has_losses__reverts(
-        gov, asset, vault, lossy_strategy, add_debt_to_strategy
-        ):
+    gov, asset, vault, lossy_strategy, add_debt_to_strategy
+):
     vault_balance = asset.balanceOf(vault)
     current_debt = vault_balance
     new_debt = vault_balance // 2
@@ -107,6 +108,7 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_strategy_has_l
 
     with ape.reverts("strategy has unrealised losses"):
         vault.update_debt(lossy_strategy.address, new_debt, sender=gov)
+
 
 def test_update_debt__with_current_debt_greater_than_new_debt_and_insufficient_withdrawable(
     gov, asset, vault, locked_strategy, add_debt_to_strategy
