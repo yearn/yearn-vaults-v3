@@ -406,12 +406,12 @@ def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256
     return shares
 
 @internal
-def _assess_share_of_unrealised_losses(strategy: address, assets_to_withdraw: uint256) -> uint256:
+def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256) -> uint256:
     # NOTE: these are the ASSET decimals (which should be the same than the strategy decimals) but if the strategy doesn't comply with ERC4626 in that regard, it will break
-    strategy_current_debt: uint256 = self.strategies[strategy].current_debt
     one_strategy_share: uint256 = 10 ** DECIMALS
+    strategy_current_debt: uint256 = self.strategies[strategy].current_debt
     strategy_assets: uint256 = IStrategy(strategy).convertToAssets(IStrategy(strategy).balanceOf(self))
-
+    assets_to_withdraw: uint256 = min(strategy_current_debt, assets_needed)
     if (strategy_assets < strategy_current_debt) and (strategy_current_debt > 0):
         unrealised_losses: uint256 = strategy_current_debt - strategy_assets
         # NOTE: if there are unrealised losses, the user will take his share
@@ -466,14 +466,14 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
             assert self.strategies[strategy].activation != 0, "inactive strategy"
             # TODO: assert if the strategy has no debt?
 
-            assets_to_withdraw = min(assets_needed, IStrategy(strategy).maxWithdraw(self))
-
             # CHECK FOR UNREALISED LOSSES
-            unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_to_withdraw)
+            unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_needed)
             if unrealised_losses_share > 0:
-                assets_to_withdraw -= unrealised_losses_share 
                 requested_assets -= unrealised_losses_share
+                assets_needed -= unrealised_losses_share
+                curr_total_debt -= unrealised_losses_share
             
+            assets_to_withdraw = min(assets_needed, IStrategy(strategy).maxWithdraw(self))
             # continue to next strategy if nothing to withdraw
             if assets_to_withdraw == 0:
                 continue
