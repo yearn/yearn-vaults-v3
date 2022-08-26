@@ -214,6 +214,7 @@ def test_withdraw__with_locked_and_liquid_strategy__withdraws(
     assert asset.balanceOf(locked_strategy) == amount_to_lock
     assert asset.balanceOf(fish) == amount_to_withdraw
 
+
 def test_withdraw__with_lossy_strategy__withdraws_less_than_deposited(
     gov,
     fish,
@@ -268,6 +269,7 @@ def test_withdraw__with_lossy_strategy__withdraws_less_than_deposited(
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(lossy_strategy) == 0
     assert asset.balanceOf(fish) == amount_to_withdraw - amount_to_lose
+
 
 def test_withdraw__with_lossy_and_liquid_strategy__withdraws_less_than_deposited(
     gov,
@@ -329,6 +331,7 @@ def test_withdraw__with_lossy_and_liquid_strategy__withdraws_less_than_deposited
     assert asset.balanceOf(lossy_strategy) == 0
     assert asset.balanceOf(fish) == amount_to_withdraw - amount_to_lose
 
+
 def test_withdraw__with_liquid_and_lossy_strategy__withdraws_less_than_deposited(
     gov,
     fish,
@@ -388,5 +391,3 @@ def test_withdraw__with_liquid_and_lossy_strategy__withdraws_less_than_deposited
     assert asset.balanceOf(liquid_strategy) == 0
     assert asset.balanceOf(lossy_strategy) == 0
     assert asset.balanceOf(fish) == amount_to_withdraw - amount_to_lose
-
-
