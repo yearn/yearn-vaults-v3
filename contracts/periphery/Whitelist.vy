@@ -1,6 +1,5 @@
 # @version 0.3.4
 
-
 event AddedToWhitelist:
     account: address 
 event RemovedFromWhitelist:
