@@ -649,7 +649,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         loss = current_debt - total_assets
 
     # TODO: add a check for PROFIT_MAX_UNLOCK_TIME to save gas in the following lines
-
+    
     # Compute unlocked profit since last time
     remaining_time: uint256 = 0
     unlocked_profit: uint256 = 0 
@@ -674,21 +674,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if accountant != empty(address):
         # TODO: total_fees should be a struct with different types of fees, so they can be properly minted/transfered to each party
         total_fees, total_refunds = IAccountant(accountant).report(strategy, gain, loss)
-    
-        # if fees are non-zero, issue shares
-        if total_fees > 0:
-            # TODO: distribute fees across governance and strategists
-            # TODO: Minting of shares to accountant after processing gain, and before processing loss to ensure accountant
-            # does not benefit from a cheaper share price
-            # if fees are non-zero, issue shares
-            self._issue_shares_for_amount(total_fees, accountant)
-
-        # if refunds are non-zero, transfer assets
-        if total_refunds > 0:
-            # Accountant should approved transfer of assets
-            ASSET.transferFrom(self.accountant, self, total_refunds)
-            # Assets coming from refunds are allocated as total_idle
-            self.total_idle += total_refunds
 
     if gain > 0:
         # update current debt after processing management fee
@@ -726,6 +711,20 @@ def _process_report(strategy: address) -> (uint256, uint256):
                     self.profit_distribution_rate_ = 0
                     self.total_debt_ += unlocked_profit + gain + pending_profit
 
+    # Minting fees after gain computation to ensure fees don't benefit from cheaper pps 
+    # if fees are non-zero, issue shares
+    if total_fees > 0:
+        # TODO: distribute fees across governance and strategists
+        # TODO: Minting of shares to accountant after processing gain, and before processing loss to ensure accountant
+        # does not benefit from a cheaper share price
+        # if fees are non-zero, issue shares
+        self._issue_shares_for_amount(total_fees, accountant)
+    # if refunds are non-zero, transfer assets
+    if total_refunds > 0:
+        # Accountant should approved transfer of assets
+        ASSET.transferFrom(self.accountant, self, total_refunds)
+        # Assets coming from refunds are allocated as total_idle
+        self.total_idle += total_refunds
 
     # Strategy is reporting a loss
     if loss > 0:

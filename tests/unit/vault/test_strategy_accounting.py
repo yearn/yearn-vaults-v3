@@ -1,4 +1,3 @@
-from hashlib import new
 import ape
 import pytest
 from utils.constants import YEAR, DAY, ROLES, MAX_BPS, WEEK, MAX_INT
@@ -96,8 +95,11 @@ def test_process_report__with_gain_and_zero_management_fees(
     new_debt = vault_balance
     gain = new_debt // 2
     management_fee = 0
-    performance_fee = 5000
+    performance_fee = 5_000
     total_fee = gain // 2
+
+    initial_total_assets = vault.totalAssets()
+    initial_total_supply = vault.totalSupply()
 
     # add debt to strategy
     add_debt_to_strategy(gov, strategy, vault, new_debt)
@@ -129,7 +131,12 @@ def test_process_report__with_gain_and_zero_management_fees(
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
-    assert vault.balanceOf(accountant) == total_fee
+
+    # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
+    share_price_before_minting_fees = (
+        initial_total_assets + total_fee
+    ) / initial_total_supply
+    assert vault.balanceOf(accountant) == total_fee / share_price_before_minting_fees
 
 
 def test_process_report__with_gain_and_zero_performance_fees(
@@ -149,6 +156,9 @@ def test_process_report__with_gain_and_zero_performance_fees(
     management_fee = 1000
     performance_fee = 0
     total_fee = vault_balance // 10  # 10% mgmt fee over all assets, over a year
+
+    initial_total_assets = vault.totalAssets()
+    initial_total_supply = vault.totalSupply()
 
     # add debt to strategy
     add_debt_to_strategy(gov, strategy, vault, new_debt)
@@ -181,7 +191,14 @@ def test_process_report__with_gain_and_zero_performance_fees(
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
-    assert vault.balanceOf(accountant) == pytest.approx(total_fee, rel=1e-4)
+
+    # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
+    share_price_before_minting_fees = (
+        initial_total_assets + total_fee
+    ) / initial_total_supply
+    assert vault.balanceOf(accountant) == pytest.approx(
+        total_fee / share_price_before_minting_fees, 1e-5
+    )
 
 
 def test_process_report__with_gain_and_both_fees(
@@ -201,6 +218,9 @@ def test_process_report__with_gain_and_both_fees(
     management_fee = 2500
     performance_fee = 2500
     total_fee = gain // 4
+
+    initial_total_assets = vault.totalAssets()
+    initial_total_supply = vault.totalSupply()
 
     # add debt to strategy
     add_debt_to_strategy(gov, strategy, vault, new_debt)
@@ -232,7 +252,14 @@ def test_process_report__with_gain_and_both_fees(
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
-    assert vault.balanceOf(accountant) == pytest.approx(total_fee, rel=1e-4)
+
+    # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
+    share_price_before_minting_fees = (
+        initial_total_assets + total_fee
+    ) / initial_total_supply
+    assert vault.balanceOf(accountant) == pytest.approx(
+        total_fee / share_price_before_minting_fees, 1e-5
+    )
 
 
 def test_process_report__with_fees_exceeding_fee_cap(
@@ -253,6 +280,9 @@ def test_process_report__with_fees_exceeding_fee_cap(
     management_fee = 5000
     performance_fee = 5000
     max_fee = gain * 3 // 4  # max fee set at 3/4
+
+    initial_total_assets = vault.totalAssets()
+    initial_total_supply = vault.totalSupply()
 
     # add debt to strategy
     add_debt_to_strategy(gov, strategy, vault, new_debt)
@@ -285,7 +315,14 @@ def test_process_report__with_fees_exceeding_fee_cap(
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
-    assert vault.balanceOf(accountant) == max_fee
+
+    # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
+    share_price_before_minting_fees = (
+        initial_total_assets + max_fee
+    ) / initial_total_supply
+    assert vault.balanceOf(accountant) == pytest.approx(
+        max_fee / share_price_before_minting_fees, 1e-5
+    )
 
 
 def test_process_report__with_loss(
