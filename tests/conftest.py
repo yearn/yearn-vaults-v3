@@ -1,13 +1,10 @@
 import pytest
-from ape import chain
 from ape.types import ContractLog
 from eth_account.messages import encode_structured_data
-from utils.constants import MAX_INT, ROLES, WEEK
+from utils.constants import MAX_INT, ROLES, WEEK, ZERO_ADDRESS
 
 
 # Accounts
-
-
 @pytest.fixture(scope="session")
 def gov(accounts):
     yield accounts[0]
@@ -111,9 +108,16 @@ def create_vault(project, gov, fee_manager, flexible_fee_manager):
         governance=gov,
         deposit_limit=MAX_INT,
         max_profit_locking_time=WEEK,
+        whitelist=ZERO_ADDRESS,
     ):
         vault = gov.deploy(
-            project.VaultV3, asset, "VaultV3", "AV", governance, max_profit_locking_time
+            project.VaultV3,
+            asset,
+            "VaultV3",
+            "AV",
+            governance,
+            max_profit_locking_time,
+            whitelist,
         )
         # set vault deposit
         vault.set_deposit_limit(deposit_limit, sender=gov)

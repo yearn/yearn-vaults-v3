@@ -23,6 +23,9 @@ interface IStrategy:
 interface IFeeManager:
     def assess_fees(strategy: address, gain: uint256) -> uint256: view
 
+interface IWhitelist:
+    def is_whitelisted(user: address) -> bool: view
+
 # EVENTS #
 # ERC4626 EVENTS
 event Deposit:
@@ -115,6 +118,7 @@ enum Roles:
 # IMMUTABLE #
 ASSET: immutable(ERC20)
 DECIMALS: immutable(uint256)
+WHITELIST: immutable(address)
 
 # CONSTANTS #
 API_VERSION: constant(String[28]) = "0.1.0"
@@ -170,9 +174,11 @@ PROFIT_MAX_UNLOCK_TIME: immutable(uint256)
 
 # Constructor
 @external
-def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: address, profit_max_unlock_time: uint256):
+def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: address, profit_max_unlock_time: uint256, whitelist: address):
     ASSET = asset
     DECIMALS = convert(ERC20Detailed(asset.address).decimals(), uint256)
+    # Use 'empty(address)' (0x0) to open it to everyone
+    WHITELIST = whitelist
 
     self.name = name
     self.symbol = symbol
@@ -844,6 +850,12 @@ def set_minimum_total_idle(minimum_total_idle: uint256):
     self.minimum_total_idle = minimum_total_idle
     log UpdateMinimumTotalIdle(minimum_total_idle)
 
+# WHITELIST
+@internal
+def is_whitelisted(_address: address):
+    if WHITELIST != empty(address):
+        assert IWhitelist(WHITELIST).is_whitelisted(_address) # dev: not whitelisted
+
 # ROLE MANAGEMENT #
 @internal
 def _enforce_role(account: address, role: Roles):
@@ -942,10 +954,12 @@ def shutdown_vault():
 ## ERC20 + ERC4626 ##
 @external
 def deposit(assets: uint256, receiver: address) -> uint256:
+    self.is_whitelisted(receiver)
     return self._deposit(msg.sender, receiver, assets)
 
 @external
 def mint(shares: uint256, receiver: address) -> uint256:
+    self.is_whitelisted(receiver)
     assets: uint256 = self._convert_to_assets(shares)
     self._deposit(msg.sender, receiver, assets)
     return assets
@@ -968,11 +982,13 @@ def approve(spender: address, amount: uint256) -> bool:
 
 @external
 def transfer(receiver: address, amount: uint256) -> bool:
+    self.is_whitelisted(receiver)
     self._transfer(msg.sender, receiver, amount)
     return True
 
 @external
 def transferFrom(sender: address, receiver: address, amount: uint256) -> bool:
+    self.is_whitelisted(receiver)
     return self._transfer_from(sender, receiver, amount)
 
 ## ERC20+4626 compatibility
