@@ -391,7 +391,6 @@ def test_withdraw__with_liquid_and_lossy_strategy__withdraws_less_than_deposited
     assert asset.balanceOf(liquid_strategy) == 0
     assert asset.balanceOf(lossy_strategy) == 0
     assert asset.balanceOf(fish) == amount_to_withdraw - amount_to_lose
-    
 
 
 def test_withdraw__with_liquid_and_lossy_strategy_that_losses_while_withdrawing__withdraws_less_than_deposited(
@@ -453,6 +452,3 @@ def test_withdraw__with_liquid_and_lossy_strategy_that_losses_while_withdrawing_
     assert asset.balanceOf(liquid_strategy) == 0
     assert asset.balanceOf(lossy_strategy) == 0
     assert asset.balanceOf(fish) == amount_to_withdraw - amount_to_lose
-    
-
-
