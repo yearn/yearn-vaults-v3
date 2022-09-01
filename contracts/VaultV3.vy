@@ -718,6 +718,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # if refunds are non-zero, transfer assets
     if total_refunds > 0:
         # Accountant should approve transfer of assets
+        total_refunds = min(total_refunds, ASSET.balanceOf(accountant))
         ASSET.transferFrom(self.accountant, self, total_refunds)
         # Assets coming from refunds are allocated as total_idle
         self.total_idle += total_refunds
