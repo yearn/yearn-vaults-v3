@@ -14,7 +14,9 @@ abstract contract ERC4626BaseStrategy is IStrategyERC4626, ERC4626 {
 
     address public override vault;
 
-    constructor(address _vault, address _asset) ERC4626(IERC20Metadata(address(_asset))) {
+    constructor(address _vault, address _asset)
+        ERC4626(IERC20Metadata(address(_asset)))
+    {
         _initialize(_vault, _asset);
     }
 
@@ -25,18 +27,20 @@ abstract contract ERC4626BaseStrategy is IStrategyERC4626, ERC4626 {
     }
 
     // TODO: add roles (including vault)
-    // TODO: should we force invest and freeFunds to be in deposit and withdraw functions? 
+    // TODO: should we force invest and freeFunds to be in deposit and withdraw functions?
 
     function invest() external override {
-        // TODO: add permissioning ? 
+        // TODO: add permissioning ?
     }
 
-    function investTrigger() external view override virtual returns (bool) {
-        
-    }
+    function investTrigger() external view virtual override returns (bool) {}
 
-    function freeFunds(uint256 _amount) external override returns (uint256 _freedFunds) {
-        // TODO: add permissioning ? 
+    function freeFunds(uint256 _amount)
+        external
+        override
+        returns (uint256 _freedFunds)
+    {
+        // TODO: add permissioning ?
     }
 
     function migrate(address _newStrategy) external override {
@@ -45,14 +49,19 @@ abstract contract ERC4626BaseStrategy is IStrategyERC4626, ERC4626 {
 
     function _invest() internal virtual;
 
-    function _freeFunds(uint256 _amount) internal virtual returns (uint256 amountFreed);
+    function _freeFunds(uint256 _amount)
+        internal
+        virtual
+        returns (uint256 amountFreed);
 
-    function _protectedTokens() internal view virtual returns (address[] memory);
+    function _protectedTokens()
+        internal
+        view
+        virtual
+        returns (address[] memory);
 
     function sweep(address _token) external {
         // TODO: add permissioning
         // TODO: add logic
     }
-
 }
-
