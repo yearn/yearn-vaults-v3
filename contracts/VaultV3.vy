@@ -714,14 +714,10 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Minting fees after gain computation to ensure fees don't benefit from cheaper pps 
     # if fees are non-zero, issue shares
     if total_fees > 0:
-        # TODO: distribute fees across governance and strategists
-        # TODO: Minting of shares to accountant after processing gain, and before processing loss to ensure accountant
-        # does not benefit from a cheaper share price
-        # if fees are non-zero, issue shares
         self._issue_shares_for_amount(total_fees, accountant)
     # if refunds are non-zero, transfer assets
     if total_refunds > 0:
-        # Accountant should approved transfer of assets
+        # Accountant should approve transfer of assets
         ASSET.transferFrom(self.accountant, self, total_refunds)
         # Assets coming from refunds are allocated as total_idle
         self.total_idle += total_refunds
@@ -729,8 +725,9 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Strategy is reporting a loss
     if loss > 0:
         self.strategies[strategy].current_debt -= loss
-        # We take into consideration fees, as if there is enough pending profit, we can unlock it to avoiding changes in pps
+        # We take into consideration fees, as if there is enough pending profit, we can unlock it to avoid changes in pps
         loss_with_fees: uint256 = loss + total_fees
+        # NOTE: the vault will unlock profit to avoid pps decrease after minting fees (for those accountants minting fees in lossy situations)
         if loss_with_fees >= pending_profit:
             self.profit_distribution_rate_ = 0
             if loss > pending_profit:
@@ -738,10 +735,11 @@ def _process_report(strategy: address) -> (uint256, uint256):
                 self.total_debt_ = self.total_debt_ + unlocked_profit - (loss - pending_profit)
             else:
                 # We unlock all pending profit, some takes the loss, and the difference between pending_profit
-                # and loss its unblocked to reduce efects of fees on pps, reducing profit_distribution to 0
+                # and loss is unblocked to reduce efects of fees on pps, reducing profit_distribution to 0
                 self.total_debt_ = self.total_debt_ + unlocked_profit + (pending_profit - loss)
         else:
-            # Pending profit can absorb loss and fees without impacting pps
+            # Pending profit can absorb loss and fees without impacting pps. 
+            # Note: 'pending_profit' and 'remaining_time' are always > 0
             self.profit_distribution_rate_ = (pending_profit - loss_with_fees) * MAX_BPS / remaining_time
             self.total_debt_ += unlocked_profit
             self.profit_last_update = block.timestamp

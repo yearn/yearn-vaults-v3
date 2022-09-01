@@ -9,7 +9,6 @@ contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
 
   // used to generate losses, accepts single arg to send losses to
   function setLoss(address _target, uint256 _loss) external {
-    _burn(vault, convertToShares(_loss));
     IERC20(asset()).transfer(_target, _loss);
   }
 
