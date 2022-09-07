@@ -193,8 +193,13 @@ def test_withdraw__locked_funds_with_locked_and_liquid_strategy__withdraws(
 
     with ape.reverts("insufficient assets in vault"):
         vault.withdraw(
-            amount_to_withdraw, fish.address, fish.address, [s.address for s in strategies], sender=fish
+            amount_to_withdraw,
+            fish.address,
+            fish.address,
+            [s.address for s in strategies],
+            sender=fish,
         )
+
 
 def test_withdraw__with_locked_and_liquid_strategy__withdraws(
     gov,
@@ -540,7 +545,9 @@ def test_withdraw__half_of_assets_from_lossy_strategy_that_losses_while_withdraw
     assert event[n].sender == fish
     assert event[n].receiver == fish
     assert event[n].owner == fish
-    assert event[n].shares == shares // 2 # only half of the total shares should be burnt
+    assert (
+        event[n].shares == shares // 2
+    )  # only half of the total shares should be burnt
     assert event[n].assets == amount_to_withdraw - amount_to_lose
 
     assert vault.totalAssets() == amount // 2
@@ -551,7 +558,6 @@ def test_withdraw__half_of_assets_from_lossy_strategy_that_losses_while_withdraw
     assert asset.balanceOf(liquid_strategy) == amount_per_strategy
     assert asset.balanceOf(lossy_strategy) == 0
     assert asset.balanceOf(fish) == amount_to_withdraw - amount_to_lose
-
 
 
 def test_withdraw__half_of_strategy_assets_from_lossy_strategy_with_unrealised_losses__withdraws_less_than_deposited(
@@ -570,7 +576,9 @@ def test_withdraw__half_of_strategy_assets_from_lossy_strategy_with_unrealised_l
     amount = fish_amount
     amount_per_strategy = amount // 2  # deposit half of amount per strategy
     amount_to_lose = amount_per_strategy // 2  # loss only half of strategy
-    amount_to_withdraw = amount // 4  # withdraw a quarter deposit (half of strategy debt)
+    amount_to_withdraw = (
+        amount // 4
+    )  # withdraw a quarter deposit (half of strategy debt)
     shares = amount
     liquid_strategy = create_strategy(vault)
     lossy_strategy = create_lossy_strategy(vault)
@@ -611,6 +619,11 @@ def test_withdraw__half_of_strategy_assets_from_lossy_strategy_with_unrealised_l
     assert vault.total_debt() == amount - amount_to_withdraw
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(liquid_strategy) == amount_per_strategy
-    assert asset.balanceOf(lossy_strategy) == amount_per_strategy - amount_to_lose - amount_to_lose // 2 # withdrawn from strategy
-    assert asset.balanceOf(fish) == amount_to_withdraw - amount_to_lose // 2 # it only takes half loss
+    assert (
+        asset.balanceOf(lossy_strategy)
+        == amount_per_strategy - amount_to_lose - amount_to_lose // 2
+    )  # withdrawn from strategy
+    assert (
+        asset.balanceOf(fish) == amount_to_withdraw - amount_to_lose // 2
+    )  # it only takes half loss
     assert vault.balanceOf(fish) == amount - amount_to_withdraw

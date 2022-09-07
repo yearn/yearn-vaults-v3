@@ -409,7 +409,6 @@ def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256
 def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256) -> uint256:
     # NOTE: the function returns the share of losses that a user should take if withdrawing from this strategy
     strategy_current_debt: uint256 = self.strategies[strategy].current_debt
-    # max amounts
     assets_to_withdraw: uint256 = min(assets_needed, strategy_current_debt)
     vault_shares: uint256 = IStrategy(strategy).balanceOf(self)
     strategy_assets: uint256 = IStrategy(strategy).convertToAssets(vault_shares)
