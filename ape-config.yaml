@@ -4,7 +4,6 @@ plugins:
   - name: solidity
   - name: vyper
   - name: hardhat
-    version: 0.4.2
 
 default_ecosystem: ethereum
 dependencies:
