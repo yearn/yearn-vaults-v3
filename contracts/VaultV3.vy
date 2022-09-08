@@ -590,9 +590,6 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
 
     The vault will not invest the funds into the underlying protocol, which is responsibility of the strategy. 
     """
-
-    self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
-
     new_debt: uint256 = target_debt
     # Revert if target_debt cannot be achieved due to configured max_debt for given strategy
     assert new_debt <= self.strategies[strategy].max_debt, "target debt higher than max debt"
