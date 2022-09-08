@@ -173,6 +173,7 @@ PROFIT_MAX_UNLOCK_TIME: immutable(uint256)
 def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: address, profit_max_unlock_time: uint256):
     ASSET = asset
     DECIMALS = convert(ERC20Detailed(asset.address).decimals(), uint256)
+    assert 10 ** (2 * DECIMALS) <= max_value(uint256) # dev: token decimals too high
 
     self.name = name
     self.symbol = symbol
