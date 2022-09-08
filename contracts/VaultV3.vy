@@ -394,6 +394,25 @@ def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256
     return shares
 
 @internal
+def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256) -> uint256:
+    # NOTE: the function returns the share of losses that a user should take if withdrawing from this strategy
+    strategy_current_debt: uint256 = self.strategies[strategy].current_debt
+    assets_to_withdraw: uint256 = min(assets_needed, strategy_current_debt)
+    vault_shares: uint256 = IStrategy(strategy).balanceOf(self)
+    strategy_assets: uint256 = IStrategy(strategy).convertToAssets(vault_shares)
+    
+    # If no losses, return 0
+    if strategy_assets >= strategy_current_debt or strategy_current_debt == 0:
+        return 0
+
+    # user will withdraw assets_to_withdraw divided by loss ratio (strategy_assets / strategy_current_debt - 1)
+    # but will only receive assets_to_withdrar
+    # NOTE: if there are unrealised losses, the user will take his share
+    losses_user_share: uint256 = assets_to_withdraw - assets_to_withdraw * strategy_assets / strategy_current_debt
+    return losses_user_share
+
+
+@internal
 def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: uint256, strategies: DynArray[address, 10] = []) -> uint256:
     if sender != owner:
         self._spend_allowance(owner, sender, shares_to_burn)
@@ -412,11 +431,12 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
     # load to memory to save gas
     curr_total_idle: uint256 = self.total_idle
     
-    # If there are not enough assets in the Vault contract, we try to free funds from strategies specified above
+    # If there are not enough assets in the Vault contract, we try to free funds from strategies specified in the input
     if requested_assets > curr_total_idle:
         # load to memory to save gas
         curr_total_debt: uint256 = self.total_debt_
         # If there is not enough debt on storage and there is profit being unlocked, we need to compute unlocked profit till now to fullfil requested_assets
+        # We can update unlocked profit only when debt < requested_assets because otherwise it won't matter, and that way we save gas
         if requested_assets > self.total_debt_:
             unlocked_profit: uint256 = 0
             if self.profit_end_date > block.timestamp:
@@ -431,20 +451,56 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
         # Withdraw from strategies if insufficient total idle
         assets_needed: uint256 = requested_assets - curr_total_idle
         assets_to_withdraw: uint256 = 0
+
+        # NOTE: to compare against real withdrawals from strategies
+        previous_balance: uint256 = ASSET.balanceOf(self)
         for strategy in strategies:
             assert self.strategies[strategy].activation != 0, "inactive strategy"
+          
+            # Starts with all the assets needed
+            assets_to_withdraw = assets_needed
 
-            assets_to_withdraw = min(assets_needed, IStrategy(strategy).maxWithdraw(self))
-            # continue if nothing to withdraw
+            # CHECK FOR UNREALISED LOSSES
+            # If unrealised losses > 0, then the user will take the proportional share and realise it (required to avoid users withdrawing from lossy strategies) 
+            # NOTE: assets_to_withdraw will be capped to strategy's current_debt within the function
+            unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_to_withdraw)
+            if unrealised_losses_share > 0:
+                # User now "needs" less assets to be unlocked (as he took some as losses)
+                assets_to_withdraw -= unrealised_losses_share
+                requested_assets -= unrealised_losses_share
+                # NOTE: done here instead of waiting for regular update of these values because it's a rare case (so we can save minor amounts of gas)
+                assets_needed -= unrealised_losses_share
+                curr_total_debt -= unrealised_losses_share
+            
+            # After losses are taken, vault asks what is the max amount to withdraw
+            assets_to_withdraw = min(assets_to_withdraw, IStrategy(strategy).maxWithdraw(self))
+
+            # TODO: should this be before taking the losses? probably not
+            # continue to next strategy if nothing to withdraw
             if assets_to_withdraw == 0:
                 continue
-            
-            # TODO: warning! if there are losses, the user withdrawing will not get them
-            IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
-            curr_total_idle += assets_to_withdraw
-            curr_total_debt -= assets_to_withdraw
-            self.strategies[strategy].current_debt -= assets_to_withdraw
 
+            # WITHDRAW FROM STRATEGY
+            IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
+            post_balance: uint256 = ASSET.balanceOf(self)
+            
+            # If we have not received what we expected, we consider the difference a loss
+            loss: uint256 = 0
+            if(previous_balance + assets_to_withdraw > post_balance):
+              loss = previous_balance + assets_to_withdraw - post_balance
+
+            # NOTE: we update the previous_balance variable here to save gas in next iteration
+            previous_balance = post_balance
+ 
+            # TODO: what are the considerations re locked profit?
+            # NOTE: strategy's debt decreases by the full amount but the total idle increases 
+            # by the actual amount only (as the difference is considered lost)
+            curr_total_idle += (assets_to_withdraw - loss)
+            requested_assets -= loss
+            curr_total_debt -= assets_to_withdraw
+            # Vault will reduce debt because the unrealised loss has been taken by user
+            self.strategies[strategy].current_debt -= (assets_to_withdraw + unrealised_losses_share)
+            # NOTE: the user will receive less tokens (the rest were lost)
             # break if we have enough total idle to serve initial request 
             if requested_assets <= curr_total_idle:
                 break
@@ -457,11 +513,11 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
         self.total_debt_ = curr_total_debt
 
     self._burn_shares(shares, owner)
-    self.total_idle = curr_total_idle - requested_assets 
+    # commit memory to storage
+    self.total_idle = curr_total_idle - requested_assets
     self.erc20_safe_transfer(ASSET.address, receiver, requested_assets)
 
     log Withdraw(sender, receiver, owner, requested_assets, shares)
-
     return requested_assets
 
 ## STRATEGY MANAGEMENT ##
@@ -557,7 +613,8 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         # HACK: to save gas
         minimum_total_idle: uint256 = self.minimum_total_idle
         total_idle: uint256 = self.total_idle
-
+        
+        # Respect minimum total idle in vault
         if total_idle + assets_to_withdraw < minimum_total_idle:
             assets_to_withdraw = minimum_total_idle - total_idle
             if assets_to_withdraw > current_debt:
@@ -572,9 +629,13 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
             assets_to_withdraw = withdrawable
             new_debt = current_debt - withdrawable
 
+        # TODO: should we allow taking losses if we report them?
+        # If there are unrealised losses we don't let the vault reduce its debt
+        unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_to_withdraw)
+        assert unrealised_losses_share == 0, "strategy has unrealised losses"
+
         # TODO: check if ERC4626 reverts if not enough assets
         IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
-        # TODO: verify that the assets where sent?
         self.total_idle += assets_to_withdraw
         # TODO: WARNING: we do this because there are rounding errors due to gradual profit unlocking
         if assets_to_withdraw >= self.total_debt_:
