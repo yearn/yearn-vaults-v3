@@ -854,7 +854,7 @@ def set_minimum_total_idle(minimum_total_idle: uint256):
 @internal
 def is_whitelisted(_address: address):
     if WHITELIST != empty(address):
-        assert IWhitelist(WHITELIST).is_whitelisted(_address) # dev: not whitelisted
+        assert IWhitelist(WHITELIST).is_whitelisted(_address), "not whitelisted"
 
 # ROLE MANAGEMENT #
 @internal

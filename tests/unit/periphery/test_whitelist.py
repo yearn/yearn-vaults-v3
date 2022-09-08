@@ -37,20 +37,20 @@ def test_add_to_whitelist__reverts(project, bunny, doggie):
 
     assert not whitelist.is_whitelisted(random_address)
 
-    with ape.reverts():
+    with ape.reverts("not owner"):
         whitelist.add_to_whitelist(random_address, sender=doggie)
 
     assert not whitelist.is_whitelisted(random_address)
 
 
-def test_remove_from_whitelist_reverts(project, bunny, doggie):
+def test_remove_from_whitelist__reverts(project, bunny, doggie):
     whitelist = bunny.deploy(project.Whitelist)
     random_address = "0x0000000000000000000000000000000000000001"
 
     whitelist.add_to_whitelist(random_address, sender=bunny)
     assert whitelist.is_whitelisted(random_address)
 
-    with ape.reverts():
+    with ape.reverts("not owner"):
         whitelist.remove_from_whitelist(random_address, sender=doggie)
 
     assert whitelist.is_whitelisted(random_address)
