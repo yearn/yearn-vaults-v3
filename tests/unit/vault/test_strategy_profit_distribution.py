@@ -943,3 +943,171 @@ def test_unlocking_time_to_zero_days(
 
     assert vault.profit_distribution_rate() == 0
     assert vault.totalAssets() == pytest.approx(amount + profit, 1e-6)
+
+
+def test_profit_distribution__one_loss_and_enough_pending_profit_no_fees(
+    gov,
+    fish,
+    asset,
+    create_vault,
+    create_lossy_strategy,
+    user_deposit,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    set_fees_for_strategy,
+    flexible_accountant,
+):
+    amount = 10 * 10**9
+    profit = int(5 * 10**9)
+    loss = profit // 2
+
+    vault = create_vault(asset, accountant=flexible_accountant)
+    lossy_strategy = create_lossy_strategy(vault)
+
+    # deposit assets to vault and prepare strategy
+    user_deposit(fish, vault, asset, amount)
+    initial_timestamp = chain.pending_timestamp
+    add_strategy_to_vault(gov, lossy_strategy, vault)
+    add_debt_to_strategy(gov, lossy_strategy, vault, amount)
+
+    # We create a virtual profit
+    asset.transfer(lossy_strategy, profit, sender=fish)
+    pps_before_profit = vault.price_per_share()
+
+    # We call process_report at t_1
+    chain.pending_timestamp = initial_timestamp + DAY
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    vault.process_report(lossy_strategy, sender=gov)
+
+    assert vault.price_per_share() / 10 ** vault.decimals() == 1.0
+    assert vault.profit_distribution_rate() == int(profit / WEEK * MAX_BPS)
+
+    distribution_rate_bef_loss = vault.profit_distribution_rate()
+
+    # We create a loss
+    lossy_strategy.setLoss(gov.address, loss, sender=gov)
+
+    chain.pending_timestamp = initial_timestamp + 2 * DAY
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    pps_before_loss = vault.price_per_share()
+
+    tx = vault.process_report(lossy_strategy, sender=gov)
+
+    event = list(tx.decode_logs(vault.StrategyReported))
+    assert len(event) == 1
+    assert event[0].loss == loss
+    assert event[0].total_fees == 0
+
+    # Profit distribution dumps loss and therefore its distribution rate is lower...
+    pending_profit_bef_loss = distribution_rate_bef_loss * (WEEK - DAY) / MAX_BPS
+    assert vault.profit_distribution_rate() == int(
+        (pending_profit_bef_loss - loss) / (WEEK - DAY) * MAX_BPS
+    )
+
+    # Price per share does not decrease, it actually increases as some profit gets unlocked
+    assert vault.price_per_share() > pps_before_loss
+    assert vault.totalAssets() == int(
+        amount + distribution_rate_bef_loss * DAY / MAX_BPS
+    )
+
+    chain.pending_timestamp = initial_timestamp + 10 * DAY
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    # Once all profit has been unlocked...
+    assert vault.totalAssets() == pytest.approx(amount + profit - loss, 1e-5)
+
+
+def test_profit_distribution__one_loss_and_enough_pending_profit_and_small_fees(
+    gov,
+    fish,
+    asset,
+    create_vault,
+    create_lossy_strategy,
+    user_deposit,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    set_fees_for_strategy,
+    flexible_accountant,
+):
+    amount = 10 * 10**9
+    profit = int(5 * 10**9)
+    loss = profit // 2
+    management_fee = 0
+    performance_fee = 1000
+
+    vault = create_vault(asset, accountant=flexible_accountant)
+    lossy_strategy = create_lossy_strategy(vault)
+
+    # deposit assets to vault and prepare strategy
+    user_deposit(fish, vault, asset, amount)
+    initial_timestamp = chain.pending_timestamp
+    add_strategy_to_vault(gov, lossy_strategy, vault)
+    add_debt_to_strategy(gov, lossy_strategy, vault, amount)
+
+    # set up accountant
+    set_fees_for_strategy(
+        gov, lossy_strategy, flexible_accountant, management_fee, performance_fee
+    )
+
+    # We create a virtual profit
+    asset.transfer(lossy_strategy, profit, sender=fish)
+    pps_before_profit = vault.price_per_share()
+
+    # We call process_report at t_1
+    chain.pending_timestamp = initial_timestamp + DAY
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    tx = vault.process_report(lossy_strategy, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyReported))
+
+    expected_performance_fee = performance_fee * profit / MAX_BPS
+
+    assert event[0].total_fees == pytest.approx(expected_performance_fee, 1e-5)
+
+    # pps increases a bit, due to the minting of fees and the releasing of profit to avoid pps decreasing; as fees
+    # are minted at a more expensive price
+    assert vault.price_per_share() > pps_before_profit
+    assert vault.profit_distribution_rate() == pytest.approx(
+        (profit - expected_performance_fee) / WEEK * MAX_BPS, 1e-5
+    )
+
+    distribution_rate_bef_loss = vault.profit_distribution_rate()
+    pps_before_loss = vault.price_per_share()
+
+    # We create a loss
+    lossy_strategy.setLoss(gov.address, loss, sender=gov)
+
+    chain.pending_timestamp = initial_timestamp + 2 * DAY
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    tx = vault.process_report(lossy_strategy, sender=gov)
+
+    event = list(tx.decode_logs(vault.StrategyReported))
+    assert len(event) == 1
+    assert event[0].loss == loss
+    assert event[0].total_fees == 0
+
+    # Profit distribution dumps loss and therefore its distribution rate is lower...
+    pending_profit_bef_loss = distribution_rate_bef_loss * (WEEK - DAY) / MAX_BPS
+    assert vault.profit_distribution_rate() == int(
+        (pending_profit_bef_loss - loss) / (WEEK - DAY) * MAX_BPS
+    )
+
+    # Price per share does not decrease, it actually increases as some profit gets unlocked
+    assert vault.price_per_share() > pps_before_loss
+    unlocked = profit - pending_profit_bef_loss
+    assert vault.totalAssets() == pytest.approx(amount + unlocked, 1e-5)
+
+    chain.pending_timestamp = initial_timestamp + 10 * DAY
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    # Once all profit has been unlocked...
+    assert vault.totalAssets() == pytest.approx(amount + profit - loss, 1e-5)
+
+    assert vault.totalAssets() == pytest.approx(
+        vault.convertToAssets(vault.balanceOf(flexible_accountant))
+        + vault.convertToAssets(vault.balanceOf(fish)),
+        1e-5,
+    )

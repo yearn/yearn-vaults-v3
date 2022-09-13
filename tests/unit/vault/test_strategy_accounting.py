@@ -471,6 +471,10 @@ def test_process_report__with_loss_and_refunds(
     assert vault.price_per_share() == pps_before_loss
     assert vault.totalAssets() == assets_before_loss
 
+    assert vault.total_idle() == loss
+    assert vault.total_debt() == new_debt - loss
+    assert vault.totalAssets() == vault_balance
+
 
 def test_process_report__with_loss_management_fees_and_refunds(
     chain,

@@ -672,7 +672,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
     accountant: address = self.accountant
     # if accountant is not set, fees and refunds are zero
     if accountant != empty(address):
-        # TODO: total_fees should be a struct with different types of fees, so they can be properly minted/transfered to each party
         total_fees, total_refunds = IAccountant(accountant).report(strategy, gain, loss)
 
     if gain > 0:
