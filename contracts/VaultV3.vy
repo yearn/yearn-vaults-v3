@@ -20,8 +20,8 @@ interface IStrategy:
     def convertToAssets(shares: uint256) -> (uint256): view
     def convertToShares(assets: uint256) -> (uint256): view
 
-interface IFeeManager:
-    def assess_fees(strategy: address, gain: uint256) -> uint256: view
+interface IAccountant:
+    def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
 
 # EVENTS #
 # ERC4626 EVENTS
@@ -66,6 +66,7 @@ event StrategyReported:
     loss: uint256
     current_debt: uint256
     total_fees: uint256
+    total_refunds: uint256
 
 # DEBT MANAGEMENT EVENTS
 event DebtUpdated:
@@ -74,8 +75,8 @@ event DebtUpdated:
     new_debt: uint256
 
 # STORAGE MANAGEMENT EVENTS
-event UpdateFeeManager:
-    fee_manager: address
+event UpdateAccountant:
+    accountant: address
 
 event UpdatedMaxDebtForStrategy:
     sender: address
@@ -138,7 +139,7 @@ minimum_total_idle: public(uint256)
 # Maximum amount of tokens that the vault can accept. If totalAssets > deposit_limit, deposits will revert
 deposit_limit: public(uint256)
 # TODO: remove
-fee_manager: public(address)
+accountant: public(address)
 # TODO: remove
 health_check: public(address)
 # HashMap mapping addresses to their roles
@@ -703,7 +704,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         loss = current_debt - total_assets
 
     # TODO: add a check for PROFIT_MAX_UNLOCK_TIME to save gas in the following lines
-
+    
     # Compute unlocked profit since last time
     remaining_time: uint256 = 0
     unlocked_profit: uint256 = 0 
@@ -720,30 +721,15 @@ def _process_report(strategy: address) -> (uint256, uint256):
             pending_profit = profit_distribution_rate_ * remaining_time / MAX_BPS
 
 
-    # Strategy is reporting a loss
-    if loss > 0:
-        self.strategies[strategy].current_debt -= loss
-
-        if loss >= pending_profit:
-            # If loss is too big for the profit buffer, we set distribution rate to zero
-            self.total_debt_ = self.total_debt_ + unlocked_profit - (loss - pending_profit) 
-            self.profit_distribution_rate_ = 0
-        else:
-            self.profit_distribution_rate_ = (pending_profit - loss) * MAX_BPS / remaining_time
-            self.total_debt_ += unlocked_profit
-            self.profit_last_update = block.timestamp
-
     # TODO: should we add a very low protocol management fee? (set to factory contract)
     total_fees: uint256 = 0
-    if gain > 0:
-        fee_manager: address = self.fee_manager
-        # if fee manager is not set, fees are zero
-        if fee_manager != empty(address):
-            total_fees = IFeeManager(fee_manager).assess_fees(strategy, gain)
-            # if fees are non-zero, issue shares
-            if total_fees > 0:
-                self._issue_shares_for_amount(total_fees, fee_manager)
+    total_refunds: uint256 = 0
+    accountant: address = self.accountant
+    # if accountant is not set, fees and refunds are zero
+    if accountant != empty(address):
+        total_fees, total_refunds = IAccountant(accountant).report(strategy, gain, loss)
 
+    if gain > 0:
         # update current debt after processing management fee
         self.strategies[strategy].current_debt += gain
         
@@ -779,14 +765,48 @@ def _process_report(strategy: address) -> (uint256, uint256):
                     self.profit_distribution_rate_ = 0
                     self.total_debt_ += unlocked_profit + gain + pending_profit
 
-    self.strategies[strategy].last_report = block.timestamp
+    # Minting fees after gain computation to ensure fees don't benefit from cheaper pps 
+    # if fees are non-zero, issue shares
+    if total_fees > 0:
+        self._issue_shares_for_amount(total_fees, accountant)
+    # if refunds are non-zero, transfer assets
+    if total_refunds > 0:
+        # Accountant should approve transfer of assets
+        total_refunds = min(total_refunds, ASSET.balanceOf(accountant))
+        ASSET.transferFrom(self.accountant, self, total_refunds)
+        # Assets coming from refunds are allocated as total_idle
+        self.total_idle += total_refunds
 
+    # Strategy is reporting a loss
+    if loss > 0:
+        self.strategies[strategy].current_debt -= loss
+        # We take into consideration fees, as if there is enough pending profit, we can unlock it to avoid changes in pps
+        loss_with_fees: uint256 = loss + total_fees
+        # NOTE: the vault will unlock profit to avoid pps decrease after minting fees (for those accountants minting fees in lossy situations)
+        if loss_with_fees >= pending_profit:
+            self.profit_distribution_rate_ = 0
+            if loss > pending_profit:
+                # We unlock all pending profit to reduce as much efect of loss on pps
+                self.total_debt_ = self.total_debt_ + unlocked_profit - (loss - pending_profit)
+            else:
+                # We unlock all pending profit, some takes the loss, and the difference between pending_profit
+                # and loss is unblocked to reduce efects of fees on pps, reducing profit_distribution to 0
+                self.total_debt_ = self.total_debt_ + unlocked_profit + (pending_profit - loss)
+        else:
+            # Pending profit can absorb loss and fees without impacting pps. 
+            # Note: 'pending_profit' and 'remaining_time' are always > 0
+            self.profit_distribution_rate_ = (pending_profit - loss_with_fees) * MAX_BPS / remaining_time
+            self.total_debt_ += unlocked_profit
+            self.profit_last_update = block.timestamp
+
+    self.strategies[strategy].last_report = block.timestamp
     log StrategyReported(
         strategy,
         gain,
         loss,
         self.strategies[strategy].current_debt,
-        total_fees
+        total_fees,
+        total_refunds
     )
     return (gain, loss)
 
@@ -824,10 +844,10 @@ def _profit_distribution_rate() -> uint256:
 
 # SETTERS #
 @external
-def set_fee_manager(new_fee_manager: address):
+def set_accountant(new_accountant: address):
     # TODO: permissioning: CONFIG_MANAGER
-    self.fee_manager = new_fee_manager
-    log UpdateFeeManager(new_fee_manager)
+    self.accountant = new_accountant
+    log UpdateAccountant(new_accountant)
 
 @external
 def set_deposit_limit(deposit_limit: uint256):

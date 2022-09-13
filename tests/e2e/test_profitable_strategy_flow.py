@@ -20,7 +20,7 @@ def test_profitable_strategy_flow(
     add_strategy_to_vault,
     airdrop_asset,
     set_fees_for_strategy,
-    fee_manager,
+    accountant,
 ):
     performance_fee = 1_000  # 10%
 
@@ -37,7 +37,7 @@ def test_profitable_strategy_flow(
     vault = create_vault(asset)
     # We use lossy strategy as it allows us to create losses
     strategy = create_lossy_strategy(vault)
-    set_fees_for_strategy(gov, strategy, fee_manager, 0, performance_fee)
+    set_fees_for_strategy(gov, strategy, accountant, 0, performance_fee)
     add_strategy_to_vault(gov, strategy, vault)
 
     user_1_initial_balance = asset.balanceOf(user_1)
@@ -47,6 +47,9 @@ def test_profitable_strategy_flow(
     assert vault.balanceOf(user_1) == deposit_amount  # 1:1 assets:shares
     assert vault.price_per_share() / 10 ** asset.decimals() == 1.0
 
+    initial_total_assets = vault.totalAssets()
+    initial_total_supply = vault.totalSupply()
+
     add_debt_to_strategy(gov, strategy, vault, deposit_amount)
 
     assert vault.totalAssets() == deposit_amount
@@ -54,6 +57,7 @@ def test_profitable_strategy_flow(
     assert strategy.totalAssets() == deposit_amount
 
     # we simulate profit on strategy
+    total_fee = first_profit * (performance_fee / MAX_BPS)
     asset.transfer(strategy, first_profit, sender=whale)
 
     tx = vault.process_report(strategy.address, sender=gov)
@@ -68,7 +72,16 @@ def test_profitable_strategy_flow(
         first_profit * (1 - performance_fee / MAX_BPS) / days_to_secs(7) * MAX_BPS
     )
     profit_dist_rate = vault.profit_distribution_rate()
-    assert vault.price_per_share() / 10 ** vault.decimals() == 1.0
+
+    # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
+    share_price_before_minting_fees = (
+        initial_total_assets + total_fee
+    ) / initial_total_supply
+    assert vault.balanceOf(accountant) == pytest.approx(
+        total_fee / share_price_before_minting_fees, 1e-5
+    )
+    assert vault.price_per_share() / 10 ** vault.decimals() == pytest.approx(1.0, 1e-3)
+
     pps = vault.price_per_share()
 
     # let one day pass
@@ -197,7 +210,7 @@ def test_profitable_strategy_flow(
     assert asset.balanceOf(user_2) > user_2_initial_balance
 
     assert vault.totalAssets() == pytest.approx(
-        vault.convertToAssets(vault.balanceOf(fee_manager)), 1e-5
+        vault.convertToAssets(vault.balanceOf(accountant)), 1e-5
     )
     assert vault.totalAssets() == pytest.approx(strategy.totalAssets(), 1e-5)
 
