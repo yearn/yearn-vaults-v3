@@ -230,9 +230,9 @@ def _decrease_allowance(owner: address, spender: address, amount: uint256) -> bo
 
 # TODO: review correct implementation
 @internal
-def _permit(owner: address, spender: address, amount: uint256, expiry: uint256, signature: Bytes[65]) -> bool:
+def _permit(owner: address, spender: address, amount: uint256, deadline: uint256, v: uint8, r: bytes32, s: bytes32) -> bool:
     assert owner != empty(address), "invalid owner"
-    assert expiry == 0 or expiry >= block.timestamp, "permit expired"
+    assert deadline >= block.timestamp, "permit expired"
     nonce: uint256 = self.nonces[owner]
     digest: bytes32 = keccak256(
         concat(
@@ -245,16 +245,12 @@ def _permit(owner: address, spender: address, amount: uint256, expiry: uint256, 
                     convert(spender, bytes32),
                     convert(amount, bytes32),
                     convert(nonce, bytes32),
-                    convert(expiry, bytes32),
+                    convert(deadline, bytes32),
                 )
             )
         )
     )
-    # NOTE: signature is packed as r, s, v
-    r: uint256 = convert(slice(signature, 0, 32), uint256)
-    s: uint256 = convert(slice(signature, 32, 32), uint256)
-    v: uint256 = convert(slice(signature, 64, 1), uint256)
-    assert ecrecover(digest, v, r, s) == owner, "invalid signature"
+    assert ecrecover(digest, convert(v, uint256), convert(r, uint256), convert(s, uint256)) == owner, "invalid signature"
     self.allowance[owner][spender] = amount
     self.nonces[owner] = nonce + 1
     log Approval(owner, spender, amount)
@@ -986,8 +982,8 @@ def decreaseAllowance(spender: address, amount: uint256) -> bool:
     return self._decrease_allowance(msg.sender, spender, amount)
 
 @external
-def permit(owner: address, spender: address, amount: uint256, expiry: uint256, signature: Bytes[65]) -> bool:
-    return self._permit(owner, spender, amount, expiry, signature)
+def permit(owner: address, spender: address, amount: uint256, deadline: uint256, v: uint8, r: bytes32, s: bytes32) -> bool:
+    return self._permit(owner, spender, amount, deadline, v, r, s)
 
 @view
 @external
