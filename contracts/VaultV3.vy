@@ -144,6 +144,8 @@ accountant: public(address)
 health_check: public(address)
 # HashMap mapping addresses to their roles
 roles: public(HashMap[address, Roles])
+# HashMap mapping roles to their permissioned state. If false, the role is not open to the public
+open_roles: public(HashMap[Roles, bool])
 # Address that can add and remove addresses to roles 
 role_manager: public(address)
 # Temporary variable to store the address of the next role_manager until the role is accepted
@@ -864,12 +866,17 @@ def set_minimum_total_idle(minimum_total_idle: uint256):
 # ROLE MANAGEMENT #
 @internal
 def _enforce_role(account: address, role: Roles):
-    assert role in self.roles[account] # dev: not allowed
+    assert role in self.roles[account] or self.open_roles[role] # dev: not allowed
 
 @external
 def set_role(account: address, role: Roles):
     assert msg.sender == self.role_manager
     self.roles[account] = role
+
+@external
+def set_open_role(role: Roles):
+    assert msg.sender == self.role_manager
+    self.open_roles[role] = True
 
 @external
 def transfer_role_manager(role_manager: address):
