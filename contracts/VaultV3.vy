@@ -5,7 +5,6 @@ from vyper.interfaces import ERC4626
 from vyper.interfaces import ERC20Detailed
 
 # TODO: external contract: factory
-# TODO: external contract: healtcheck
 
 # INTERFACES #
 interface IStrategy:
