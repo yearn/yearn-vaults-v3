@@ -7,11 +7,7 @@
 - Strategy: Smart contract that is used to deposit in Protocols to generate yield
 - Vault: ERC4626 compliant Smart contract that receives Assets from Depositors to then distribute them among the different Strategies added to the vault, managing accounting and Assets distribution. 
 - Role: the different flags an Account can have in the Vault so that the Account can do certain specific actions. Can be fulfilled by a smart contract or an EOA.
-    - role_manager: the role assigner. Unique account that can add and remove flags to certain accounts
-    - ACCOUNTING_MANAGER: role in charge of functions that are related to accounting like P&L management or smart contract adding
-    - DEBT_MANAGER: role in charge of functions that are related to debt management like changing debt limits
-    - STRATEGY_MANAGER: role in charge of adding, removing and migrating strategies from the vault
-    - EMERGENCY_MANAGER: role in charge of calling the shutdown function if something happened
+- Accountant: smart contract that receives P&L reporting and returns shares and refunds to the strategy
 
 # VaultV3 Specification
 The Vault code has been designed as an unopinionated system to distribute funds of depositors into different opportunities (aka Strategies) and manage accounting in a robust way. That's all.
@@ -79,14 +75,17 @@ If totalAssets > currentDebt: the vault will record a profit
 Both loss and profit will impact strategy's debt, increasing the debt (current debt + profit) if there are profits, decreasing its debt (current debt - loss) if there are losses.
 
 #### Fees
-Fee assessment and distribution is handled by the accountant module. 
+Fee assessment and distribution is handled by the Accountant module. 
 
 It will report the amount of fees that need to be charged and the vault will issue shares for that amount of fees.
 
 ### Profit distribution 
-Profit from different processReport calls will accumulate in a buffer. This buffer will be linearly unlocked over the unlocking seconds. 
+Profit from different process_report calls will accumulate in a buffer. This buffer will be linearly unlocked over the locking period seconds at profit_distribution_rate. 
 
 Profits will be locked for a max period of time of PROFIT_MAX_UNLOCK_TIME seconds and will be gradually distributed. To avoid spending too much gas for profit unlock, the amount of time a profit will be locked is a weighted average between the new profit and the previous profit. 
+
+new_locking_period = locked_profit * pending_time_to_unlock + new_profit * PROFIT_MAX_UNLOCK_TIME / (locked_profit + new_profit)
+new_profit_distribution_rate = (locked_profit + new_profit) / new_locking_period
 
 Losses will be offset by locked profit, if possible.
 
@@ -102,12 +101,11 @@ This responsibility is taken by callers with STRATEGY_MANAGER role
 
 A vault can have strategies added, removed and migrated 
 
-Added strategies will be eligible to receive funds from the vault. 
+Added strategies will be eligible to receive funds from the vault, when the max_debt is set to > 0
 
-Revoked strategies will return all debt and stop being eligible to receive more. 
+Revoked strategies will return all debt and stop being eligible to receive more. It can only be done when the strategy's current_debt is 0
 
-Strategy migration is the process of replacing an existing strategy with a new one, which will inherit all parameters and debt
-
+Strategy migration is the process of replacing an existing strategy with a new one, which will inherit all parameters, including its debt
 
 ### Debt Management
 This responsibility is taken by callers with DEBT_MANAGER role
@@ -118,17 +116,20 @@ The debt manager can specify how many funds the vault should try to have reserve
 These funds will remain in the vault unless requested by a Depositor
 
 #### Setting maximum debt for a specific strategy
-The maximum amount of tokens the vault will allow a strategy to owe. 
+The maximum amount of tokens the vault will allow a strategy to owe at any moment in time.
 
+Stored in strategies[strategy].max_debt
+
+When a debt rebalance is triggered, the Vault will cap the new target debt to this number (max_debt)
 
 #### Rebalance Debt
-The vault sends and receives funds to/from strategies. The function updateDebt(strategy, target_debt) will compare the current debt with the target_debt and cap it to max_debt for that strategy.
+The vault sends and receives funds to/from strategies. The function updateDebt(strategy, target_debt) will set the current_debt of the strategy to target_debt (if possible)
 
 If the strategy currently has less debt than the target_debt, the vault will send funds to it.
 
-The vault checks that the minimumTotalIdle parameter is respected (i.e. there's at least a certain amount of funds in the vault).
+The vault checks that the `minimumTotalIdle` parameter is respected (i.e. there's at least a certain amount of funds in the vault).
 
-If the strategy has more debt than the maxDebt, the vault will request the funds back. These funds may be locked in the strategy, which will result in the strategy returning less funds than requested by the vault. 
+If the strategy has more debt than the max_debt, the vault will request the funds back. These funds may be locked in the strategy, which will result in the strategy returning less funds than requested by the vault. 
 
 ## Roles
 Vault functions that are permissioned will be callable by accounts that hold specific roles. 
@@ -141,7 +142,7 @@ These are:
 
 Every role can be filled by an EOA, multisig or other smart contracts. Each role can be filled by several accounts.
 
-The account that manages roles is a single account, set in `role_manager`. 
+The account that manages roles is a single account, set in `role_manager`.
 
 This role_manager can be an EOA, a multisig or a Governance Module that relays calls. 
 
@@ -158,14 +159,13 @@ In any case, to be compatible with the vault, they need to implement the followi
 - withdraw(assets, receiver, owner): withdraws `assets` amount of tokens from the strategy
 - balanceOf(address): return the number of shares of the strategy that the address has
 
-This means that the vault can deposit into any ERC4626 vault but also that a non-compliant strategy can be implemented provided that these functions have been implemented. 
+This means that the vault can deposit into any ERC4626 vault but also that a non-compliant strategy can be implemented provided that these functions have been implemented (even in a non ERC4626 compliant way). 
 
 Anything else is left to the strategy writer. However, to make security review easier, the Yearn's template has the following optional functions: 
 - tend(): a function that will be called by bots. It will do anything to maintain a position, act on certain triggers, ...
 - tendTrigger(): implementation that trigger bots that will call tend function on the contract
 - invest(): deposit funds into underlying protocol
 - emergencyFreeFunds(): close the position and return funds to the strategy. Losses might be accepted here.
-- ...
 
 
 ## ERC4626 compliance
@@ -186,16 +186,15 @@ _Light emergency_: Deposits can be paused by setting depositLimit to 0
 _Shutdown mode_: Deposits are not allowed
 
 ### Withdrawals
-Withdrawals can't be paused under any circumstance by any role
+Withdrawals can't be paused under any circumstance
 
 ### Accounting
-Shutdown mode does not affect accounting.
+Shutdown mode does not affect accounting
 
 ### Debt rebalance
 _Light emergency_: Setting minimumTotalIdle to MAX_UINT256 will result in the vault requesting the debt back from strategies. This would stop new strategies from getting funded too, as the vault prioritizes minimumTotalIdle
 
 _Shutdown mode_: All strategies' maxDebt is set to 0. Strategies will return funds as soon as they can.
-
 
 ### Relevant emergency
 In the case the current roles stop fulfilling their responsibilities or something else's happen, the EMERGENCY_MANAGER can shutdown the vault. 
@@ -207,11 +206,3 @@ During shutdown mode, the vault will try to get funds back from every strategy a
 No strategies can be added during shutdown
 
 Any relevant role will start pointing to the EMERGENCY_MANAGER in case new permissioned allowed actions need to be taken.
-
-TODO: keep it irreversible?
-
-TODO: emergencyFreeFunds: implement a way to force wind down of a strategy (even taking losses) only callable by EMERGENCY_MANAGER?
-
-# Yearn Registry Specification
-
-TODO
