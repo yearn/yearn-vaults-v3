@@ -3,6 +3,11 @@ from utils.constants import ROLES
 from utils.utils import from_units
 
 
+def test_check_set_open_role_access(vault, bunny):
+    with ape.reverts():
+        vault.set_open_role(ROLES.STRATEGY_MANAGER, sender=bunny)
+
+
 def test_set_strategy_role_open(vault, create_strategy, bunny, gov):
     new_strategy = create_strategy(vault)
     with ape.reverts():
