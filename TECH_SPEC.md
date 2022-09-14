@@ -1,25 +1,24 @@
 # Yearn System Specification (DRAFT)
 
 ### Definitions
-TODO: fill these definitions
-- VAULT: 
-- ASSET:
-- SHARE: 
-- DEPOSITOR: 
-- STRATEGY: 
-- ROLES:
-    - role_manager
-    - ACCOUNTING_MANAGER
-    - DEBT_MANAGER
-    - STRATEGY_MANAGER
-    - EMERGENCY_MANAGER
+- Asset: Any ERC20-compliant token
+- Shares: ERC20-compliant token that tracks Asset balance in the vault for every distributor. Named yv<Asset_Symbol>
+- Depositor: Account that holds Shares
+- Strategy: Smart contract that is used to deposit in Protocols to generate yield
+- Vault: ERC4626 compliant Smart contract that receives Assets from Depositors to then distribute them among the different Strategies added to the vault, managing accounting and Assets distribution. 
+- Role: the different flags an Account can have in the Vault so that the Account can do certain specific actions. Can be fulfilled by a smart contract or an EOA.
+    - role_manager: the role assigner. Unique account that can add and remove flags to certain accounts
+    - ACCOUNTING_MANAGER: role in charge of functions that are related to accounting like P&L management or smart contract adding
+    - DEBT_MANAGER: role in charge of functions that are related to debt management like changing debt limits
+    - STRATEGY_MANAGER: role in charge of adding, removing and migrating strategies from the vault
+    - EMERGENCY_MANAGER: role in charge of calling the shutdown function if something happened
 
 # VaultV3 Specification
-The vault code has been designed as an unopinionated system to distribute funds of depositors into different opportunities (aka strategies) and manage accounting in a robust way. That's all.
+The Vault code has been designed as an unopinionated system to distribute funds of depositors into different opportunities (aka Strategies) and manage accounting in a robust way. That's all.
 
 The depositors receive shares of the different investments that can then be redeemed or used as yield-bearing tokens.
 
-The Vault does not have a preference on any of the dimensions that should be considered:
+The Vault does not have a preference on any of the dimensions that should be considered when operating a vault:
 - *Decentralization*: roles can be filled by EOA, smart contract like multisig or governance module
 - *Liquidity*: vault can have 0 liquidity or be fully liquid. It will depend on parameters and strategies added
 - *Security*: vault managers can choose what strategies to add and how to do that process
@@ -42,15 +41,16 @@ We expect all the vaults available to be deployed from a Factory Contract, publi
 Players deploying "branded" vaults (e.g. Yearn) will use a separate registry to allow permissioned endorsement of vaults for their product
 
 When deploying a new vault, it requires the following parameters:
-- asset
-- name
-- symbol
-- role_manager
+- asset: address of the ERC20 token that can be deposited in the vault
+- name: name of Shares as described in ERC20
+- symbol: symbol of Shares ERC20
+- role_manager: account that can assign and revoke Roles
+- PROFIT_MAX_UNLOCK_TIME: max amount of time profit will be locked before being distributed
 
 ## Normal Operation
 
 ### Deposits / Mints
-Users can deposit ASSET tokens to receive yvTokens (SHARES). 
+Users can deposit ASSET tokens to receive yvTokens (SHARES).
 
 Deposits are limited under depositLimit and shutdown parameters. Read below for details.
 
