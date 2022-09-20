@@ -7,6 +7,7 @@ import pytest
 def test_total_debt(
     create_vault,
     asset,
+    fish_amount,
     create_strategy,
     user_deposit,
     fish,
@@ -14,13 +15,9 @@ def test_total_debt(
     add_debt_to_strategy,
     gov,
 ):
-    """
-    Method vault.total_debt() returns the total debt that the vault has. If there are profits that have been unlocked,
-    it will estimate them.
-    """
 
-    amount = 10**9
-    first_profit = 10**9
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
 
     initial_timestamp = chain.pending_timestamp
 
@@ -67,12 +64,13 @@ def test_profit_distribution_rate(
     create_strategy,
     user_deposit,
     fish,
+    fish_amount,
     add_strategy_to_vault,
     add_debt_to_strategy,
     gov,
 ):
-    amount = 10**9
-    first_profit = 10**9
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
 
     initial_timestamp = chain.pending_timestamp
 
@@ -92,13 +90,17 @@ def test_profit_distribution_rate(
     asset.transfer(strategy, first_profit, sender=fish)
     vault.process_report(strategy, sender=gov)
 
-    assert vault.profit_distribution_rate() == int(first_profit / WEEK * MAX_BPS)
+    assert vault.profit_distribution_rate() == pytest.approx(
+        first_profit / WEEK * MAX_BPS, 1e-6
+    )
 
     # We increase time and check estimation
     chain.pending_timestamp = initial_timestamp + days_to_secs(4)
     chain.mine(timestamp=chain.pending_timestamp)
 
-    assert vault.profit_distribution_rate() == int(first_profit / WEEK * MAX_BPS)
+    assert vault.profit_distribution_rate() == pytest.approx(
+        first_profit / WEEK * MAX_BPS
+    )
 
     # We increase time after profit has been released and check estimation
     chain.pending_timestamp = initial_timestamp + days_to_secs(10)
@@ -111,6 +113,7 @@ def test_profit_distribution_rate(
 def test_profit_distribution__one_gain(
     gov,
     fish,
+    fish_amount,
     asset,
     create_vault,
     create_strategy,
@@ -118,14 +121,9 @@ def test_profit_distribution__one_gain(
     add_strategy_to_vault,
     add_debt_to_strategy,
 ):
-    """
-    Scenario where there is a gain on day 1 of 1000 assets.
-    Initially we have 1000 assets and therefore 1000 shares (1:1).
-    By day 8, total_assets should be 1000 + 1000 = 2000 assets
-    """
 
-    amount = 10**9
-    first_profit = 10**9
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
 
     initial_timestamp = chain.pending_timestamp
 
@@ -165,7 +163,9 @@ def test_profit_distribution__one_gain(
     assert vault.total_idle() == 0
     assert vault.price_per_share() == pps_before_profit
 
-    assert vault.profit_distribution_rate() == int(first_profit / WEEK * MAX_BPS)
+    assert vault.profit_distribution_rate() == pytest.approx(
+        first_profit / WEEK * MAX_BPS, 1e-6
+    )
     assert vault.profit_last_update() == pytest.approx(chain.pending_timestamp, abs=5)
 
     # We move in time and we keep checking values
@@ -188,6 +188,7 @@ def test_profit_distribution__one_gain(
 def test_profit_distribution__two_gain(
     gov,
     fish,
+    fish_amount,
     asset,
     create_vault,
     create_strategy,
@@ -195,15 +196,10 @@ def test_profit_distribution__two_gain(
     add_strategy_to_vault,
     add_debt_to_strategy,
 ):
-    """
-    Scenario where there is a gain on day 1 of 1000 assets and a gain on day 3 of 500 assets.
-    Initially we have 1000 assets and therefore 1000 shares (1:1).
-    By day 8, total_assets should be 1000 + 1000 + 500 = 2500 assets
-    """
 
-    amount = 10**9
-    first_profit = 10**9
-    second_profit = 10**9
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
+    second_profit = fish_amount // 10
 
     initial_timestamp = chain.pending_timestamp
 
@@ -235,7 +231,9 @@ def test_profit_distribution__two_gain(
     assert vault.total_debt() == amount
     assert vault.total_idle() == 0
 
-    assert vault.profit_distribution_rate() == int(first_profit / WEEK * MAX_BPS)
+    assert vault.profit_distribution_rate() == pytest.approx(
+        first_profit / WEEK * MAX_BPS, 1e-6
+    )
     dist_rate_before_second_profit = vault.profit_distribution_rate()
     assert vault.profit_end_date() == pytest.approx(
         days_to_secs(8) + initial_timestamp, abs=5
@@ -280,6 +278,7 @@ def test_profit_distribution__two_gain(
 def test_profit_distribution__one_gain_one_loss(
     gov,
     fish,
+    fish_amount,
     asset,
     create_vault,
     create_lossy_strategy,
@@ -287,16 +286,10 @@ def test_profit_distribution__one_gain_one_loss(
     add_strategy_to_vault,
     add_debt_to_strategy,
 ):
-    """
-    Scenario where there is a gain on day 1 of 1000 assets and a loss on
-    day 4 of 500 assets.
-    Initially we have 1000 assets and therefore 1000 shares (1:1).
-    By day 8, total_assets should be 1000 + 1000 - 500 = 1500 assets
-    """
 
-    amount = 10**9
-    profit = 10**9
-    loss = int(10**9 / 2)
+    amount = fish_amount // 10
+    profit = fish_amount // 10
+    loss = fish_amount // 20
 
     initial_timestamp = chain.pending_timestamp
 
@@ -328,7 +321,9 @@ def test_profit_distribution__one_gain_one_loss(
     strategy.setLoss(fish, loss, sender=gov)
     assert strategy.totalAssets() == amount + profit - loss
 
-    assert vault.profit_distribution_rate() == int(profit / WEEK * MAX_BPS)
+    assert vault.profit_distribution_rate() == pytest.approx(
+        profit / WEEK * MAX_BPS, 1e-6
+    )
     dist_rate_profit_1_before_loss = vault.profit_distribution_rate()
 
     tx = vault.process_report(strategy, sender=gov)
@@ -349,6 +344,7 @@ def test_profit_distribution__one_gain_one_loss(
 def test_profit_distribution__one_gain_one_big_loss(
     gov,
     fish,
+    fish_amount,
     asset,
     create_vault,
     create_lossy_strategy,
@@ -356,17 +352,10 @@ def test_profit_distribution__one_gain_one_big_loss(
     add_strategy_to_vault,
     add_debt_to_strategy,
 ):
-    """
-    Scenario where there is a gain on day 1 of 500 assets, and a loss on
-    day 2 of 1000 assets.
-    Initially we have 1000 assets and therefore 1000 shares (1:1).
-    By day 2, total_assets should be 1000 + 500 - 1000 = 500 assets.
-    Loss is too big for the profitBuffer, so it should drain it and reset profit_distribution_rate
-    """
 
-    amount = 10**9
-    first_profit = int(10**9 / 2)
-    big_loss = 10**9
+    amount = fish_amount // 10
+    first_profit = fish_amount // 20
+    big_loss = fish_amount // 10
 
     initial_timestamp = chain.pending_timestamp
 
@@ -402,12 +391,13 @@ def test_profit_distribution__one_gain_one_big_loss(
 
     # There should not be any profit on the history
     assert vault.profit_distribution_rate() == 0
-    assert vault.totalAssets() == pytest.approx(10**9 / 2, 1e-5)
+    assert vault.totalAssets() == pytest.approx(fish_amount // 20, 1e-6)
 
 
 def test_profit_distribution__one_gain_with_fees(
     gov,
     fish,
+    fish_amount,
     asset,
     create_vault,
     create_strategy,
@@ -417,13 +407,10 @@ def test_profit_distribution__one_gain_with_fees(
     set_fees_for_strategy,
     accountant,
 ):
-    """
-    Scenario where there is a gain on day 1 of 1000 assets and there are performance fees.
-    Initially we have 1000 assets and therefore 1000 shares (1:1).
-    """
 
-    amount = 10**9
-    profit = 10**9
+    amount = fish_amount // 10
+    profit = fish_amount // 10
+
     management_fee = 0
     performance_fee = 1_000
     total_fees = profit // 10
@@ -480,8 +467,8 @@ def test_profit_distribution__one_gain_with_fees(
     share_price_before_minting_fees = (
         initial_total_assets + total_fees
     ) / initial_total_supply
-    assert vault.balanceOf(accountant) == int(
-        total_fees / share_price_before_minting_fees
+    assert vault.balanceOf(accountant) == pytest.approx(
+        total_fees / share_price_before_minting_fees, 1e-6
     )
 
     assert vault.price_per_share() / 10 ** vault.decimals() == pytest.approx(
@@ -494,6 +481,7 @@ def test_profit_distribution__one_gain_with_fees(
 def test_profit_distribution__one_gain_with_100_percent_fees(
     gov,
     fish,
+    fish_amount,
     asset,
     create_vault,
     create_strategy,
@@ -503,13 +491,10 @@ def test_profit_distribution__one_gain_with_100_percent_fees(
     set_fees_for_strategy,
     flexible_accountant,
 ):
-    """
-    Scenario where there is a gain on day 1 of 1000 assets and there are performance fees of 100% of profit.
-    Initially we have 1000 assets and therefore 1000 shares (1:1).
-    """
 
-    amount = 10**9
-    profit = 10**9
+    amount = fish_amount // 10
+    profit = fish_amount // 10
+
     management_fee = 0
     performance_fee = 10_000
     total_fees = profit
@@ -579,6 +564,7 @@ def test_profit_distribution__one_gain_with_100_percent_fees(
 def test_profit_distribution__one_gain_with_200_percent_fees(
     gov,
     fish,
+    fish_amount,
     asset,
     create_vault,
     create_strategy,
@@ -588,13 +574,10 @@ def test_profit_distribution__one_gain_with_200_percent_fees(
     set_fees_for_strategy,
     flexible_accountant,
 ):
-    """
-    Scenario where there is a gain on day 1 of 1000 assets and there are performance fees of 200% of profit.
-    Initially we have 1000 assets and therefore 1000 shares (1:1).
-    """
 
-    amount = 10**9
-    profit = 10**9
+    amount = fish_amount // 10
+    profit = fish_amount // 10
+
     management_fee = 0
     performance_fee = 20_000
     total_fees = profit * 2
@@ -665,6 +648,7 @@ def test_profit_distribution__one_gain_with_200_percent_fees(
 def test_profit_distribution__one_gain_with_200_percent_fees_and_enough_pending_profit(
     gov,
     fish,
+    fish_amount,
     asset,
     create_vault,
     create_strategy,
@@ -674,15 +658,11 @@ def test_profit_distribution__one_gain_with_200_percent_fees_and_enough_pending_
     set_fees_for_strategy,
     flexible_accountant,
 ):
-    """
-    Scenario where there is a gain on day 1 of 1000 assets without fees. After there is another profit
-    and there are performance fees of 200% of profit.
-    Initially we have 1000 assets and therefore 1000 shares (1:1).
-    """
 
-    amount = 10**9
-    first_profit = int(5 * 10**9)
-    second_profit = int(10**9)
+    amount = fish_amount // 10
+    first_profit = fish_amount // 2
+    second_profit = fish_amount // 10
+
     management_fee = 0
     performance_fee = 20_000
 
@@ -750,6 +730,7 @@ def test_profit_distribution__one_gain_with_200_percent_fees_and_enough_pending_
 def test_profit_distribution__one_loss_with_very_big_fees_and_small_pending_profit(
     gov,
     fish,
+    fish_amount,
     asset,
     create_vault,
     create_lossy_strategy,
@@ -759,8 +740,8 @@ def test_profit_distribution__one_loss_with_very_big_fees_and_small_pending_prof
     set_fees_for_strategy,
     flexible_accountant,
 ):
-    amount = 10 * 10**9
-    profit = int(10**9)
+    amount = fish_amount // 10
+    profit = fish_amount // 100
     loss = 2 * profit
     # We have a very big management fee only for testing purposes
     management_fee = MAX_BPS * 100
@@ -833,6 +814,7 @@ def test_profit_distribution__one_loss_with_very_big_fees_and_small_pending_prof
 def test_profit_distribution__one_gain_one_deposit_one_withdraw(
     gov,
     fish,
+    fish_amount,
     asset,
     create_vault,
     create_strategy,
@@ -840,15 +822,10 @@ def test_profit_distribution__one_gain_one_deposit_one_withdraw(
     add_strategy_to_vault,
     add_debt_to_strategy,
 ):
-    """
-    Scenario where there is a gain on day 1 of 1000 assets, a deposit on day 2 of 1000 assets and a withdrawal
-    of 1000 assets on day 3.
-    Initially we have 1000 assets and therefore 1000 shares (1:1).
-    """
 
-    amount = 10**9
-    first_profit = 10**9
-    deposit = 10**9
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
+    deposit = fish_amount // 10
     withdraw = deposit
 
     initial_timestamp = chain.pending_timestamp
@@ -915,6 +892,7 @@ def test_profit_distribution__one_gain_one_deposit_one_withdraw(
 def test_unlocking_time_to_zero_days(
     gov,
     fish,
+    fish_amount,
     asset,
     create_vault,
     create_lossy_strategy,
@@ -922,8 +900,9 @@ def test_unlocking_time_to_zero_days(
     add_strategy_to_vault,
     add_debt_to_strategy,
 ):
-    amount = 10**9
-    profit = 10**9
+
+    amount = fish_amount // 10
+    profit = fish_amount // 10
 
     initial_timestamp = chain.pending_timestamp
 
@@ -948,6 +927,7 @@ def test_unlocking_time_to_zero_days(
 def test_profit_distribution__one_loss_and_enough_pending_profit_no_fees(
     gov,
     fish,
+    fish_amount,
     asset,
     create_vault,
     create_lossy_strategy,
@@ -957,8 +937,8 @@ def test_profit_distribution__one_loss_and_enough_pending_profit_no_fees(
     set_fees_for_strategy,
     flexible_accountant,
 ):
-    amount = 10 * 10**9
-    profit = int(5 * 10**9)
+    amount = fish_amount // 10
+    profit = fish_amount // 40
     loss = profit // 2
 
     vault = create_vault(asset, accountant=flexible_accountant)
@@ -981,7 +961,9 @@ def test_profit_distribution__one_loss_and_enough_pending_profit_no_fees(
     vault.process_report(lossy_strategy, sender=gov)
 
     assert vault.price_per_share() / 10 ** vault.decimals() == 1.0
-    assert vault.profit_distribution_rate() == int(profit / WEEK * MAX_BPS)
+    assert vault.profit_distribution_rate() == pytest.approx(
+        profit / WEEK * MAX_BPS, 1e-6
+    )
 
     distribution_rate_bef_loss = vault.profit_distribution_rate()
 
@@ -1002,14 +984,14 @@ def test_profit_distribution__one_loss_and_enough_pending_profit_no_fees(
 
     # Profit distribution dumps loss and therefore its distribution rate is lower...
     pending_profit_bef_loss = distribution_rate_bef_loss * (WEEK - DAY) / MAX_BPS
-    assert vault.profit_distribution_rate() == int(
-        (pending_profit_bef_loss - loss) / (WEEK - DAY) * MAX_BPS
+    assert vault.profit_distribution_rate() == pytest.approx(
+        (pending_profit_bef_loss - loss) / (WEEK - DAY) * MAX_BPS, 1e-6
     )
 
     # Price per share does not decrease, it actually increases as some profit gets unlocked
     assert vault.price_per_share() > pps_before_loss
-    assert vault.totalAssets() == int(
-        amount + distribution_rate_bef_loss * DAY / MAX_BPS
+    assert vault.totalAssets() == pytest.approx(
+        amount + distribution_rate_bef_loss * DAY / MAX_BPS, 1e-6
     )
 
     chain.pending_timestamp = initial_timestamp + 10 * DAY
@@ -1022,6 +1004,7 @@ def test_profit_distribution__one_loss_and_enough_pending_profit_no_fees(
 def test_profit_distribution__one_loss_and_enough_pending_profit_and_small_fees(
     gov,
     fish,
+    fish_amount,
     asset,
     create_vault,
     create_lossy_strategy,
@@ -1031,8 +1014,8 @@ def test_profit_distribution__one_loss_and_enough_pending_profit_and_small_fees(
     set_fees_for_strategy,
     flexible_accountant,
 ):
-    amount = 10 * 10**9
-    profit = int(5 * 10**9)
+    amount = fish_amount // 10
+    profit = fish_amount // 40
     loss = profit // 2
     management_fee = 0
     performance_fee = 1000
@@ -1091,8 +1074,8 @@ def test_profit_distribution__one_loss_and_enough_pending_profit_and_small_fees(
 
     # Profit distribution dumps loss and therefore its distribution rate is lower...
     pending_profit_bef_loss = distribution_rate_bef_loss * (WEEK - DAY) / MAX_BPS
-    assert vault.profit_distribution_rate() == int(
-        (pending_profit_bef_loss - loss) / (WEEK - DAY) * MAX_BPS
+    assert vault.profit_distribution_rate() == pytest.approx(
+        (pending_profit_bef_loss - loss) / (WEEK - DAY) * MAX_BPS, 1e-6
     )
 
     # Price per share does not decrease, it actually increases as some profit gets unlocked
