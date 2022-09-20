@@ -5,6 +5,15 @@ from ape import chain
 from utils.utils import days_to_secs
 
 
+def relative_error(asset):
+    if asset.decimals() >= 8:
+        return 1e-5
+    if asset.decimals() >= 4:
+        return 1e-4
+    else:
+        return 1e-3
+
+
 def test_profitable_strategy_flow(
     asset,
     gov,
@@ -65,11 +74,12 @@ def test_profitable_strategy_flow(
     assert event[0].gain == first_profit
 
     # pps is maintained at 1:1, but assets are increased due to fees
-    assert (
-        vault.totalAssets() == deposit_amount + first_profit * performance_fee / MAX_BPS
+    assert vault.totalAssets() == pytest.approx(
+        deposit_amount + first_profit * performance_fee / MAX_BPS, relative_error(asset)
     )
-    assert vault.profit_distribution_rate() == int(
-        first_profit * (1 - performance_fee / MAX_BPS) / days_to_secs(7) * MAX_BPS
+    assert vault.profit_distribution_rate() == pytest.approx(
+        first_profit * (1 - performance_fee / MAX_BPS) / days_to_secs(7) * MAX_BPS,
+        rel=relative_error(asset),
     )
     profit_dist_rate = vault.profit_distribution_rate()
 
@@ -78,8 +88,9 @@ def test_profitable_strategy_flow(
         initial_total_assets + total_fee
     ) / initial_total_supply
     assert vault.balanceOf(accountant) == pytest.approx(
-        total_fee / share_price_before_minting_fees, 1e-5
+        total_fee / share_price_before_minting_fees, relative_error(asset)
     )
+    # pps is slightly higher as we are minting fees for a lower value
     assert vault.price_per_share() / 10 ** vault.decimals() == pytest.approx(1.0, 1e-3)
 
     pps = vault.price_per_share()
@@ -93,7 +104,7 @@ def test_profitable_strategy_flow(
         deposit_amount
         + first_profit * performance_fee / MAX_BPS
         + vault.profit_distribution_rate() / MAX_BPS * days_to_secs(1),
-        1e-5,
+        relative_error(asset),
     )
     assert vault.profit_distribution_rate() == profit_dist_rate
     assert vault.price_per_share() > pps
@@ -126,16 +137,20 @@ def test_profitable_strategy_flow(
     pps_before_loss = vault.price_per_share()
     assets_before_loss = vault.totalAssets()
     profit_dist_rate_before_loss = vault.profit_distribution_rate()
+
     # we create a small loss that should be damped by profit buffer
     strategy.setLoss(gov, first_loss, sender=gov)
     tx = vault.process_report(strategy.address, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].loss == first_loss
 
-    # loss doesnt impact vault but distribution rate
+    # loss doesnt impact totalAssets but distribution rate. There are actually more
+    # assets as some of the profit has been unlocked
     assert vault.profit_distribution_rate() < profit_dist_rate_before_loss
     assert vault.totalAssets() > assets_before_loss
-    assert vault.price_per_share() > pps_before_loss
+
+    # pps is slightly higher, however due to decimals, it does not reflect
+    assert vault.price_per_share() >= pps_before_loss
 
     assert vault.total_idle() == 0
     # Les set a `minimum_total_idle` value
@@ -176,7 +191,7 @@ def test_profitable_strategy_flow(
         + second_profit
         - first_loss
         - user_1_withdraw,
-        1e-5,
+        relative_error(asset),
     )
 
     with ape.reverts("insufficient assets in vault"):
@@ -210,9 +225,11 @@ def test_profitable_strategy_flow(
     assert asset.balanceOf(user_2) > user_2_initial_balance
 
     assert vault.totalAssets() == pytest.approx(
-        vault.convertToAssets(vault.balanceOf(accountant)), 1e-5
+        vault.convertToAssets(vault.balanceOf(accountant)), relative_error(asset)
     )
-    assert vault.totalAssets() == pytest.approx(strategy.totalAssets(), 1e-5)
+    assert vault.totalAssets() == pytest.approx(
+        strategy.totalAssets(), relative_error(asset)
+    )
 
     # Let's empty the strategy and revoke it
     add_debt_to_strategy(gov, strategy, vault, 0)

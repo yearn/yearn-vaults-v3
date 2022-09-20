@@ -14,8 +14,14 @@ def gov(accounts):
 
 
 @pytest.fixture(scope="session")
-def fish_amount():
-    yield 10**18
+def fish_amount(asset):
+    # Working always with 10_000.00
+    yield 10 ** (asset.decimals() + 4)
+
+
+@pytest.fixture(scope="session")
+def half_fish_amount(fish_amount):
+    yield fish_amount // 2
 
 
 @pytest.fixture(scope="session")
@@ -26,8 +32,9 @@ def fish(accounts, asset, gov, fish_amount):
 
 
 @pytest.fixture(scope="session")
-def whale_amount():
-    yield 10**22
+def whale_amount(asset):
+    # Working always with 1_000_000.00
+    yield 10 ** (asset.decimals() + 6)
 
 
 @pytest.fixture(scope="session")
@@ -82,10 +89,10 @@ def keeper(accounts):
     yield accounts[11]
 
 
-# use this for general asset mock
-@pytest.fixture(scope="session")
-def asset(create_token):
-    return create_token("asset")
+@pytest.fixture(scope="session", params=[18, 8, 6])
+def asset(create_token, request):
+    decimals = request.param
+    return create_token("asset", decimals)
 
 
 # use this for token mock
@@ -97,8 +104,8 @@ def mock_token(create_token):
 # use this to create other tokens
 @pytest.fixture(scope="session")
 def create_token(project, gov):
-    def create_token(name):
-        return gov.deploy(project.Token, name)
+    def create_token(name, decimals=18):
+        return gov.deploy(project.Token, name, decimals)
 
     yield create_token
 

@@ -11,10 +11,18 @@ abstract contract ERC4626BaseStrategyMock is ERC4626BaseStrategy {
     uint256 public minDebt;
     uint256 public maxDebt = type(uint256).max;
 
+    //    uint8 _decimals;
+
     constructor(address _vault, address _asset)
         ERC4626BaseStrategy(_vault, _asset)
         ERC20("a", "a")
-    {}
+    {
+        //        _decimals = IERC20(asset()).decimals();
+    }
+
+    //    function decimals() public view virtual override returns (uint8) {
+    //            return _decimals;
+    //    }
 
     function setMinDebt(uint256 _minDebt) external {
         minDebt = _minDebt;
