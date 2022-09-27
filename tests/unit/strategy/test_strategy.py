@@ -47,11 +47,17 @@ def test_locked_strategy__with_locked_asset(
 
 
 def test_lossy_strategy__with_multiple_losses(
-    gov, fish, asset, vault, create_lossy_strategy, mint_and_deposit_into_strategy
+    gov,
+    fish,
+    fish_amount,
+    asset,
+    vault,
+    create_lossy_strategy,
+    mint_and_deposit_into_strategy,
 ):
     strategy = create_lossy_strategy(vault)
-    amount = 10 * 10**18
-    loss = 10**18
+    amount = fish_amount // 2
+    loss = amount // 10
 
     mint_and_deposit_into_strategy(strategy, vault, amount)
     assert asset.balanceOf(strategy) == amount
@@ -62,7 +68,6 @@ def test_lossy_strategy__with_multiple_losses(
     assert asset.balanceOf(strategy) == initial_loss
     assert strategy.maxWithdraw(vault) == initial_loss
 
-    strategy.setLoss(fish.address, loss, sender=gov)
     secondary_loss = initial_loss - loss
     assert asset.balanceOf(strategy) == secondary_loss
     assert strategy.maxWithdraw(vault) == secondary_loss

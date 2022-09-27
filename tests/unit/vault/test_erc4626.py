@@ -136,6 +136,8 @@ def test_max_withdraw__with_balance_greater_than_total_idle__returns_total_idle(
     vault.set_role(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
     user_deposit(fish, vault, asset, assets)
     add_strategy_to_vault(gov, strategy, vault)
+
+    assert 0
     add_debt_to_strategy(gov, strategy, vault, strategy_deposit)
 
     assert vault.maxWithdraw(fish.address) == total_idle

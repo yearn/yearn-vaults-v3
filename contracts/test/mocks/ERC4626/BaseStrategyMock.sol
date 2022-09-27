@@ -3,6 +3,7 @@ pragma solidity 0.8.14;
 
 import {ERC4626BaseStrategy, IERC20} from "../../ERC4626BaseStrategy.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 abstract contract ERC4626BaseStrategyMock is ERC4626BaseStrategy {
@@ -55,4 +56,18 @@ abstract contract ERC4626BaseStrategyMock is ERC4626BaseStrategy {
         override
         returns (address[] memory _protected)
     {}
+
+    function deposit(uint256 assets, address receiver)
+        public
+        override
+        returns (uint256)
+    {
+        // transfer and invest
+//        IERC20(asset()).transferFrom(receiver, address(this), assets);
+        SafeERC20.safeTransferFrom(IERC20(asset()), receiver, address(this), assets);
+//        return assets;
+        emit n(assets, receiver, address(this));
+        return assets;
+    }
+    event n(uint256 assets, address receiver, address strategy);
 }
