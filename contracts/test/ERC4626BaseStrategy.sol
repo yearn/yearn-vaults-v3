@@ -26,8 +26,8 @@ abstract contract ERC4626BaseStrategy is IStrategyERC4626, ERC4626 {
         _decimals = IERC20Metadata(address(_asset)).decimals();
 
         vault = _vault;
-        // using approve since initialization is only called once
-        IERC20(_asset).approve(_vault, type(uint256).max); // Give Vault unlimited access (might save gas)
+        //        // using approve since initialization is only called once
+        //        IERC20(_asset).approve(_vault, type(uint256).max); // Give Vault unlimited access (might save gas)
     }
 
     /** @dev See {IERC20Metadata-decimals}. */

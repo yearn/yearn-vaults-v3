@@ -102,9 +102,25 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
             total_refunds = asset_balance
         if total_refunds > 0:
             # TODO: permissions implications. msg.sender should only be vault
-            ERC20(self.asset).approve(msg.sender, total_refunds)
+            self.erc20_safe_approve(self.asset, msg.sender, total_refunds)
         
     return (total_fees, total_refunds)
+
+@internal
+def erc20_safe_approve(token: address, spender: address, amount: uint256):
+    # Used only to send tokens that are not the type managed by this Vault.
+    # HACK: Used to handle non-compliant tokens like USDT
+    response: Bytes[32] = raw_call(
+        token,
+        concat(
+            method_id("approve(address,uint256)"),
+            convert(spender, bytes32),
+            convert(amount, bytes32),
+        ),
+        max_outsize=32,
+    )
+    if len(response) > 0:
+        assert convert(response, bool), "Transfer failed!"
 
 
 @external

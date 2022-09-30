@@ -304,6 +304,23 @@ def _convert_to_shares(assets: uint256) -> uint256:
 
 # TODO: review in detail
 @internal
+def erc20_safe_approve(token: address, spender: address, amount: uint256):
+    # Used only to send tokens that are not the type managed by this Vault.
+    # HACK: Used to handle non-compliant tokens like USDT
+    response: Bytes[32] = raw_call(
+        token,
+        concat(
+            method_id("approve(address,uint256)"),
+            convert(spender, bytes32),
+            convert(amount, bytes32),
+        ),
+        max_outsize=32,
+    )
+    if len(response) > 0:
+        assert convert(response, bool), "Transfer failed!"
+
+
+@internal
 def erc20_safe_transfer_from(token: address, sender: address, receiver: address, amount: uint256):
     # Used only to send tokens that are not the type managed by this Vault.
     # HACK: Used to handle non-compliant tokens like USDT
@@ -661,9 +678,9 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
             assets_to_transfer = available_idle
             new_debt = current_debt + assets_to_transfer
         if assets_to_transfer > 0:
-            ASSET.approve(strategy, assets_to_transfer)
+            self.erc20_safe_approve(ASSET.address, strategy, assets_to_transfer)
             IStrategy(strategy).deposit(assets_to_transfer, self)
-            ASSET.approve(strategy, 0)
+            self.erc20_safe_approve(ASSET.address, strategy, 0)
             self.total_idle -= assets_to_transfer
             self.total_debt_ += assets_to_transfer
 
@@ -774,7 +791,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if total_refunds > 0:
         # Accountant should approve transfer of assets
         total_refunds = min(total_refunds, ASSET.balanceOf(accountant))
-        ASSET.transferFrom(self.accountant, self, total_refunds)
+        self.erc20_safe_transfer_from(ASSET.address, self.accountant, self, total_refunds)
         # Assets coming from refunds are allocated as total_idle
         self.total_idle += total_refunds
 
@@ -917,7 +934,7 @@ def sweep(token: address) -> (uint256):
     else:
         amount = ERC20(token).balanceOf(self)
     assert amount != 0, "no dust"
-    ERC20(token).transfer(msg.sender, amount)
+    self.erc20_safe_transfer(ASSET.address, msg.sender, amount)
     log Sweep(token, amount)
     return amount
 

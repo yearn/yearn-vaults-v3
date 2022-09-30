@@ -2,8 +2,11 @@
 pragma solidity 0.8.14;
 
 import {ERC4626BaseStrategyMock, IERC20} from "./BaseStrategyMock.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
+    using SafeERC20 for IERC20;
+
     uint256 public withdrawingLoss;
 
     constructor(address _vault, address _asset)
@@ -12,7 +15,7 @@ contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
 
     // used to generate losses, accepts single arg to send losses to
     function setLoss(address _target, uint256 _loss) external {
-        IERC20(asset()).transfer(_target, _loss);
+        IERC20(asset()).safeTransfer(_target, _loss);
     }
 
     function setWithdrawingLoss(uint256 _loss) external {
@@ -20,28 +23,28 @@ contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
     }
 
     function _withdraw(
-        address caller,
-        address receiver,
-        address owner,
-        uint256 assets,
-        uint256 shares
+        address _caller,
+        address _receiver,
+        address _owner,
+        uint256 _assets,
+        uint256 _shares
     ) internal override {
-        if (caller != owner) {
-            _spendAllowance(owner, caller, shares);
+        if (_caller != _owner) {
+            _spendAllowance(_owner, _caller, _shares);
         }
 
-        _burn(owner, shares);
+        _burn(_owner, _shares);
         // Withdrawing loss simulates a loss while withdrawing
-        IERC20(asset()).transfer(receiver, assets - withdrawingLoss);
+        IERC20(asset()).safeTransfer(_receiver, _assets - withdrawingLoss);
         // burns (to simulate loss while withdrawing)
-        IERC20(asset()).transfer(asset(), withdrawingLoss);
+        IERC20(asset()).safeTransfer(asset(), withdrawingLoss);
 
         emit Withdraw(
-            caller,
-            receiver,
-            owner,
-            assets - withdrawingLoss,
-            shares
+            _caller,
+            _receiver,
+            _owner,
+            _assets - withdrawingLoss,
+            _shares
         );
     }
 
