@@ -90,33 +90,34 @@ def test_process_report__set_accounting_role_open(
     vault,
     create_strategy,
     asset,
+    fish_amount,
     user_deposit,
     add_strategy_to_vault,
     add_debt_to_strategy,
     bunny,
     gov,
 ):
-    asset.mint(bunny, 10**18, sender=bunny)
-    user_deposit(bunny, vault, asset, 10**18)
+    asset.mint(bunny, fish_amount, sender=gov)
+    user_deposit(bunny, vault, asset, fish_amount)
     new_strategy = create_strategy(vault)
     add_strategy_to_vault(gov, new_strategy, vault)
-    add_debt_to_strategy(gov, new_strategy, vault, 10**18)
+    add_debt_to_strategy(gov, new_strategy, vault, fish_amount)
     vault.set_open_role(ROLES.ACCOUNTING_MANAGER, sender=gov)
-    asset.mint(new_strategy, 10**18, sender=bunny)
+    asset.mint(new_strategy, fish_amount, sender=gov)
     tx = vault.process_report(new_strategy, sender=bunny)
     event = list(tx.decode_logs(vault.StrategyReported))
     assert len(event) == 1
-    assert event[0].strategy == new_strategy.address and event[0].gain == 10**18
+    assert event[0].strategy == new_strategy.address and event[0].gain == fish_amount
 
 
-def test_sweep__set_accounting_role_open(vault, mock_token, bunny, gov):
-    mock_token.mint(vault, "1000 ether", sender=bunny)
+def test_sweep__set_accounting_role_open(vault, fish_amount, asset, bunny, gov):
+    asset.mint(vault, fish_amount, sender=gov)
     vault.set_open_role(ROLES.ACCOUNTING_MANAGER, sender=gov)
-    tx = vault.sweep(mock_token, sender=bunny)
+    tx = vault.sweep(asset, sender=bunny)
     event = list(tx.decode_logs(vault.Sweep))
     assert len(event) == 1
-    assert event[0].token == mock_token.address
-    assert mock_token.balanceOf(bunny) == from_units(mock_token, 1000)
+    assert event[0].token == asset.address
+    assert asset.balanceOf(bunny) == fish_amount
 
 
 # DEBT_MANAGER
