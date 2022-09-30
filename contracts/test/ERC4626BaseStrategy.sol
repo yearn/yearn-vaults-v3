@@ -8,11 +8,13 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IVault} from "../interfaces/IVault.sol";
 import {IStrategyERC4626} from "../interfaces/IStrategyERC4626.sol";
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 abstract contract ERC4626BaseStrategy is IStrategyERC4626, ERC4626 {
     using SafeERC20 for IERC20;
 
     address public override vault;
+    uint8 private _decimals;
 
     constructor(address _vault, address _asset)
         ERC4626(IERC20Metadata(address(_asset)))
@@ -21,9 +23,22 @@ abstract contract ERC4626BaseStrategy is IStrategyERC4626, ERC4626 {
     }
 
     function _initialize(address _vault, address _asset) internal {
+        _decimals = IERC20Metadata(address(_asset)).decimals();
+
         vault = _vault;
-        // using approve since initialization is only called once
-        IERC20(_asset).approve(_vault, type(uint256).max); // Give Vault unlimited access (might save gas)
+        //        // using approve since initialization is only called once
+        //        IERC20(_asset).approve(_vault, type(uint256).max); // Give Vault unlimited access (might save gas)
+    }
+
+    /** @dev See {IERC20Metadata-decimals}. */
+    function decimals()
+        public
+        view
+        virtual
+        override(ERC20, IERC20Metadata)
+        returns (uint8)
+    {
+        return _decimals;
     }
 
     // TODO: add roles (including vault)

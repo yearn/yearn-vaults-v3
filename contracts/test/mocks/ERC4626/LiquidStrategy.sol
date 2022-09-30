@@ -19,7 +19,12 @@ contract ERC4626LiquidStrategy is ERC4626BaseStrategyMock {
         _amountFreed = IERC20(asset()).balanceOf(address(this));
     }
 
-    function maxWithdraw(address owner) public view override returns (uint256) {
-        return _convertToAssets(balanceOf(owner), Math.Rounding.Down);
+    function maxWithdraw(address _owner)
+        public
+        view
+        override
+        returns (uint256)
+    {
+        return _convertToAssets(balanceOf(_owner), Math.Rounding.Down);
     }
 }

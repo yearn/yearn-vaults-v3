@@ -35,7 +35,6 @@ def test_lossy_strategy_flow(
     assert vault.price_per_share() / 10 ** asset.decimals() == 1.0
 
     add_debt_to_strategy(gov, strategy, vault, deposit_amount)
-    assert strategy.totalSupply() == deposit_amount
     assert strategy.totalAssets() == deposit_amount
     assert strategy.balanceOf(vault) == deposit_amount
     assert vault.totalAssets() == deposit_amount
@@ -84,7 +83,7 @@ def test_lossy_strategy_flow(
     assert vault.totalAssets() == 2 * deposit_amount - first_loss - second_loss
     assert vault.total_idle() == 0
 
-    # Les set a `minimum_total_idle` value
+    # Lets set a `minimum_total_idle` value
     vault.set_minimum_total_idle(3 * deposit_amount // 4, sender=gov)
 
     # we allowed more debt than `minimum_total_idle` allows us, to ensure `update_debt`

@@ -14,8 +14,14 @@ def gov(accounts):
 
 
 @pytest.fixture(scope="session")
-def fish_amount():
-    yield 10**18
+def fish_amount(asset):
+    # Working always with 10_000.00
+    yield 10 ** (asset.decimals() + 4)
+
+
+@pytest.fixture(scope="session")
+def half_fish_amount(fish_amount):
+    yield fish_amount // 2
 
 
 @pytest.fixture(scope="session")
@@ -26,8 +32,9 @@ def fish(accounts, asset, gov, fish_amount):
 
 
 @pytest.fixture(scope="session")
-def whale_amount():
-    yield 10**22
+def whale_amount(asset):
+    # Working always with 1_000_000.00
+    yield 10 ** (asset.decimals() + 6)
 
 
 @pytest.fixture(scope="session")
@@ -82,10 +89,25 @@ def keeper(accounts):
     yield accounts[11]
 
 
-# use this for general asset mock
-@pytest.fixture(scope="session")
-def asset(create_token):
-    return create_token("asset")
+# TODO: uncomment decimals to check different tokens
+@pytest.fixture(
+    scope="session",
+    params=[
+        ("create", 18),
+        # ("create", 8),
+        # ("create", 6),
+        # ("mock", "usdt"),
+    ],
+)
+def asset(create_token, mock_real_token, request):
+    operation = request.param[0]
+    arg = request.param[1]
+    assert operation in ("create", "mock")
+
+    if operation == "create":
+        return create_token("asset", decimals=arg)
+    elif operation == "mock":
+        return mock_real_token(name=arg)
 
 
 # use this for token mock
@@ -94,11 +116,21 @@ def mock_token(create_token):
     return create_token("mock")
 
 
+# use this to use real tokens
+@pytest.fixture(scope="session")
+def mock_real_token(project, gov):
+    def mock_real_token(name):
+        if name == "usdt":
+            return gov.deploy(project.TetherToken, 10**18, name, "USDT", 6)
+
+    yield mock_real_token
+
+
 # use this to create other tokens
 @pytest.fixture(scope="session")
 def create_token(project, gov):
-    def create_token(name):
-        return gov.deploy(project.Token, name)
+    def create_token(name, decimals=18):
+        return gov.deploy(project.Token, name, decimals)
 
     yield create_token
 
@@ -202,15 +234,15 @@ def flexible_accountant(project, gov, asset):
 
 
 @pytest.fixture(scope="session")
-def mint_and_deposit_into_strategy(project, gov):
+def mint_and_deposit_into_strategy(gov, asset):
     def mint_and_deposit_into_strategy(
         strategy, account=gov, amount_to_mint=10**18, amount_to_deposit=None
     ):
         if amount_to_deposit == None:
             amount_to_deposit = amount_to_mint
 
-        asset = project.Token.at(strategy.asset())
-        asset.mint(account.address, amount_to_mint, sender=account)
+        asset.mint(account.address, amount_to_mint, sender=gov)
+
         asset.approve(strategy.address, amount_to_deposit, sender=account)
         strategy.deposit(amount_to_deposit, account.address, sender=account)
 
@@ -218,31 +250,15 @@ def mint_and_deposit_into_strategy(project, gov):
 
 
 @pytest.fixture(scope="session")
-def mint_and_deposit_into_strategy(project, gov):
-    def mint_and_deposit_into_strategy(
-        strategy, account=gov, amount_to_mint=10**18, amount_to_deposit=None
-    ):
-        if amount_to_deposit == None:
-            amount_to_deposit = amount_to_mint
-
-        asset = project.Token.at(strategy.asset())
-        asset.mint(account.address, amount_to_mint, sender=account)
-        asset.approve(strategy.address, amount_to_deposit, sender=account)
-        strategy.deposit(amount_to_deposit, account.address, sender=account)
-
-    yield mint_and_deposit_into_strategy
-
-
-@pytest.fixture(scope="session")
-def mint_and_deposit_into_vault(project, gov):
+def mint_and_deposit_into_vault(gov, asset):
     def mint_and_deposit_into_vault(
         vault, account=gov, amount_to_mint=10**18, amount_to_deposit=None
     ):
         if amount_to_deposit == None:
             amount_to_deposit = amount_to_mint
 
-        asset = project.Token.at(vault.asset())
-        asset.mint(account.address, amount_to_mint, sender=account)
+        asset.mint(account.address, amount_to_mint, sender=gov)
+
         asset.approve(vault.address, amount_to_deposit, sender=account)
         vault.deposit(amount_to_deposit, account.address, sender=account)
 

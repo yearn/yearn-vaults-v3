@@ -40,14 +40,16 @@ def test_preview_deposit(asset, fish, fish_amount, create_vault, user_deposit):
     assert vault.previewDeposit(assets) == assets
 
 
-@pytest.mark.parametrize("deposit_limit", [10**18 // 2, 10**18])
+@pytest.mark.parametrize("deposit_limit", ["half_fish_amount", "fish_amount"])
 def test_max_deposit__with_total_assets_greater_than_or_equal_deposit_limit__returns_zero(
-    asset, fish, fish_amount, gov, create_vault, deposit_limit, user_deposit
+    asset, fish, fish_amount, gov, create_vault, deposit_limit, user_deposit, request
 ):
     vault = create_vault(asset)
     assets = fish_amount
 
     user_deposit(fish, vault, asset, assets)
+
+    deposit_limit = request.getfixturevalue(deposit_limit)
 
     vault.set_deposit_limit(deposit_limit, sender=gov)
 
@@ -76,14 +78,16 @@ def test_preview_mint(asset, fish, fish_amount, create_vault, user_deposit):
     assert vault.previewMint(shares) == shares
 
 
-@pytest.mark.parametrize("deposit_limit", [10**18 // 2, 10**18])
+@pytest.mark.parametrize("deposit_limit", ["half_fish_amount", "fish_amount"])
 def test_max_mint__with_total_assets_greater_than_or_equal_deposit_limit__returns_zero(
-    asset, fish, fish_amount, gov, create_vault, deposit_limit, user_deposit
+    asset, fish, fish_amount, gov, create_vault, deposit_limit, user_deposit, request
 ):
     vault = create_vault(asset)
     assets = fish_amount
 
     user_deposit(fish, vault, asset, assets)
+
+    deposit_limit = request.getfixturevalue(deposit_limit)
 
     vault.set_deposit_limit(deposit_limit, sender=gov)
 
