@@ -97,9 +97,9 @@ def keeper(accounts):
     scope="session",
     params=[
         ("create", 18),
-        ("create", 8),
-        ("create", 6),
-        ("mock", "usdt"),
+        # ("create", 8),
+        # ("create", 6),
+        # ("mock", "usdt"),
     ],
 )
 def asset(create_token, mock_real_token, request):
@@ -175,18 +175,22 @@ def create_vault(
         governance=gov,
         deposit_limit=MAX_INT,
         max_profit_locking_time=WEEK,
+        vault_name=None,
+        vault_symbol="VV3",
     ):
-        # Every single vault that we create with the factory must have a different salt. The
-        # salt is computed with the asset, name and symbol. Easiest way to create a unique name
-        # would be to create a unique name, by adding a suffix. We will use 4 last digits of
-        # time.time()
-        vault_suffix = str(int(time.time()))[-4:]
+        if not vault_name:
+            # Every single vault that we create with the factory must have a different salt. The
+            # salt is computed with the asset, name and symbol. Easiest way to create a vault
+            # would be to create a unique name by adding a suffix. We will use 4 last digits of
+            # time.time()
+            vault_suffix = str(int(time.time()))[-4:]
+            vault_name = f"Vault V3 {vault_suffix}"
 
         tx = vault_factory.deploy_new_vault(
             vault_blueprint,
             asset,
-            f"Vault V3 {vault_suffix}",
-            "AV",
+            vault_name,
+            vault_symbol,
             governance,
             max_profit_locking_time,
             sender=gov,

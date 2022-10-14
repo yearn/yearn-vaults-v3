@@ -1,46 +1,13 @@
-from web3 import Web3, HTTPProvider
-from hexbytes import HexBytes
 from ape import project, reverts
-from ape.contracts.base import ContractContainer
 
 
-def get_blueprint_bytecode(contract: ContractContainer):
-    # Prepare blueprint code
-    blueprint_preamble = b"\xFE\x71\x00"  # ERC5202 preamble
-    blueprint_bytecode = blueprint_preamble + HexBytes(
-        contract.contract_type.deployment_bytecode.bytecode
-    )
-    # the length of the deployed code in bytes
-    len_bytes = len(blueprint_bytecode).to_bytes(2, "big")
-    deploy_bytecode = b"\x61" + len_bytes + b"\x3d\x81\x60\x0a\x3d\x39\xf3"
-    return HexBytes(deploy_bytecode + blueprint_bytecode)
-
-
-def deploy_blueprint(deploy_bytecode, gov):
-    # we connect to hardhat node
-    w3 = Web3(HTTPProvider("http://127.0.0.1:8545"))
-    assert w3.isConnected()
-
-    deployer_abi = []
-    c = w3.eth.contract(abi=deployer_abi, bytecode=deploy_bytecode)
-    deploy_transaction = c.constructor()
-    tx_info = {"from": gov.address, "value": 0, "gasPrice": 0}
-    tx_hash = deploy_transaction.transact(tx_info)
-
-    return w3.eth.get_transaction_receipt(tx_hash)["contractAddress"]
-
-
-def test_new_vault(gov, asset, bunny, fish):
-    # Deploy blueprint
-    deploy_bytecode = get_blueprint_bytecode(project.VaultV3)
-    blueprint_address = deploy_blueprint(deploy_bytecode, gov)
-
-    # Deploy factory
-    vault_factory = gov.deploy(project.VaultFactory, "Vault V3 Factory")
+def test_new_vault_with_diferent_salt(
+    gov, asset, bunny, fish, vault_factory, vault_blueprint
+):
     assert vault_factory.name() == "Vault V3 Factory"
 
     tx = vault_factory.deploy_new_vault(
-        blueprint_address,
+        vault_blueprint,
         asset.address,
         "first_vault",
         "fv",
@@ -54,7 +21,7 @@ def test_new_vault(gov, asset, bunny, fish):
     assert new_vault.role_manager() == bunny.address
 
     tx = vault_factory.deploy_new_vault(
-        blueprint_address,
+        vault_blueprint,
         asset.address,
         "second_vault",
         "sv",
@@ -68,17 +35,11 @@ def test_new_vault(gov, asset, bunny, fish):
     assert new_vault.role_manager() == fish.address
 
 
-def test_new_vault_same_name_asset_and_symbol__reverts(gov, asset, bunny, fish):
-    # Deploy blueprint
-    deploy_bytecode = get_blueprint_bytecode(project.VaultV3)
-    blueprint_address = deploy_blueprint(deploy_bytecode, gov)
-
-    # Deploy factory
-    vault_factory = gov.deploy(project.VaultFactory, "Vault V3 Factory")
-    assert vault_factory.name() == "Vault V3 Factory"
-
+def test_new_vault_same_name_asset_and_symbol__reverts(
+    gov, asset, bunny, fish, vault_factory, vault_blueprint
+):
     tx = vault_factory.deploy_new_vault(
-        blueprint_address,
+        vault_blueprint,
         asset.address,
         "first_vault",
         "fv",
@@ -93,7 +54,7 @@ def test_new_vault_same_name_asset_and_symbol__reverts(gov, asset, bunny, fish):
 
     with reverts():
         vault_factory.deploy_new_vault(
-            blueprint_address,
+            vault_blueprint,
             asset.address,
             "first_vault",
             "fv",
