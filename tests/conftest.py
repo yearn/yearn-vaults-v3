@@ -3,11 +3,14 @@ from ape import chain
 from ape.types import ContractLog
 from eth_account.messages import encode_structured_data
 from utils.constants import MAX_INT, ROLES, WEEK
+import time
+import os
+from web3 import Web3, HTTPProvider
+from hexbytes import HexBytes
+from ape.contracts.base import ContractContainer
 
 
 # Accounts
-
-
 @pytest.fixture(scope="session")
 def gov(accounts):
     yield accounts[0]
@@ -94,9 +97,9 @@ def keeper(accounts):
     scope="session",
     params=[
         ("create", 18),
-        # ("create", 8),
-        # ("create", 6),
-        # ("mock", "usdt"),
+        ("create", 8),
+        ("create", 6),
+        ("mock", "usdt"),
     ],
 )
 def asset(create_token, mock_real_token, request):
@@ -136,7 +139,36 @@ def create_token(project, gov):
 
 
 @pytest.fixture(scope="session")
-def create_vault(project, gov, accountant, flexible_accountant):
+def vault_blueprint(project, gov):
+    # we default to local node
+    w3 = Web3(HTTPProvider(os.getenv("CHAIN_PROVIDER", "http://127.0.0.1:8545")))
+    assert w3.isConnected()
+
+    blueprint_bytecode = b"\xFE\x71\x00" + HexBytes(
+        project.VaultV3.contract_type.deployment_bytecode.bytecode
+    )  # ERC5202
+    len_bytes = len(blueprint_bytecode).to_bytes(2, "big")
+    deploy_bytecode = HexBytes(
+        b"\x61" + len_bytes + b"\x3d\x81\x60\x0a\x3d\x39\xf3" + blueprint_bytecode
+    )
+
+    c = w3.eth.contract(abi=[], bytecode=deploy_bytecode)
+    deploy_transaction = c.constructor()
+    tx_info = {"from": gov.address, "value": 0, "gasPrice": 0}
+    tx_hash = deploy_transaction.transact(tx_info)
+
+    return w3.eth.get_transaction_receipt(tx_hash)["contractAddress"]
+
+
+@pytest.fixture(scope="session")
+def vault_factory(project, gov):
+    return gov.deploy(project.VaultFactory, "Vault V3 Factory")
+
+
+@pytest.fixture(scope="session")
+def create_vault(
+    project, gov, accountant, flexible_accountant, vault_factory, vault_blueprint
+):
     def create_vault(
         asset,
         accountant=accountant,
@@ -144,9 +176,24 @@ def create_vault(project, gov, accountant, flexible_accountant):
         deposit_limit=MAX_INT,
         max_profit_locking_time=WEEK,
     ):
-        vault = gov.deploy(
-            project.VaultV3, asset, "VaultV3", "AV", governance, max_profit_locking_time
+        # Every single vault that we create with the factory must have a different salt. The
+        # salt is computed with the asset, name and symbol. Easiest way to create a unique name
+        # would be to create a unique name, by adding a suffix. We will use 4 last digits of
+        # time.time()
+        vault_suffix = str(int(time.time()))[-4:]
+
+        tx = vault_factory.deploy_new_vault(
+            vault_blueprint,
+            asset,
+            f"Vault V3 {vault_suffix}",
+            "AV",
+            governance,
+            max_profit_locking_time,
+            sender=gov,
         )
+        event = list(tx.decode_logs(vault_factory.NewVault))
+        vault = project.VaultV3.at(event[0].vault_address)
+
         # set vault deposit
         vault.set_deposit_limit(deposit_limit, sender=gov)
         # set up fee manager
