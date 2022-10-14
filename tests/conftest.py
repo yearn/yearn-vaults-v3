@@ -7,8 +7,9 @@ import time
 import os
 from web3 import Web3, HTTPProvider
 from hexbytes import HexBytes
-from ape.contracts.base import ContractContainer
 
+# we default to local node
+w3 = Web3(HTTPProvider(os.getenv("CHAIN_PROVIDER", "http://127.0.0.1:8545")))
 
 # Accounts
 @pytest.fixture(scope="session")
@@ -140,9 +141,6 @@ def create_token(project, gov):
 
 @pytest.fixture(scope="session")
 def vault_blueprint(project, gov):
-    # we default to local node
-    w3 = Web3(HTTPProvider(os.getenv("CHAIN_PROVIDER", "http://127.0.0.1:8545")))
-
     blueprint_bytecode = b"\xFE\x71\x00" + HexBytes(
         project.VaultV3.contract_type.deployment_bytecode.bytecode
     )  # ERC5202
