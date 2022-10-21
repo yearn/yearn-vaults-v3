@@ -158,14 +158,12 @@ def vault_blueprint(project, gov):
 
 
 @pytest.fixture(scope="session")
-def vault_factory(project, gov):
-    return gov.deploy(project.VaultFactory, "Vault V3 Factory")
+def vault_factory(project, gov, vault_blueprint):
+    return gov.deploy(project.VaultFactory, "Vault V3 Factory 0.0.1", vault_blueprint)
 
 
 @pytest.fixture(scope="session")
-def create_vault(
-    project, gov, accountant, flexible_accountant, vault_factory, vault_blueprint
-):
+def create_vault(project, gov, accountant, flexible_accountant, vault_factory):
     def create_vault(
         asset,
         accountant=accountant,
@@ -184,7 +182,6 @@ def create_vault(
             vault_name = f"Vault V3 {vault_suffix}"
 
         tx = vault_factory.deploy_new_vault(
-            vault_blueprint,
             asset,
             vault_name,
             vault_symbol,

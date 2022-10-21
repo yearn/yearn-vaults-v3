@@ -1,13 +1,10 @@
 from ape import project, reverts
 
 
-def test_new_vault_with_different_salt(
-    gov, asset, bunny, fish, vault_factory, vault_blueprint
-):
-    assert vault_factory.name() == "Vault V3 Factory"
+def test_new_vault_with_different_salt(gov, asset, bunny, fish, vault_factory):
+    assert vault_factory.name() == "Vault V3 Factory 0.0.1"
 
     tx = vault_factory.deploy_new_vault(
-        vault_blueprint,
         asset.address,
         "first_vault",
         "fv",
@@ -21,7 +18,6 @@ def test_new_vault_with_different_salt(
     assert new_vault.role_manager() == bunny.address
 
     tx = vault_factory.deploy_new_vault(
-        vault_blueprint,
         asset.address,
         "second_vault",
         "sv",
@@ -36,10 +32,9 @@ def test_new_vault_with_different_salt(
 
 
 def test_new_vault_same_name_asset_and_symbol_different_sender(
-    gov, asset, bunny, vault_factory, vault_blueprint
+    gov, asset, bunny, vault_factory
 ):
     tx = vault_factory.deploy_new_vault(
-        vault_blueprint,
         asset.address,
         "first_vault",
         "fv",
@@ -53,7 +48,6 @@ def test_new_vault_same_name_asset_and_symbol_different_sender(
     assert new_vault.role_manager() == bunny.address
 
     vault_factory.deploy_new_vault(
-        vault_blueprint,
         asset.address,
         "first_vault",
         "fv",
@@ -68,10 +62,9 @@ def test_new_vault_same_name_asset_and_symbol_different_sender(
 
 
 def test_new_vault_same_sender_name_asset_and_symbol__reverts(
-    gov, asset, bunny, vault_factory, vault_blueprint
+    gov, asset, bunny, vault_factory
 ):
     tx = vault_factory.deploy_new_vault(
-        vault_blueprint,
         asset.address,
         "first_vault",
         "fv",
@@ -86,7 +79,6 @@ def test_new_vault_same_sender_name_asset_and_symbol__reverts(
 
     with reverts():
         vault_factory.deploy_new_vault(
-            vault_blueprint,
             asset.address,
             "first_vault",
             "fv",
