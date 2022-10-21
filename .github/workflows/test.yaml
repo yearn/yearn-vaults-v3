@@ -34,4 +34,4 @@ jobs:
 
     - name: Run tests
       run: ape test -s
-      timeout-minutes: 10
+      timeout-minutes: 15
