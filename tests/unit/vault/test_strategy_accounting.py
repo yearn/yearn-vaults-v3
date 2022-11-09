@@ -124,7 +124,7 @@ def test_process_report__with_gain_and_zero_management_fees(
         snapshot, abs=1
     )
 
-    # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
+    # Vault mints shares worth the fees to the accountant
     share_price_before_minting_fees = (
         initial_total_assets + gain
     ) / initial_total_supply
@@ -180,7 +180,7 @@ def test_process_report__with_gain_and_zero_performance_fees(
         snapshot, abs=1
     )
 
-    # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
+    # Vault mints shares worth the fees to the accountant
     share_price_before_minting_fees = (
         initial_total_assets + gain
     ) / initial_total_supply
@@ -235,7 +235,7 @@ def test_process_report__with_gain_and_both_fees(
     )
 
 
-    # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
+    # Vault mints shares worth the fees to the accountant
     share_price_before_minting_fees = (
         initial_total_assets + gain
     ) / initial_total_supply
@@ -292,7 +292,7 @@ def test_process_report__with_fees_exceeding_fee_cap(
         snapshot, abs=1
     )
 
-    # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
+    # Vault mints shares worth the fees to the accountant
     share_price_before_minting_fees = (
         initial_total_assets + gain
     ) / initial_total_supply
