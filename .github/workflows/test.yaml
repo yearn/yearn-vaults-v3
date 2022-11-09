@@ -19,6 +19,7 @@ jobs:
     - uses: ApeWorX/github-action@v1
       with:
         python-version: '3.9'
+        ape-version: '0.5.3'
 
     - name: install vyper
       run: pip install git+https://github.com/vyperlang/vyper
