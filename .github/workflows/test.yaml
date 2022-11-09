@@ -16,7 +16,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - uses: ApeWorX/github-action@v1
+    - uses: ApeWorX/github-action@v1.1
+      with:
+        python-version: '3.9'
+        ape-version-pin: '==0.5.2'
+
     - name: install vyper
       run: pip install git+https://github.com/vyperlang/vyper
     - name: Compile contracts
@@ -31,6 +35,9 @@ jobs:
 
     - name: Install hardhat
       run: npm install hardhat
+
+    - name: output current installation
+      run: pip freeze
 
     - name: Run tests
       run: ape test -s
