@@ -64,41 +64,15 @@ def test_profitable_strategy_flow(
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].gain == first_profit
 
-    # pps is maintained at 1:1, but assets are increased due to fees
-    assert vault.totalAssets() == pytest.approx(
-        deposit_amount + first_profit * performance_fee / MAX_BPS, 1e-5
-    )
-    assert vault.profit_distribution_rate() == pytest.approx(
-        first_profit * (1 - performance_fee / MAX_BPS) / days_to_secs(7) * MAX_BPS,
-        rel=1e-5,
-    )
-    profit_dist_rate = vault.profit_distribution_rate()
-
     # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
     share_price_before_minting_fees = (
-        initial_total_assets + total_fee
+        initial_total_assets + first_profit
     ) / initial_total_supply
     assert vault.balanceOf(accountant) == pytest.approx(
         total_fee / share_price_before_minting_fees, 1e-5
     )
-    # pps is slightly higher as we are minting fees for a lower value
-    assert vault.price_per_share() / 10 ** vault.decimals() == pytest.approx(1.0, 1e-3)
 
     pps = vault.price_per_share()
-
-    # let one day pass
-    chain.pending_timestamp = initial_timestamp + days_to_secs(1)
-    chain.mine(timestamp=chain.pending_timestamp)
-
-    # total_assets and pps should increase due to unlocking profit. Distribution rate should not change
-    assert vault.totalAssets() == pytest.approx(
-        deposit_amount
-        + first_profit * performance_fee / MAX_BPS
-        + vault.profit_distribution_rate() / MAX_BPS * days_to_secs(1),
-        1e-5,
-    )
-    assert vault.profit_distribution_rate() == profit_dist_rate
-    assert vault.price_per_share() > pps
 
     user_2_initial_balance = asset.balanceOf(user_2)
     # user_2 (bunny) deposit assets to vault
@@ -120,14 +94,13 @@ def test_profitable_strategy_flow(
     assert event[0].gain == second_profit
 
     assert vault.totalAssets() == pytest.approx(
-        assets_before_profit + second_profit * performance_fee / MAX_BPS
+        assets_before_profit + second_profit 
     )
     # Users deposited same amount of assets, but they have different shares due to pps
     assert vault.balanceOf(user_1) > vault.balanceOf(user_2)
 
     pps_before_loss = vault.price_per_share()
     assets_before_loss = vault.totalAssets()
-    profit_dist_rate_before_loss = vault.profit_distribution_rate()
 
     # we create a small loss that should be damped by profit buffer
     strategy.setLoss(gov, first_loss, sender=gov)
@@ -135,13 +108,10 @@ def test_profitable_strategy_flow(
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].loss == first_loss
 
-    # loss doesnt impact totalAssets but distribution rate. There are actually more
-    # assets as some of the profit has been unlocked
-    assert vault.profit_distribution_rate() < profit_dist_rate_before_loss
-    assert vault.totalAssets() > assets_before_loss
+    assert vault.totalAssets() < assets_before_loss
 
     # pps is slightly higher, however due to decimals, it does not reflect
-    assert vault.price_per_share() >= pps_before_loss
+    assert vault.price_per_share() < pps_before_loss
 
     assert vault.total_idle() == 0
     # Les set a `minimum_total_idle` value
@@ -175,7 +145,6 @@ def test_profitable_strategy_flow(
     with ape.reverts("nothing to report"):
         vault.process_report(strategy.address, sender=gov)
 
-    assert vault.profit_distribution_rate() == 0
     assert vault.totalAssets() == pytest.approx(
         2 * deposit_amount
         + first_profit

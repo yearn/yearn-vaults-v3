@@ -57,7 +57,6 @@ def test_process_report__with_gain_and_zero_fees(
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
-    profit_buffer = vault.profit_distribution_rate() * WEEK / MAX_BPS
 
     snapshot = chain.pending_timestamp
     tx = vault.process_report(strategy.address, sender=gov)
@@ -72,9 +71,6 @@ def test_process_report__with_gain_and_zero_fees(
 
     strategy_params = vault.strategies(strategy.address)
     assert strategy_params.current_debt == initial_debt + gain
-    assert vault.profit_distribution_rate() * WEEK / MAX_BPS == pytest.approx(
-        profit_buffer + gain, 1e-5
-    )
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
@@ -110,7 +106,6 @@ def test_process_report__with_gain_and_zero_management_fees(
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
-    profit_buffer = vault.profit_distribution_rate() * WEEK / MAX_BPS
 
     snapshot = chain.pending_timestamp
     tx = vault.process_report(strategy.address, sender=gov)
@@ -125,18 +120,15 @@ def test_process_report__with_gain_and_zero_management_fees(
 
     strategy_params = vault.strategies(strategy.address)
     assert strategy_params.current_debt == initial_debt + gain
-    assert vault.profit_distribution_rate() * WEEK / MAX_BPS == pytest.approx(
-        profit_buffer + gain - total_fee, 1e-5
-    )
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
 
     # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
     share_price_before_minting_fees = (
-        initial_total_assets + total_fee
+        initial_total_assets + gain
     ) / initial_total_supply
-    assert vault.balanceOf(accountant) == total_fee / share_price_before_minting_fees
+    assert pytest.approx(vault.balanceOf(accountant), rel=1e-5) == total_fee / share_price_before_minting_fees
 
 
 def test_process_report__with_gain_and_zero_performance_fees(
@@ -169,7 +161,6 @@ def test_process_report__with_gain_and_zero_performance_fees(
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
-    profit_buffer = vault.profit_distribution_rate() * WEEK / MAX_BPS
 
     chain.pending_timestamp += YEAR
     snapshot = chain.pending_timestamp
@@ -185,21 +176,15 @@ def test_process_report__with_gain_and_zero_performance_fees(
 
     strategy_params = vault.strategies(strategy.address)
     assert strategy_params.current_debt == initial_debt + gain
-    assert vault.profit_distribution_rate() * WEEK / MAX_BPS == pytest.approx(
-        profit_buffer + gain - total_fee, rel=1e-4
-    )
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
 
     # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
     share_price_before_minting_fees = (
-        initial_total_assets + total_fee
+        initial_total_assets + gain
     ) / initial_total_supply
-    assert vault.balanceOf(accountant) == pytest.approx(
-        total_fee / share_price_before_minting_fees, 1e-5
-    )
-
+    assert pytest.approx(vault.balanceOf(accountant), rel=1e-5) == total_fee / share_price_before_minting_fees
 
 def test_process_report__with_gain_and_both_fees(
     chain,
@@ -231,7 +216,6 @@ def test_process_report__with_gain_and_both_fees(
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
-    profit_buffer = vault.profit_distribution_rate() * WEEK / MAX_BPS
 
     snapshot = chain.pending_timestamp
     tx = vault.process_report(strategy.address, sender=gov)
@@ -246,20 +230,16 @@ def test_process_report__with_gain_and_both_fees(
 
     strategy_params = vault.strategies(strategy.address)
     assert strategy_params.current_debt == initial_debt + gain
-    assert vault.profit_distribution_rate() * WEEK / MAX_BPS == pytest.approx(
-        profit_buffer + gain - total_fee, rel=1e-4
-    )
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
 
+
     # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
     share_price_before_minting_fees = (
-        initial_total_assets + total_fee
+        initial_total_assets + gain
     ) / initial_total_supply
-    assert vault.balanceOf(accountant) == pytest.approx(
-        total_fee / share_price_before_minting_fees, 1e-5
-    )
+    assert pytest.approx(vault.balanceOf(accountant), rel=1e-5) == total_fee / share_price_before_minting_fees
 
 
 def test_process_report__with_fees_exceeding_fee_cap(
@@ -293,7 +273,6 @@ def test_process_report__with_fees_exceeding_fee_cap(
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
-    profit_buffer = vault.profit_distribution_rate() * WEEK / MAX_BPS
 
     chain.pending_timestamp += YEAR  # need time to pass to accrue more fees
     snapshot = chain.pending_timestamp
@@ -309,20 +288,15 @@ def test_process_report__with_fees_exceeding_fee_cap(
 
     strategy_params = vault.strategies(strategy.address)
     assert strategy_params.current_debt == initial_debt + gain
-    assert vault.profit_distribution_rate() * WEEK / MAX_BPS == pytest.approx(
-        profit_buffer + gain - max_fee, 1e-5
-    )
     assert vault.strategies(strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
 
     # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
     share_price_before_minting_fees = (
-        initial_total_assets + max_fee
+        initial_total_assets + gain
     ) / initial_total_supply
-    assert vault.balanceOf(accountant) == pytest.approx(
-        max_fee / share_price_before_minting_fees, 1e-5
-    )
+    assert pytest.approx(vault.balanceOf(accountant), rel=1e-5) == max_fee / share_price_before_minting_fees
 
 
 def test_process_report__with_loss(
@@ -352,7 +326,6 @@ def test_process_report__with_loss(
 
     strategy_params = vault.strategies(lossy_strategy.address)
     assert strategy_params.current_debt == initial_debt - loss
-    assert vault.profit_distribution_rate() == 0
     assert vault.strategies(lossy_strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
