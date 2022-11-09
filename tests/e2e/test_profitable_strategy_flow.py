@@ -63,9 +63,7 @@ def test_profitable_strategy_flow(
     tx = vault.process_report(strategy.address, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].gain == first_profit
-    assert vault.totalAssets() == pytest.approx(
-        deposit_amount + first_profit, 1e-5
-    )
+    assert vault.totalAssets() == pytest.approx(deposit_amount + first_profit, 1e-5)
     # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
     share_price_before_minting_fees = (
         initial_total_assets + first_profit
@@ -95,9 +93,7 @@ def test_profitable_strategy_flow(
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].gain == second_profit
 
-    assert vault.totalAssets() == pytest.approx(
-        assets_before_profit + second_profit 
-    )
+    assert vault.totalAssets() == pytest.approx(assets_before_profit + second_profit)
     # Users deposited same amount of assets, but they have different shares due to pps
     assert vault.balanceOf(user_1) > vault.balanceOf(user_2)
 
