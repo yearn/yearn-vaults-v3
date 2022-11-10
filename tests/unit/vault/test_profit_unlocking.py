@@ -41,7 +41,6 @@ def test_total_debt(
     post_profit_totalSupply = vault.totalSupply()
 
     assert post_profit_totalSupply > amount
-
     # We increase time and check estimation
     chain.pending_timestamp = initial_timestamp + days_to_secs(4)
     chain.mine(timestamp=chain.pending_timestamp)

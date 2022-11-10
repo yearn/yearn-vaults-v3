@@ -117,8 +117,6 @@ PROFIT_MAX_UNLOCK_TIME: immutable(uint256)
 
 # CONSTANTS #
 API_VERSION: constant(String[28]) = "0.1.0"
-# TODO: make this variable immutable
-PROFIT_MAX_UNLOCK_TIME: constant(uint256) = 2 * 7 * 24 * 3600
 
 # STORAGE #
 # HashMap that records all the strategies that are allowed to receive assets from the vault
@@ -289,34 +287,6 @@ def _burn_unlocked_shares() -> uint256:
   self._burn_shares(unlocked_shares, self)
   return unlocked_shares
 
-@view
-@internal
-def _unlocked_shares() -> uint256:
-  _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
-  unlocked_shares: uint256 = 0
-  if _full_profit_unlock_date > block.timestamp:
-    unlocked_shares = self.profit_unlocking_rate * (block.timestamp - self.last_profit_update)
-  else:
-    # All shares have been unlocked
-    unlocked_shares = self.profit_unlocking_rate * (_full_profit_unlock_date - self.last_profit_update)
-  return unlocked_shares
-
-@view
-@internal
-def _total_supply() -> uint256:
-  return self.total_supply - self._unlocked_shares()
-
-@internal
-def _burn_unlocked_shares() -> uint256:
-  unlocked_shares: uint256 = self._unlocked_shares()
-
-  if self.full_profit_unlock_date > block.timestamp:
-    self.last_profit_update = block.timestamp
-  else:
-    self.profit_unlocking_rate = 0
-
-  self._burn_shares(unlocked_shares, self)
-  return unlocked_shares
 
 @view
 @internal
