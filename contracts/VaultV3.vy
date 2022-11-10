@@ -136,6 +136,7 @@ allowance: public(HashMap[address, HashMap[address, uint256]])
 
 # Total amount of shares that are currently minted
 total_supply: public(uint256)
+
 # Total amount of assets that has been deposited in strategies
 total_debt: public(uint256)
 # Current assets held in the vault contract. Replacing balanceOf(this) to avoid price_per_share manipulation
@@ -162,7 +163,7 @@ name: public(String[64])
 symbol: public(String[32])
 
 full_profit_unlock_date: public(uint256)
-profit_unlocking_rate: uint256
+profit_unlocking_rate: public(uint256)
 last_profit_update: uint256
 
 last_report: public(uint256)
