@@ -740,27 +740,20 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if accountant != empty(address):
         total_fees, total_refunds = IAccountant(accountant).report(strategy, gain, loss)
 
+    newly_locked_shares: uint256 = 0
     if gain > 0:
         # update current debt after processing management fee
         self.strategies[strategy].current_debt += gain
         self.total_debt += gain
-        # TODO: check for total_fees > gain
-        # TODO: update new total_supply before minting
-        # NOTE: vault will issue shares worth the profit to avoid instant pps change
-        new_locked_shares: uint256 = self._issue_shares_for_amount(gain - total_fees, self)
-        # NOTE: the following two variables are updated during the issuance of shares
-        remaining_time: uint256 = self.full_profit_unlock_date - block.timestamp
-        pending_shares: uint256 = remaining_time * self.profit_unlocking_rate
-        new_profit_locking_period: uint256 = (pending_shares * remaining_time + new_locked_shares * PROFIT_MAX_UNLOCK_TIME) / (pending_shares + new_locked_shares)
-
-        self.profit_unlocking_rate = (pending_shares + new_locked_shares) * MAX_BPS / new_profit_locking_period
-        self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
-        self.last_profit_update = block.timestamp
-
+        if gain > total_fees:
+          # NOTE: vault will issue shares worth the profit to avoid instant pps change
+          newly_locked_shares += self._issue_shares_for_amount(gain - total_fees, self)
+    
     # Minting fees after gain computation to ensure fees don't benefit from cheaper pps 
-    # if fees are non-zero, issue shares
     if total_fees > 0:
+        # if fees are non-zero, issue shares
         self._issue_shares_for_amount(total_fees, accountant)
+
     # if refunds are non-zero, transfer assets
     if total_refunds > 0:
         # Accountant should approve transfer of assets
@@ -774,6 +767,35 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if loss > 0:
         self.strategies[strategy].current_debt -= loss
         self.total_debt -= loss
+
+    remaining_time: uint256 = 0
+    _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
+    if _full_profit_unlock_date > block.timestamp: 
+      remaining_time = _full_profit_unlock_date - block.timestamp
+    else:
+      remaining_time = 0
+
+    previously_locked_shares: uint256 = remaining_time * self.profit_unlocking_rate
+
+    shares_to_burn: uint256 = 0
+    # Vault insta unlocks losses and fees to avoid pps decrease
+    if loss + total_fees > 0:
+        shares_to_unlock: uint256 = self._convert_to_shares(loss + total_fees)
+        # TODO: second min needed to avoid reverts?
+        shares_to_burn = min(shares_to_unlock, min(previously_locked_shares, self.balance_of[self]))
+        self._burn_shares(shares_to_burn, self)
+        if newly_locked_shares > shares_to_burn:
+          newly_locked_shares -= shares_to_burn
+        else:
+          newly_locked_shares = 0
+          # unlocking previously locked shares
+          previously_locked_shares -= shares_to_burn - newly_locked_shares
+
+    new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * PROFIT_MAX_UNLOCK_TIME) / (previously_locked_shares + newly_locked_shares)
+
+    self.profit_unlocking_rate = (previously_locked_shares + newly_locked_shares) * MAX_BPS / new_profit_locking_period
+    self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
+    self.last_profit_update = block.timestamp
 
 
     self.strategies[strategy].last_report = block.timestamp
