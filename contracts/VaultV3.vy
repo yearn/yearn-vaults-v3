@@ -162,7 +162,7 @@ name: public(String[64])
 symbol: public(String[32])
 
 full_profit_unlock_date: public(uint256)
-profit_unlocking_rate: public(uint256)
+profit_unlocking_rate: uint256
 last_profit_update: uint256
 
 last_report: public(uint256)
