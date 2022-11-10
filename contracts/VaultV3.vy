@@ -862,7 +862,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if loss + total_fees > 0:
         shares_to_unlock: uint256 = self._convert_to_shares(loss + total_fees)
         # TODO: second min needed to avoid reverts?
-        shares_to_burn = min(shares_to_unlock, min(previously_locked_shares, self.balance_of[self]))
+        shares_to_burn = min(shares_to_unlock, min(previously_locked_shares, self.balance_of[self]) + newly_locked_shares)
         self._burn_shares(shares_to_burn, self)
         if newly_locked_shares > shares_to_burn:
           newly_locked_shares -= shares_to_burn
