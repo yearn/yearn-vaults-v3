@@ -800,6 +800,10 @@ def _process_report(strategy: address) -> (uint256, uint256):
         # NOTE: vault will issue shares worth the profit to avoid instant pps change
         newly_locked_shares += self._issue_shares_for_amount(gain, self)
 
+    if total_fees > 0:
+        # if fees are non-zero, issue shares
+        self._issue_shares_for_amount(total_fees, accountant)
+    
     if total_refunds > 0:
         # if refunds are non-zero, transfer assets
         total_refunds = min(total_refunds, self.balance_of[accountant])
