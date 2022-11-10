@@ -117,6 +117,8 @@ PROFIT_MAX_UNLOCK_TIME: immutable(uint256)
 
 # CONSTANTS #
 API_VERSION: constant(String[28]) = "0.1.0"
+# TODO: make this variable immutable
+PROFIT_MAX_UNLOCK_TIME: constant(uint256) = 2 * 7 * 24 * 3600
 
 # STORAGE #
 # HashMap that records all the strategies that are allowed to receive assets from the vault
@@ -129,7 +131,11 @@ allowance: public(HashMap[address, HashMap[address, uint256]])
 # Total amount of shares that are currently minted
 total_supply: public(uint256)
 # Total amount of assets that has been deposited in strategies
+<<<<<<< HEAD
 total_debt: public(uint256)
+=======
+total_debt: uint256
+>>>>>>> bd63e74 (feat: implement no sandwiching using share burning and minting)
 # Current assets held in the vault contract. Replacing balanceOf(this) to avoid price_per_share manipulation
 total_idle: public(uint256)
 # Minimum amount of assets that should be kept in the vault contract to allow for fast, cheap redeems
@@ -153,8 +159,13 @@ name: public(String[64])
 # ERC20 - symbol of the token
 symbol: public(String[32])
 
+<<<<<<< HEAD
 full_profit_unlock_date: public(uint256)
 profit_unlocking_rate: public(uint256)
+=======
+full_profit_unlock_date: uint256
+profit_unlocking_rate: uint256
+>>>>>>> bd63e74 (feat: implement no sandwiching using share burning and minting)
 last_profit_update: uint256
 
 # `nonces` track `permit` approvals with signature.
@@ -287,6 +298,35 @@ def _burn_unlocked_shares() -> uint256:
 
 @view
 @internal
+def _unlocked_shares() -> uint256:
+  _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
+  unlocked_shares: uint256 = 0
+  if _full_profit_unlock_date > block.timestamp:
+    unlocked_shares = self.profit_unlocking_rate * (block.timestamp - self.last_profit_update)
+  else:
+    # All shares have been unlocked
+    unlocked_shares = self.profit_unlocking_rate * (_full_profit_unlock_date - self.last_profit_update)
+  return unlocked_shares
+
+@view
+@internal
+def _total_supply() -> uint256:
+  return self.total_supply - self._unlocked_shares()
+
+@internal
+def _burn_unlocked_shares() -> uint256:
+  unlocked_shares: uint256 = self._unlocked_shares()
+
+  if self.full_profit_unlock_date > block.timestamp:
+    self.last_profit_update = block.timestamp
+  else:
+    self.profit_unlocking_rate = 0
+
+  self._burn_shares(unlocked_shares, self)
+  return unlocked_shares
+
+@view
+@internal
 def _total_assets() -> uint256:
     """
     Total amount of assets that are in the vault and in the strategies. 
@@ -384,6 +424,8 @@ def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
 
 @internal
 def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
+    # NOTE: we update total supply
+    self._burn_unlocked_shares()
     new_shares: uint256 = self._convert_to_shares(amount)
 
     # We don't make the function revert
