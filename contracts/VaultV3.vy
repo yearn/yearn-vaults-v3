@@ -130,9 +130,9 @@ balance_of: HashMap[address, uint256]
 allowance: public(HashMap[address, HashMap[address, uint256]])
 
 # Total amount of shares that are currently minted
-total_supply: uint256
+total_supply: public(uint256)
 # Total amount of assets that has been deposited in strategies
-total_debt: uint256
+total_debt: public(uint256)
 # Current assets held in the vault contract. Replacing balanceOf(this) to avoid price_per_share manipulation
 total_idle: public(uint256)
 # Minimum amount of assets that should be kept in the vault contract to allow for fast, cheap redeems
@@ -159,9 +159,9 @@ name: public(String[64])
 # ERC20 - symbol of the token
 symbol: public(String[32])
 
-full_profit_unlock_date: uint256
-profit_unlocking_rate: uint256
-last_profit_update: uint256
+full_profit_unlock_date: public(uint256)
+profit_unlocking_rate: public(uint256)
+last_profit_update: public(uint256)
 
 # `nonces` track `permit` approvals with signature.
 nonces: public(HashMap[address, uint256])
@@ -253,15 +253,21 @@ def _permit(owner: address, spender: address, amount: uint256, deadline: uint256
     return True
 
 @view
+@external
+def unlocked_shares() -> uint256:
+  return self._unlocked_shares()
+
+@view
 @internal
 def _unlocked_shares() -> uint256:
   _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
   unlocked_shares: uint256 = 0
   if _full_profit_unlock_date > block.timestamp:
-    unlocked_shares = self.profit_unlocking_rate * (block.timestamp - self.last_profit_update)
+    unlocked_shares = self.profit_unlocking_rate * (block.timestamp - self.last_profit_update) / MAX_BPS
   else:
     # All shares have been unlocked
-    unlocked_shares = self.profit_unlocking_rate * (_full_profit_unlock_date - self.last_profit_update)
+    unlocked_shares = self.profit_unlocking_rate * (_full_profit_unlock_date - self.last_profit_update) / MAX_BPS
+
   return unlocked_shares
 
 @view
@@ -272,6 +278,8 @@ def _total_supply() -> uint256:
 @internal
 def _burn_unlocked_shares() -> uint256:
   unlocked_shares: uint256 = self._unlocked_shares()
+  if unlocked_shares == 0:
+    return 0
 
   if self.full_profit_unlock_date > block.timestamp:
     self.last_profit_update = block.timestamp
@@ -742,13 +750,14 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     newly_locked_shares: uint256 = 0
     if gain > 0:
-        # update current debt after processing management fee
-        self.strategies[strategy].current_debt += gain
-        self.total_debt += gain
         if gain > total_fees:
           # NOTE: vault will issue shares worth the profit to avoid instant pps change
           newly_locked_shares += self._issue_shares_for_amount(gain - total_fees, self)
-    
+
+        # update current debt after processing management fee
+        self.strategies[strategy].current_debt += gain
+        self.total_debt += gain
+            
     # Minting fees after gain computation to ensure fees don't benefit from cheaper pps 
     if total_fees > 0:
         # if fees are non-zero, issue shares
@@ -792,11 +801,11 @@ def _process_report(strategy: address) -> (uint256, uint256):
           previously_locked_shares -= shares_to_burn - newly_locked_shares
 
     new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * PROFIT_MAX_UNLOCK_TIME) / (previously_locked_shares + newly_locked_shares)
+    if new_profit_locking_period > 0:
+      self.profit_unlocking_rate = (previously_locked_shares + newly_locked_shares) * MAX_BPS / new_profit_locking_period
+      self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
 
-    self.profit_unlocking_rate = (previously_locked_shares + newly_locked_shares) * MAX_BPS / new_profit_locking_period
-    self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
     self.last_profit_update = block.timestamp
-
 
     self.strategies[strategy].last_report = block.timestamp
     log StrategyReported(
