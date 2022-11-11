@@ -266,7 +266,7 @@ def _unlocked_shares() -> uint256:
     unlocked_shares = self.profit_unlocking_rate * (block.timestamp - self.last_profit_update) / MAX_BPS
   else:
     # All shares have been unlocked
-    unlocked_shares = self.profit_unlocking_rate * (_full_profit_unlock_date - self.last_profit_update) / MAX_BPS
+    unlocked_shares = self.profit_unlocking_rate * (_full_profit_unlock_date - self.last_profit_update)/ MAX_BPS
 
   return unlocked_shares
 
@@ -750,15 +750,13 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     newly_locked_shares: uint256 = 0
     if gain > 0:
-        if gain > total_fees:
-          # NOTE: vault will issue shares worth the profit to avoid instant pps change
-          newly_locked_shares += self._issue_shares_for_amount(gain - total_fees, self)
+        # NOTE: vault will issue shares worth the profit to avoid instant pps change
+        newly_locked_shares += self._issue_shares_for_amount(gain, self)
 
         # update current debt after processing management fee
         self.strategies[strategy].current_debt += gain
         self.total_debt += gain
-            
-    # Minting fees after gain computation to ensure fees don't benefit from cheaper pps 
+
     if total_fees > 0:
         # if fees are non-zero, issue shares
         self._issue_shares_for_amount(total_fees, accountant)
@@ -791,21 +789,25 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if loss + total_fees > 0:
         shares_to_unlock: uint256 = self._convert_to_shares(loss + total_fees)
         # TODO: second min needed to avoid reverts?
-        shares_to_burn = min(shares_to_unlock, min(previously_locked_shares, self.balance_of[self]) + newly_locked_shares)
+        shares_to_burn = min(shares_to_unlock, min(previously_locked_shares + newly_locked_shares, self.balance_of[self]))
         self._burn_shares(shares_to_burn, self)
         if newly_locked_shares > shares_to_burn:
           newly_locked_shares -= shares_to_burn
         else:
-          newly_locked_shares = 0
           # unlocking previously locked shares
-          previously_locked_shares -= shares_to_burn - newly_locked_shares
+          previously_locked_shares -= (shares_to_burn - newly_locked_shares)
+          newly_locked_shares = 0
 
-    new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * PROFIT_MAX_UNLOCK_TIME) / (previously_locked_shares + newly_locked_shares)
-    if new_profit_locking_period > 0:
-      self.profit_unlocking_rate = (previously_locked_shares + newly_locked_shares) * MAX_BPS / new_profit_locking_period
-      self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
 
-    self.last_profit_update = block.timestamp
+    if previously_locked_shares + newly_locked_shares > 0:
+      new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * PROFIT_MAX_UNLOCK_TIME) / (previously_locked_shares + newly_locked_shares)
+      if new_profit_locking_period > 0:
+        self.profit_unlocking_rate = (previously_locked_shares + newly_locked_shares) * MAX_BPS / new_profit_locking_period
+        self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
+      else:
+        self.profit_unlocking_rate = 0
+
+      self.last_profit_update = block.timestamp
 
     self.strategies[strategy].last_report = block.timestamp
     log StrategyReported(
