@@ -264,7 +264,7 @@ def _unlocked_shares() -> uint256:
   unlocked_shares: uint256 = 0
   if _full_profit_unlock_date > block.timestamp:
     unlocked_shares = self.profit_unlocking_rate * (block.timestamp - self.last_profit_update) / MAX_BPS
-  else:
+  elif _full_profit_unlock_date != 0:
     # All shares have been unlocked
     unlocked_shares = self.balance_of[self]
 

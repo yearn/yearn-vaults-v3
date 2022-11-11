@@ -126,7 +126,7 @@ def test_process_report__with_gain_and_zero_management_fees(
 
     # Vault mints shares worth the fees to the accountant
     share_price_before_minting_fees = (
-        initial_total_assets + total_fee 
+        initial_total_assets 
     ) / initial_total_supply
     assert (
         pytest.approx(vault.balanceOf(accountant), rel=1e-5)
@@ -185,7 +185,7 @@ def test_process_report__with_gain_and_zero_performance_fees(
 
     # Vault mints shares worth the fees to the accountant
     share_price_before_minting_fees = (
-        initial_total_assets + total_fee
+        initial_total_assets
     ) / initial_total_supply
     assert (
         pytest.approx(vault.balanceOf(accountant), rel=1e-5)
@@ -243,7 +243,7 @@ def test_process_report__with_gain_and_both_fees(
 
     # Vault mints shares worth the fees to the accountant
     share_price_before_minting_fees = (
-        initial_total_assets + total_fee
+        initial_total_assets
     ) / initial_total_supply
     assert (
         pytest.approx(vault.balanceOf(accountant), rel=1e-5)
