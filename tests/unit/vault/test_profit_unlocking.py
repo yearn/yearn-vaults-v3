@@ -39,20 +39,22 @@ def test_total_debt(
 
     assert vault.totalAssets() == amount + first_profit
     assert vault.total_debt() == amount + first_profit
-    assert vault.totalSupply() > amount
-    print("TotalSupply", vault.totalSupply())
-    assert False
+    post_profit_totalSupply = vault.totalSupply()
+
+    assert post_profit_totalSupply > amount
+
     # We increase time and check estimation
     chain.pending_timestamp = initial_timestamp + days_to_secs(4)
     chain.mine(timestamp=chain.pending_timestamp)
 
-    print("TotalSupply", vault.totalSupply())
-
-    assert False
+    assert post_profit_totalSupply > vault.totalSupply()
+    assert pytest.approx(vault.totalSupply(), rel=1e-5) == post_profit_totalSupply - first_profit * days_to_secs(4) / days_to_secs(14)
 
     # We increase time after profit has been released and check estimation
-    chain.pending_timestamp = initial_timestamp + days_to_secs(10)
+    chain.pending_timestamp = chain.pending_timestamp + days_to_secs(10)
     chain.mine(timestamp=chain.pending_timestamp)
+
     assert vault.totalAssets() == vault.total_debt()
-    assert vault.total_debt() == pytest.approx(amount + first_profit, rel=1e-5)
+    assert vault.total_debt() == amount + first_profit
+    assert pytest.approx(vault.totalSupply(), rel=1e-5) == amount
 
