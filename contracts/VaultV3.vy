@@ -387,8 +387,6 @@ def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
 
 @internal
 def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
-    # NOTE: we update total supply
-    self._burn_unlocked_shares()
     new_shares: uint256 = self._convert_to_shares(amount)
 
     # We don't make the function revert
