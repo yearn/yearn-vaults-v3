@@ -63,15 +63,13 @@ def test_profitable_strategy_flow(
     tx = vault.process_report(strategy.address, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].gain == first_profit
-    assert vault.totalAssets() == pytest.approx(deposit_amount + first_profit, 1e-5)
+    assert pytest.approx(deposit_amount + first_profit, 1e-5) == vault.totalAssets()
     # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
     share_price_before_minting_fees = (
-        initial_total_assets
+        initial_total_assets + total_fee
     ) / initial_total_supply
 
-    assert vault.balanceOf(accountant) == pytest.approx(
-        total_fee / share_price_before_minting_fees, 1e-5
-    )
+    assert pytest.approx(vault.balanceOf(accountant), 1e-5) == total_fee / share_price_before_minting_fees
 
     pps = vault.price_per_share()
 
@@ -94,7 +92,7 @@ def test_profitable_strategy_flow(
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].gain == second_profit
 
-    assert vault.totalAssets() == pytest.approx(assets_before_profit + second_profit)
+    assert pytest.approx(assets_before_profit + second_profit) == vault.totalAssets()
     # Users deposited same amount of assets, but they have different shares due to pps
     assert vault.balanceOf(user_1) > vault.balanceOf(user_2)
 
@@ -108,7 +106,7 @@ def test_profitable_strategy_flow(
     assert event[0].loss == first_loss
 
     assert vault.totalAssets() < assets_before_loss
-    assert vault.price_per_share() < pps_before_loss
+    assert vault.price_per_share() > pps_before_loss
 
     assert vault.total_idle() == 0
     # Les set a `minimum_total_idle` value
@@ -126,7 +124,7 @@ def test_profitable_strategy_flow(
     user_1_withdraw = vault.total_idle()
     vault.withdraw(user_1_withdraw, user_1, user_1, sender=user_1)
 
-    assert vault.total_idle() == pytest.approx(0, abs=1)
+    assert pytest.approx(0, abs=1) == vault.total_idle()
 
     new_debt = strategy.totalAssets() - deposit_amount // 4
     add_debt_to_strategy(gov, strategy, vault, new_debt)
@@ -142,14 +140,7 @@ def test_profitable_strategy_flow(
     with ape.reverts("nothing to report"):
         vault.process_report(strategy.address, sender=gov)
 
-    assert vault.totalAssets() == pytest.approx(
-        2 * deposit_amount
-        + first_profit
-        + second_profit
-        - first_loss
-        - user_1_withdraw,
-        1e-5,
-    )
+    assert pytest.approx(vault.totalAssets()) == 2 * deposit_amount + first_profit + second_profit - first_loss - user_1_withdraw
 
     with ape.reverts("insufficient assets in vault"):
         vault.withdraw(
@@ -160,8 +151,8 @@ def test_profitable_strategy_flow(
         )
 
     # we need to use strategies param to take assets from strategies
-    vault.withdraw(
-        vault.convertToAssets(vault.balanceOf(user_1)),
+    vault.redeem(
+        vault.balanceOf(user_1),
         user_1,
         user_1,
         [strategy.address],
@@ -169,7 +160,7 @@ def test_profitable_strategy_flow(
     )
 
     assert vault.total_idle() == 0
-    assert vault.balanceOf(user_1) == pytest.approx(0, abs=1)
+    assert pytest.approx(0, abs=1) == vault.balanceOf(user_1)
 
     assert asset.balanceOf(user_1) > user_1_initial_balance
 
@@ -178,13 +169,13 @@ def test_profitable_strategy_flow(
     )
 
     assert vault.total_idle() == 0
-    assert vault.balanceOf(user_2) == pytest.approx(0, abs=1)
+    assert pytest.approx(0, abs=1) == vault.balanceOf(user_2)
     assert asset.balanceOf(user_2) > user_2_initial_balance
 
-    assert vault.totalAssets() == pytest.approx(
-        vault.convertToAssets(vault.balanceOf(accountant)), 1e-5
-    )
-    assert vault.totalAssets() == pytest.approx(strategy.totalAssets(), 1e-5)
+    chain.mine(timestamp=chain.pending_timestamp + days_to_secs(14))
+    
+    assert pytest.approx(vault.totalAssets(), rel=1e-5) == vault.convertToAssets(vault.balanceOf(accountant))
+    assert pytest.approx(strategy.totalAssets(), 1e-5) == vault.totalAssets()
 
     # Let's empty the strategy and revoke it
     add_debt_to_strategy(gov, strategy, vault, 0)
