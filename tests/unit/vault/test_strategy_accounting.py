@@ -82,7 +82,7 @@ def test_process_report__with_gain_and_zero_management_fees(
     asset,
     vault,
     strategy,
-    accountant,
+    deploy_accountant,
     airdrop_asset,
     set_fees_for_strategy,
     add_debt_to_strategy,
@@ -96,7 +96,7 @@ def test_process_report__with_gain_and_zero_management_fees(
 
     initial_total_assets = vault.totalAssets()
     initial_total_supply = vault.totalSupply()
-
+    accountant = deploy_accountant(vault)
     # add debt to strategy
     add_debt_to_strategy(gov, strategy, vault, new_debt)
     # airdrop gain to strategy
@@ -140,7 +140,7 @@ def test_process_report__with_gain_and_zero_performance_fees(
     asset,
     vault,
     strategy,
-    accountant,
+    deploy_accountant,
     airdrop_asset,
     set_fees_for_strategy,
     add_debt_to_strategy,
@@ -155,6 +155,7 @@ def test_process_report__with_gain_and_zero_performance_fees(
     initial_total_assets = vault.totalAssets()
     initial_total_supply = vault.totalSupply()
 
+    accountant = deploy_accountant(vault)
     # add debt to strategy
     add_debt_to_strategy(gov, strategy, vault, new_debt)
     # airdrop gain to strategy
@@ -199,7 +200,7 @@ def test_process_report__with_gain_and_both_fees(
     asset,
     vault,
     strategy,
-    accountant,
+    deploy_accountant,
     airdrop_asset,
     set_fees_for_strategy,
     add_debt_to_strategy,
@@ -214,6 +215,7 @@ def test_process_report__with_gain_and_both_fees(
     initial_total_assets = vault.totalAssets()
     initial_total_supply = vault.totalSupply()
 
+    accountant = deploy_accountant(vault)
     # add debt to strategy
     add_debt_to_strategy(gov, strategy, vault, new_debt)
     # airdrop gain to strategy
@@ -257,7 +259,7 @@ def test_process_report__with_fees_exceeding_fee_cap(
     asset,
     vault,
     strategy,
-    accountant,
+    deploy_accountant,
     airdrop_asset,
     set_fees_for_strategy,
     add_debt_to_strategy,
@@ -273,6 +275,7 @@ def test_process_report__with_fees_exceeding_fee_cap(
     initial_total_assets = vault.totalAssets()
     initial_total_supply = vault.totalSupply()
 
+    accountant = deploy_accountant(vault)
     # add debt to strategy
     add_debt_to_strategy(gov, strategy, vault, new_debt)
     # airdrop gain to strategy
@@ -303,7 +306,7 @@ def test_process_report__with_fees_exceeding_fee_cap(
 
     # Vault mints shares worth the fees to the accountant
     share_price_before_minting_fees = (
-        initial_total_assets + max_fee 
+        initial_total_assets
     ) / initial_total_supply
     assert (
         pytest.approx(vault.balanceOf(accountant), rel=1e-5)
@@ -352,7 +355,7 @@ def test_process_report__with_loss_and_management_fees(
     lossy_strategy,
     add_debt_to_strategy,
     set_fees_for_strategy,
-    accountant,
+    deploy_accountant,
 ):
     vault_balance = asset.balanceOf(vault)
     new_debt = vault_balance
@@ -361,6 +364,7 @@ def test_process_report__with_loss_and_management_fees(
     performance_fee = 0
     refund_ratio = 0
 
+    accountant = deploy_accountant(vault)
     # set up accountant
     set_fees_for_strategy(
         gov, lossy_strategy, accountant, management_fee, performance_fee, refund_ratio
@@ -416,7 +420,7 @@ def test_process_report__with_loss_and_refunds(
     lossy_strategy,
     add_debt_to_strategy,
     set_fees_for_strategy,
-    accountant,
+    deploy_accountant,
 ):
     vault_balance = asset.balanceOf(vault)
     new_debt = vault_balance
@@ -425,8 +429,12 @@ def test_process_report__with_loss_and_refunds(
     performance_fee = 0
     refund_ratio = 10_000
 
+    accountant = deploy_accountant(vault)
     # set up accountant
-    asset.mint(accountant, loss, sender=gov)
+    asset.mint(gov, loss, sender=gov)
+    asset.approve(vault, loss, sender=gov)
+    vault.deposit(loss, accountant, sender=gov)
+
     set_fees_for_strategy(
         gov, lossy_strategy, accountant, management_fee, performance_fee, refund_ratio
     )
@@ -440,7 +448,7 @@ def test_process_report__with_loss_and_refunds(
 
     pps_before_loss = vault.price_per_share()
     assets_before_loss = vault.totalAssets()
-
+    supply_before_loss = vault.totalSupply()
     tx = vault.process_report(lossy_strategy.address, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
 
@@ -454,11 +462,9 @@ def test_process_report__with_loss_and_refunds(
 
     # Due to refunds, pps should be the same as before the loss
     assert vault.price_per_share() == pps_before_loss
-    assert vault.totalAssets() == assets_before_loss
-
-    assert vault.total_idle() == loss
+    assert vault.totalAssets() < assets_before_loss
+    assert vault.totalSupply() < supply_before_loss
     assert vault.total_debt() == new_debt - loss
-    assert vault.totalAssets() == vault_balance
 
 
 def test_process_report__with_loss_management_fees_and_refunds(
@@ -469,7 +475,7 @@ def test_process_report__with_loss_management_fees_and_refunds(
     create_lossy_strategy,
     add_debt_to_strategy,
     set_fees_for_strategy,
-    accountant,
+    deploy_accountant,
 ):
     vault_balance = asset.balanceOf(vault)
     new_debt = vault_balance
@@ -482,9 +488,12 @@ def test_process_report__with_loss_management_fees_and_refunds(
     vault.add_strategy(lossy_strategy.address, sender=gov)
     initial_timestamp = chain.pending_timestamp
     lossy_strategy.setMaxDebt(MAX_INT, sender=gov)
-
+    accountant = deploy_accountant(vault)
     # set up accountant
-    asset.mint(accountant, loss, sender=gov)
+    asset.mint(gov, loss, sender=gov)
+    asset.approve(vault, loss, sender=gov)
+    vault.deposit(loss, accountant, sender=gov)
+
     set_fees_for_strategy(
         gov, lossy_strategy, accountant, management_fee, performance_fee, refund_ratio
     )
@@ -528,7 +537,8 @@ def test_process_report__with_loss_management_fees_and_refunds(
     assert vault.balanceOf(accountant) == pytest.approx(expected_management_fees, 1e-4)
 
 
-def test_set_accountant__with_accountant(gov, vault, accountant):
+def test_set_accountant__with_accountant(gov, vault, deploy_accountant):
+    accountant = deploy_accountant(vault)
     tx = vault.set_accountant(accountant.address, sender=gov)
     event = list(tx.decode_logs(vault.UpdateAccountant))
 

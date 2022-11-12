@@ -20,7 +20,7 @@ def test_profitable_strategy_flow(
     add_strategy_to_vault,
     airdrop_asset,
     set_fees_for_strategy,
-    accountant,
+    deploy_accountant,
 ):
     performance_fee = 1_000  # 10%
 
@@ -35,6 +35,7 @@ def test_profitable_strategy_flow(
     initial_timestamp = chain.pending_timestamp
 
     vault = create_vault(asset)
+    accountant = deploy_accountant(vault)
     # We use lossy strategy as it allows us to create losses
     strategy = create_lossy_strategy(vault)
     set_fees_for_strategy(gov, strategy, accountant, 0, performance_fee)
@@ -59,14 +60,13 @@ def test_profitable_strategy_flow(
     # we simulate profit on strategy
     total_fee = first_profit * (performance_fee / MAX_BPS)
     asset.transfer(strategy, first_profit, sender=whale)
-
     tx = vault.process_report(strategy.address, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].gain == first_profit
     assert pytest.approx(deposit_amount + first_profit, 1e-5) == vault.totalAssets()
     # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
     share_price_before_minting_fees = (
-        initial_total_assets
+        initial_total_assets 
     ) / initial_total_supply
 
     assert pytest.approx(vault.balanceOf(accountant), 1e-5) == total_fee / share_price_before_minting_fees
@@ -164,9 +164,7 @@ def test_profitable_strategy_flow(
 
     assert asset.balanceOf(user_1) > user_1_initial_balance
 
-    vault.redeem(
-        vault.balanceOf(user_2), user_2, user_2, [strategy.address], sender=user_2
-    )
+    vault.redeem(vault.balanceOf(user_2), user_2, user_2, [strategy.address], sender=user_2)
 
     assert vault.total_idle() == 0
     assert pytest.approx(0, abs=1) == vault.balanceOf(user_2)

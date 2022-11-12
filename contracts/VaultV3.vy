@@ -194,7 +194,6 @@ def _spend_allowance(owner: address, spender: address, amount: uint256):
 @internal
 def _transfer(sender: address, receiver: address, amount: uint256):
     # Protect people from accidentally sending their shares to bad places
-    assert receiver not in [self, empty(address)]
     assert self.balance_of[sender] >= amount, "insufficient funds"
     self.balance_of[sender] -= amount
     self.balance_of[receiver] += amount
@@ -770,7 +769,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         # if refunds are non-zero, transfer assets
         total_refunds = min(total_refunds, self.balance_of[accountant])
         # Shares received as a refund are locked to avoid sudden pps change
-        self._transfer_from(accountant, self, total_refunds)
+        self._transfer(accountant, self, total_refunds)
         newly_locked_shares += total_refunds
  
     # Strategy is reporting a loss
@@ -966,11 +965,13 @@ def approve(spender: address, amount: uint256) -> bool:
 
 @external
 def transfer(receiver: address, amount: uint256) -> bool:
+    assert receiver not in [self, empty(address)]
     self._transfer(msg.sender, receiver, amount)
     return True
 
 @external
 def transferFrom(sender: address, receiver: address, amount: uint256) -> bool:
+    assert receiver not in [self, empty(address)]
     return self._transfer_from(sender, receiver, amount)
 
 ## ERC20+4626 compatibility

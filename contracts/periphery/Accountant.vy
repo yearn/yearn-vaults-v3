@@ -98,8 +98,6 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
         asset_balance: uint256= ERC20(self.asset).balanceOf(self)
         refund_ratio: uint256 = self.refund_ratios[strategy]
         total_refunds = loss * refund_ratio / MAX_BPS
-        if total_refunds > asset_balance:
-            total_refunds = asset_balance
         if total_refunds > 0:
             # TODO: permissions implications. msg.sender should only be vault
             self.erc20_safe_approve(self.asset, msg.sender, total_refunds)
