@@ -268,7 +268,8 @@ def deploy_accountant(project, gov):
         # set up fee manager
         vault.set_accountant(accountant.address, sender=gov)
         return accountant
-    yield deploy_accountant 
+
+    yield deploy_accountant
 
 
 @pytest.fixture(scope="session")
@@ -404,6 +405,7 @@ def add_debt_to_strategy():
     def add_debt_to_strategy(user, strategy, vault, target_debt: int):
         vault.update_max_debt_for_strategy(strategy.address, target_debt, sender=user)
         vault.update_debt(strategy.address, target_debt, sender=user)
+
     return add_debt_to_strategy
 
 

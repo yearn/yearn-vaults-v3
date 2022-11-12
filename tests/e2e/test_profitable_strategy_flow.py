@@ -65,11 +65,12 @@ def test_profitable_strategy_flow(
     assert event[0].gain == first_profit
     assert pytest.approx(deposit_amount + first_profit, 1e-5) == vault.totalAssets()
     # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
-    share_price_before_minting_fees = (
-        initial_total_assets 
-    ) / initial_total_supply
+    share_price_before_minting_fees = (initial_total_assets) / initial_total_supply
 
-    assert pytest.approx(vault.balanceOf(accountant), 1e-5) == total_fee / share_price_before_minting_fees
+    assert (
+        pytest.approx(vault.balanceOf(accountant), 1e-5)
+        == total_fee / share_price_before_minting_fees
+    )
 
     pps = vault.price_per_share()
 
@@ -140,7 +141,14 @@ def test_profitable_strategy_flow(
     with ape.reverts("nothing to report"):
         vault.process_report(strategy.address, sender=gov)
 
-    assert pytest.approx(vault.totalAssets()) == 2 * deposit_amount + first_profit + second_profit - first_loss - user_1_withdraw
+    assert (
+        pytest.approx(vault.totalAssets())
+        == 2 * deposit_amount
+        + first_profit
+        + second_profit
+        - first_loss
+        - user_1_withdraw
+    )
 
     with ape.reverts("insufficient assets in vault"):
         vault.withdraw(
@@ -164,15 +172,19 @@ def test_profitable_strategy_flow(
 
     assert asset.balanceOf(user_1) > user_1_initial_balance
 
-    vault.redeem(vault.balanceOf(user_2), user_2, user_2, [strategy.address], sender=user_2)
+    vault.redeem(
+        vault.balanceOf(user_2), user_2, user_2, [strategy.address], sender=user_2
+    )
 
     assert vault.total_idle() == 0
     assert pytest.approx(0, abs=1) == vault.balanceOf(user_2)
     assert asset.balanceOf(user_2) > user_2_initial_balance
 
     chain.mine(timestamp=chain.pending_timestamp + days_to_secs(14))
-    
-    assert pytest.approx(vault.totalAssets(), rel=1e-5) == vault.convertToAssets(vault.balanceOf(accountant))
+
+    assert pytest.approx(vault.totalAssets(), rel=1e-5) == vault.convertToAssets(
+        vault.balanceOf(accountant)
+    )
     assert pytest.approx(strategy.totalAssets(), 1e-5) == vault.totalAssets()
 
     # Let's empty the strategy and revoke it
