@@ -158,8 +158,8 @@ name: public(String[64])
 symbol: public(String[32])
 
 full_profit_unlock_date: public(uint256)
-profit_unlocking_rate: public(uint256)
-last_profit_update: public(uint256)
+profit_unlocking_rate: uint256
+last_profit_update: uint256
 
 # `nonces` track `permit` approvals with signature.
 nonces: public(HashMap[address, uint256])
@@ -277,7 +277,8 @@ def _burn_unlocked_shares() -> uint256:
   unlocked_shares: uint256 = self._unlocked_shares()
   if unlocked_shares == 0:
     return 0
-
+  
+  # update variables (done here to keep _unlocked_shares as a view function)
   if self.full_profit_unlock_date > block.timestamp:
     self.last_profit_update = block.timestamp
   else:
@@ -636,7 +637,6 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         assets_to_withdraw: uint256 = current_debt - new_debt
 
         # ensure we always have minimum_total_idle when updating debt
-        # HACK: to save gas
         minimum_total_idle: uint256 = self.minimum_total_idle
         total_idle: uint256 = self.total_idle
         
@@ -660,7 +660,7 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_to_withdraw)
         assert unrealised_losses_share == 0, "strategy has unrealised losses"
 
-        # TODO: check if ERC4626 reverts if not enough assets
+        # TODO: check if ERC4626 reverts if not enough assets (!)
         IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
         self.total_idle += assets_to_withdraw
         # TODO: WARNING: we do this because there are rounding errors due to gradual profit unlocking
@@ -746,7 +746,8 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if accountant != empty(address):
         total_fees, total_refunds = IAccountant(accountant).report(strategy, gain, loss)
     
-    # We calculate the amount of shares that could be insta unlocked 
+    # We calculate the amount of shares that could be insta unlocked to avoid pps changes
+    # NOTE: this needs to be done before any pps changes
     shares_to_burn: uint256 = 0 
     if loss + total_fees > 0:
       shares_to_burn = self._convert_to_shares(loss + total_fees)
@@ -756,6 +757,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         # NOTE: vault will issue shares worth the profit to avoid instant pps change
         newly_locked_shares += self._issue_shares_for_amount(gain, self)
         # update current debt after processing management fee
+        # NOTE: this will increase total_assets
         self.strategies[strategy].current_debt += gain
         self.total_debt += gain
 
@@ -766,7 +768,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if total_refunds > 0:
         # if refunds are non-zero, transfer assets
         total_refunds = min(total_refunds, self.balance_of[accountant])
-        # Shares received as a refund are locked to avoid sudden pps change
+        # Shares received as a refund are locked to avoid sudden pps change (like profits)
         self._transfer(accountant, self, total_refunds)
         newly_locked_shares += total_refunds
  
@@ -782,14 +784,13 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if _full_profit_unlock_date > block.timestamp: 
       remaining_time = _full_profit_unlock_date - block.timestamp
       previously_locked_shares = remaining_time * self.profit_unlocking_rate / MAX_BPS 
-    else:
-      remaining_time = 0
-      previously_locked_shares = 0
 
     # Vault insta unlocks losses and fees to avoid pps decrease
+    # NOTE: it can only unlock shares that are previously locked. Any loss / fees over the amount of total locked shares will have an effect on pps
     shares_to_burn = min(shares_to_burn, previously_locked_shares + newly_locked_shares)
     if shares_to_burn > 0:
       self._burn_shares(shares_to_burn, self)
+      # we burn first the newly locked shares, then the previously locked shares (the order in code is the inverse to save gas)
       previously_locked_shares -= (shares_to_burn - min(shares_to_burn, newly_locked_shares))
       newly_locked_shares -= min(shares_to_burn, newly_locked_shares)
 
@@ -801,6 +802,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
       self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
       self.last_profit_update = block.timestamp
     else:
+      # NOTE: only setting this to 0 will turn in the desired effect, no need to update last_profit_update or full_profit_unlock_date
       self.profit_unlocking_rate = 0
 
     self.strategies[strategy].last_report = block.timestamp
@@ -989,6 +991,7 @@ def permit(owner: address, spender: address, amount: uint256, deadline: uint256,
 @external
 def balanceOf(addr: address) -> uint256:
     if(addr == self):
+      # TODO: should this return 0?
       return self.balance_of[addr] - self._unlocked_shares()
     return self.balance_of[addr]
 
