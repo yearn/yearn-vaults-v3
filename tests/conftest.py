@@ -191,6 +191,7 @@ def create_vault(project, gov, vault_factory):
         )
         event = list(tx.decode_logs(vault_factory.NewVault))
         vault = project.VaultV3.at(event[0].vault_address)
+
         vault.set_role(
             gov.address,
             ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
@@ -407,7 +408,6 @@ def add_debt_to_strategy():
     def add_debt_to_strategy(user, strategy, vault, target_debt: int):
         vault.update_max_debt_for_strategy(strategy.address, target_debt, sender=user)
         vault.update_debt(strategy.address, target_debt, sender=user)
-
     return add_debt_to_strategy
 
 
