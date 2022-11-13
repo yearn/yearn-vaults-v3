@@ -113,11 +113,10 @@ enum Roles:
 # IMMUTABLE #
 ASSET: immutable(ERC20)
 DECIMALS: immutable(uint256)
+PROFIT_MAX_UNLOCK_TIME: immutable(uint256)
 
 # CONSTANTS #
 API_VERSION: constant(String[28]) = "0.1.0"
-# TODO: make this variable immutable
-PROFIT_MAX_UNLOCK_TIME: constant(uint256) = 2 * 7 * 24 * 3600
 
 # STORAGE #
 # HashMap that records all the strategies that are allowed to receive assets from the vault
@@ -168,10 +167,12 @@ PERMIT_TYPE_HASH: constant(bytes32) = keccak256("Permit(address owner,address sp
 
 # Constructor
 @external
-def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: address):
+def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: address, profit_max_unlock_time: uint256):
     ASSET = asset
     DECIMALS = convert(ERC20Detailed(asset.address).decimals(), uint256)
     assert 10 ** (2 * DECIMALS) <= max_value(uint256) # dev: token decimals too high
+    
+    PROFIT_MAX_UNLOCK_TIME = profit_max_unlock_time
 
     self.name = name
     self.symbol = symbol
@@ -507,7 +508,6 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
             # After losses are taken, vault asks what is the max amount to withdraw
             assets_to_withdraw = min(assets_to_withdraw, IStrategy(strategy).maxWithdraw(self))
 
-            # TODO: should this be before taking the losses? probably not
             # continue to next strategy if nothing to withdraw
             if assets_to_withdraw == 0:
                 continue
@@ -608,7 +608,6 @@ def _migrate_strategy(new_strategy: address, old_strategy: address):
     log StrategyMigrated(old_strategy, new_strategy)
 
 # DEBT MANAGEMENT #
-# TODO: allow the caller to specify the debt for the strategy, enforcing max_debt
 @internal
 def _update_debt(strategy: address, target_debt: uint256) -> uint256:
     """

@@ -185,6 +185,7 @@ def create_vault(project, gov, vault_factory):
             vault_name,
             vault_symbol,
             governance,
+            max_profit_locking_time,
             sender=gov,
         )
         event = list(tx.decode_logs(vault_factory.NewVault))
