@@ -979,7 +979,6 @@ def permit(owner: address, spender: address, amount: uint256, deadline: uint256,
 @external
 def balanceOf(addr: address) -> uint256:
     if(addr == self):
-      # TODO: should this return 0?
       return self.balance_of[addr] - self._unlocked_shares()
     return self.balance_of[addr]
 
