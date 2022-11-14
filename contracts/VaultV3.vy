@@ -101,7 +101,7 @@ struct StrategyParams:
     max_debt: uint256
 
 # CONSTANTS #
-MAX_BPS: constant(uint256) = 10_000
+MAX_BPS: constant(uint256) = 1_000_000_000_000
 
 # ENUMS #
 enum Roles:
