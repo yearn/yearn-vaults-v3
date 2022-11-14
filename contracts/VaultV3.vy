@@ -136,10 +136,7 @@ total_idle: public(uint256)
 minimum_total_idle: public(uint256)
 # Maximum amount of tokens that the vault can accept. If totalAssets > deposit_limit, deposits will revert
 deposit_limit: public(uint256)
-# TODO: remove
 accountant: public(address)
-# TODO: remove
-health_check: public(address)
 # HashMap mapping addresses to their roles
 roles: public(HashMap[address, Roles])
 # HashMap mapping roles to their permissioned state. If false, the role is not open to the public
@@ -621,8 +618,6 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
     The vault will not invest the funds into the underlying protocol, which is responsibility of the strategy. 
     """
     new_debt: uint256 = target_debt
-    # Revert if target_debt cannot be achieved due to configured max_debt for given strategy
-    assert new_debt <= self.strategies[strategy].max_debt, "target debt higher than max debt"
 
     current_debt: uint256 = self.strategies[strategy].current_debt
 
@@ -654,29 +649,23 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
             assets_to_withdraw = withdrawable
             new_debt = current_debt - withdrawable
 
-        # TODO: should we allow taking losses if we report them?
         # If there are unrealised losses we don't let the vault reduce its debt
         unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_to_withdraw)
         assert unrealised_losses_share == 0, "strategy has unrealised losses"
 
-        # TODO: check if ERC4626 reverts if not enough assets (!)
         IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
         self.total_idle += assets_to_withdraw
-        # TODO: WARNING: we do this because there are rounding errors due to gradual profit unlocking
-        if assets_to_withdraw >= self.total_debt:
-            self.total_debt = 0
-        else:
-            self.total_debt -= assets_to_withdraw
-
+        
         new_debt = current_debt - assets_to_withdraw
     else:
+        # Revert if target_debt cannot be achieved due to configured max_debt for given strategy
+        assert new_debt <= self.strategies[strategy].max_debt, "target debt higher than max debt"
         # Vault is increasing debt with the strategy by sending more funds
         max_deposit: uint256 = IStrategy(strategy).maxDeposit(self)
 
         assets_to_transfer: uint256 = new_debt - current_debt
-        if assets_to_transfer > max_deposit:
-            # TODO: should we revert?
-            assets_to_transfer = max_deposit
+        assert assets_to_transfer < max_deposit, "strategy cannot take funds"
+
         # take into consideration minimum_total_idle
         # HACK: to save gas
         minimum_total_idle: uint256 = self.minimum_total_idle
@@ -689,6 +678,7 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         if assets_to_transfer > available_idle:
             assets_to_transfer = available_idle
             new_debt = current_debt + assets_to_transfer
+
         if assets_to_transfer > 0:
             self.erc20_safe_approve(ASSET.address, strategy, assets_to_transfer)
             IStrategy(strategy).deposit(assets_to_transfer, self)
@@ -725,9 +715,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
     
     # Burn shares that have been unlocked since the last update
     self._burn_unlocked_shares()
-
-    # TODO: do we want to revert or we prefer to return?
-    assert total_assets != current_debt, "nothing to report"
 
     gain: uint256 = 0
     loss: uint256 = 0
@@ -819,13 +806,13 @@ def _process_report(strategy: address) -> (uint256, uint256):
 # SETTERS #
 @external
 def set_accountant(new_accountant: address):
-    # TODO: permissioning: CONFIG_MANAGER
+    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
     self.accountant = new_accountant
     log UpdateAccountant(new_accountant)
 
 @external
 def set_deposit_limit(deposit_limit: uint256):
-    # TODO: permissioning: CONFIG_MANAGER
+    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
     self.deposit_limit = deposit_limit
     log UpdateDepositLimit(deposit_limit)
 
@@ -877,7 +864,6 @@ def available_deposit_limit() -> uint256:
 ## ACCOUNTING MANAGEMENT ##
 @external
 def process_report(strategy: address) -> (uint256, uint256):
-    # TODO: should it be open?
     self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
     return self._process_report(strategy)
 
@@ -949,7 +935,6 @@ def mint(shares: uint256, receiver: address) -> uint256:
 @external
 def withdraw(assets: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
     shares: uint256 = self._convert_to_shares(assets)
-    # TODO: withdrawal queue is empty here. Do we need to implement a custom withdrawal queue?
     self._redeem(msg.sender, receiver, owner, shares, strategies)
     return shares
 
@@ -990,7 +975,6 @@ def permit(owner: address, spender: address, amount: uint256, deadline: uint256,
 @external
 def balanceOf(addr: address) -> uint256:
     if(addr == self):
-      # TODO: should this return 0?
       return self.balance_of[addr] - self._unlocked_shares()
     return self.balance_of[addr]
 
