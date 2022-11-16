@@ -15,3 +15,4 @@ venv/
 .hypothesis/
 .idea
 .vscode
+yarn.lock
