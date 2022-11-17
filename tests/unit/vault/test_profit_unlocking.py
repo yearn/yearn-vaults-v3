@@ -228,6 +228,106 @@ def test_gain_no_fees_no_refunds_with_buffer(
     assert asset.balanceOf(fish) == fish_amount + first_profit + second_profit
 
 
+def test_gain_fees_no_refunds_no_existing_buffer(
+    create_vault,
+    asset,
+    fish_amount,
+    create_strategy,
+    user_deposit,
+    fish,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    gov,
+    airdrop_asset,
+    deploy_accountant,
+    set_fees_for_strategy,
+):
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
+    # Using only performance_fee as its easier to measure for tests
+    management_fee = 0
+    performance_fee = 1_000
+
+    vault = create_vault(asset)
+    accountant = deploy_accountant(vault)
+    airdrop_asset(gov, asset, gov, fish_amount)
+    strategy = create_strategy(vault)
+
+    set_fees_for_strategy(
+        gov, strategy, accountant, management_fee, performance_fee, refund_ratio=0
+    )
+
+    # Deposit assets to vault and get strategy ready
+    user_deposit(fish, vault, asset, amount)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, amount)
+
+    # We create a virtual profit
+    asset.transfer(strategy, first_profit, sender=gov)
+    tx = vault.process_report(strategy, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyReported))
+
+    assert_strategy_reported(
+        event[0],
+        strategy.address,
+        first_profit,
+        0,
+        amount + first_profit,
+        performance_fee * first_profit / 10_000,
+        0,
+    )
+    assert_price_per_share(vault, 1.0)
+    assert (
+        vault.profit_unlocking_rate() / MAX_BPS
+        == first_profit * (1 - performance_fee / 10_000) / WEEK
+    )
+    assert vault.balanceOf(vault) == first_profit * (1 - performance_fee / 10_000)
+    fee_shares = first_profit * (performance_fee / 10_000)
+    assert vault.balanceOf(accountant) == fee_shares
+
+    assert vault.totalSupply() == amount + first_profit
+    assert vault.totalAssets() == amount + first_profit
+
+    # We increase time after profit has been released and update strategy debt to 0
+    chain.pending_timestamp = chain.pending_timestamp + days_to_secs(10)
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    assert vault.balanceOf(vault) == 0
+    assert vault.price_per_share() / 10 ** vault.decimals() < 2.0
+
+    add_debt_to_strategy(gov, strategy, vault, 0)
+
+    assert vault.strategies(strategy).current_debt == 0
+    assert vault.price_per_share() / 10 ** vault.decimals() < 2.0
+    assert vault.total_debt() == 0
+    assert vault.total_idle() == amount + first_profit
+
+    assert vault.totalSupply() == amount + fee_shares
+    assert vault.totalAssets() == amount + first_profit
+
+    # Fish redeems shares
+    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+
+    assert_price_per_share(vault, vault.totalAssets() / vault.balanceOf(accountant))
+    assert vault.total_debt() == 0
+    assert vault.totalSupply() == first_profit * (performance_fee / 10_000)
+    assert fish_amount < asset.balanceOf(fish)
+    assert asset.balanceOf(fish) < fish_amount + first_profit
+
+    # Accountant redeems shares
+    vault.redeem(
+        vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
+    )
+
+    assert vault.total_idle() == 0
+    assert vault.totalAssets() == 0
+    assert asset.balanceOf(vault) == 0
+    assert (
+        asset.balanceOf(accountant) + asset.balanceOf(fish)
+        == fish_amount + first_profit
+    )
+
+
 def test_loss_no_fees_no_refunds_no_existing_buffer(
     create_vault,
     asset,
