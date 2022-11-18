@@ -477,6 +477,154 @@ def test_gain_fees_no_refunds_with_buffer(
     )
 
 
+def test_gain_fees_no_refunds_not_enough_buffer(
+    create_vault,
+    asset,
+    fish_amount,
+    create_strategy,
+    user_deposit,
+    fish,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    gov,
+    airdrop_asset,
+    deploy_flexible_accountant,
+    set_fees_for_strategy,
+):
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
+    second_profit = fish_amount // 10
+    # Using only performance_fee as its easier to measure for tests
+    management_fee = 0
+    first_performance_fee = 1_000
+    # Huge fee that profit cannot damp
+    second_performance_fee = 50_000
+
+    vault = create_vault(asset)
+    accountant = deploy_flexible_accountant(vault)
+    airdrop_asset(gov, asset, gov, fish_amount)
+    strategy = create_strategy(vault)
+
+    set_fees_for_strategy(
+        gov, strategy, accountant, management_fee, first_performance_fee, refund_ratio=0
+    )
+    assert accountant.fees(strategy).performance_fee == first_performance_fee
+
+    # Deposit assets to vault and get strategy ready
+    user_deposit(fish, vault, asset, amount)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, amount)
+
+    # We create a virtual profit
+    asset.transfer(strategy, first_profit, sender=gov)
+    tx = vault.process_report(strategy, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyReported))
+
+    assert_strategy_reported(
+        event[0],
+        strategy.address,
+        first_profit,
+        0,
+        amount + first_profit,
+        first_performance_fee * first_profit / MAX_BPS_ACCOUNTANT,
+        0,
+    )
+    assert_price_per_share(vault, 1.0)
+    assert vault.balanceOf(vault) == first_profit * (
+        1 - first_performance_fee / MAX_BPS_ACCOUNTANT
+    )
+    fee_shares = first_profit * (first_performance_fee / MAX_BPS_ACCOUNTANT)
+    assert vault.balanceOf(accountant) == fee_shares
+
+    assert vault.totalSupply() == amount + first_profit
+    assert vault.totalAssets() == amount + first_profit
+
+    # We increase time after profit has been released and create a second profit
+    chain.pending_timestamp = chain.pending_timestamp + WEEK // 2
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    assert (
+        pytest.approx(vault.balanceOf(vault), rel=1e-3)
+        == first_profit * (1 - first_performance_fee / MAX_BPS_ACCOUNTANT) // 2
+    )
+
+    price_per_share_before_2nd_profit = vault.price_per_share() / 10 ** vault.decimals()
+    accountant_shares_before_2nd_profit = vault.balanceOf(accountant)
+
+    # Increase fees to create a huge fee
+    set_fees_for_strategy(
+        gov,
+        strategy,
+        accountant,
+        management_fee,
+        second_performance_fee,
+        refund_ratio=0,
+    )
+    assert accountant.fees(strategy).performance_fee == second_performance_fee
+
+    asset.transfer(strategy, second_profit, sender=gov)
+    tx = vault.process_report(strategy, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyReported))
+
+    assert_strategy_reported(
+        event[0],
+        strategy.address,
+        second_profit,
+        0,
+        amount + first_profit + second_profit,
+        second_profit * second_performance_fee // MAX_BPS_ACCOUNTANT,
+        0,
+    )
+    # # pps doesn't change as profit goes directly to buffer and fees are damped
+    assert (
+        vault.price_per_share() / 10 ** vault.decimals()
+        < price_per_share_before_2nd_profit
+    )
+
+    assert (
+        pytest.approx(vault.balanceOf(accountant), rel=1e-4)
+        == accountant_shares_before_2nd_profit
+        + second_profit
+        * second_performance_fee
+        // MAX_BPS_ACCOUNTANT
+        / price_per_share_before_2nd_profit
+    )
+
+    assert vault.balanceOf(vault) == 0
+
+    assert vault.totalAssets() == amount + first_profit + second_profit
+
+    # We update strategy debt to 0
+    add_debt_to_strategy(gov, strategy, vault, 0)
+
+    assert vault.strategies(strategy).current_debt == 0
+    assert vault.price_per_share() / 10 ** vault.decimals() < 1.0
+    assert vault.total_debt() == 0
+    assert vault.total_idle() == amount + first_profit + second_profit
+    assert vault.totalSupply() == amount + vault.balanceOf(accountant)
+    assert vault.totalAssets() == amount + first_profit + second_profit
+
+    # Fish redeems shares
+    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+
+    assert_price_per_share(vault, vault.totalAssets() / vault.balanceOf(accountant))
+    assert vault.total_debt() == 0
+
+    assert asset.balanceOf(fish) < fish_amount
+
+    # Accountant redeems shares
+    vault.redeem(
+        vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
+    )
+    assert vault.total_idle() == 0
+    assert vault.totalAssets() == 0
+    assert asset.balanceOf(vault) == 0
+    assert (
+        asset.balanceOf(accountant) + asset.balanceOf(fish)
+        == fish_amount + first_profit + second_profit
+    )
+
+
 def test_loss_no_fees_no_refunds_no_existing_buffer(
     create_vault,
     asset,
