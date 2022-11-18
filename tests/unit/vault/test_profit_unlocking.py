@@ -686,6 +686,86 @@ def test_loss_no_fees_no_refunds_no_existing_buffer(
     assert asset.balanceOf(fish) == fish_amount - first_loss
 
 
+def test_loss_fees_no_refunds_no_existing_buffer(
+    create_vault,
+    asset,
+    fish_amount,
+    create_lossy_strategy,
+    user_deposit,
+    fish,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    gov,
+    airdrop_asset,
+    deploy_accountant,
+    set_fees_for_strategy,
+):
+    amount = fish_amount // 10
+    first_loss = fish_amount // 20
+
+    management_fee = 10_000
+    performance_fee = 0
+
+    vault = create_vault(asset)
+    accountant = deploy_accountant(vault)
+    airdrop_asset(gov, asset, gov, fish_amount)
+    strategy = create_lossy_strategy(vault)
+
+    set_fees_for_strategy(
+        gov, strategy, accountant, management_fee, performance_fee, refund_ratio=0
+    )
+
+    # Deposit assets to vault and get strategy ready
+    user_deposit(fish, vault, asset, amount)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, amount)
+
+    # We create a virtual loss
+    strategy.setLoss(gov, first_loss, sender=gov)
+    tx = vault.process_report(strategy, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyReported))
+
+    assert event[0].total_fees > 0
+    assert vault.price_per_share() / 10 ** vault.decimals() < 0.5
+    assert vault.balanceOf(vault) == 0
+
+    assert vault.totalSupply() > amount
+    assert vault.totalAssets() == amount - first_loss
+
+    # Update strategy debt to 0
+    add_debt_to_strategy(gov, strategy, vault, 0)
+
+    assert vault.strategies(strategy).current_debt == 0
+    assert vault.price_per_share() / 10 ** vault.decimals() < 0.5
+    assert vault.total_debt() == 0
+    assert vault.total_idle() == amount - first_loss
+    assert vault.totalSupply() > amount
+    assert vault.totalAssets() == amount - first_loss
+
+    # Fish redeems shares
+    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+
+    assert vault.total_debt() == 0
+    assert vault.totalSupply() == vault.balanceOf(accountant)
+    assert asset.balanceOf(vault) == vault.convertToAssets(vault.balanceOf(accountant))
+
+    assert asset.balanceOf(fish) < fish_amount - first_loss
+
+    # Accountant redeems shares
+    vault.redeem(
+        vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
+    )
+
+    assert vault.total_debt() == 0
+    assert vault.totalSupply() == 0
+    assert vault.totalAssets() == 0
+    assert asset.balanceOf(vault) == 0
+
+    assert (
+        asset.balanceOf(accountant) + asset.balanceOf(fish) == fish_amount - first_loss
+    )
+
+
 def test_loss_no_fees_no_refunds_with_buffer(
     create_vault,
     asset,
