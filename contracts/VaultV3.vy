@@ -782,7 +782,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
     if _full_profit_unlock_date > block.timestamp: 
       remaining_time = _full_profit_unlock_date - block.timestamp
-      previously_locked_shares = remaining_time * self.profit_unlocking_rate / MAX_BPS 
+      previously_locked_shares = self.balance_of[self] - newly_locked_shares
 
     # Vault insta unlocks losses and fees to avoid pps decrease
     # NOTE: it can only unlock shares that are previously locked. Any loss / fees over the amount of total locked shares will have an effect on pps
