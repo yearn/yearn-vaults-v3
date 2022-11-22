@@ -96,7 +96,7 @@ def test_lossy_strategy_flow(
         == 2 * deposit_amount - first_loss - second_loss - vault.total_idle()
     )
     assert vault.strategies(strategy)
-
+    
     # user_1 withdraws all his shares in `vault.total_idle`. Due to the lossy strategy, his shares have less value
     # and therefore he ends up with less assets than before
     vault.redeem(MAX_INT, user_1, user_1, sender=user_1)

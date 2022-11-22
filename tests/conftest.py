@@ -190,7 +190,6 @@ def create_vault(project, gov, vault_factory):
         )
         event = list(tx.decode_logs(vault_factory.NewVault))
         vault = project.VaultV3.at(event[0].vault_address)
-
         vault.set_role(
             gov.address,
             ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
