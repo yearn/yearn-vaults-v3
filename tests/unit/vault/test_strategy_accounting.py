@@ -1,6 +1,6 @@
 import ape
 import pytest
-from utils.constants import YEAR, DAY, ROLES, MAX_BPS, WEEK, MAX_INT
+from utils.constants import YEAR, DAY, ROLES, MAX_BPS_ACCOUNTANT, WEEK, MAX_INT
 
 
 @pytest.fixture(autouse=True)
@@ -491,7 +491,7 @@ def test_process_report__with_loss_management_fees_and_refunds(
         new_debt
         * (chain.pending_timestamp - vault.strategies(lossy_strategy).last_report)
         * management_fee
-        / MAX_BPS
+        / MAX_BPS_ACCOUNTANT
         / YEAR
     )
 

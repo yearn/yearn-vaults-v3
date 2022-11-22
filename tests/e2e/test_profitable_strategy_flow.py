@@ -1,4 +1,4 @@
-from utils.constants import MAX_BPS, MAX_INT
+from utils.constants import MAX_BPS_ACCOUNTANT, MAX_INT
 import pytest
 import ape
 from ape import chain
@@ -58,7 +58,7 @@ def test_profitable_strategy_flow(
     assert strategy.totalAssets() == deposit_amount
 
     # we simulate profit on strategy
-    total_fee = first_profit * (performance_fee / MAX_BPS)
+    total_fee = first_profit * (performance_fee / MAX_BPS_ACCOUNTANT)
     asset.transfer(strategy, first_profit, sender=whale)
     tx = vault.process_report(strategy.address, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
