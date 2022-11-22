@@ -27,23 +27,6 @@ def test_process_report__with_inactive_strategy__reverts(gov, vault, create_stra
         vault.process_report(strategy.address, sender=gov)
 
 
-def test_process_report__with_total_assets_equal_current_debt__reverts(
-    gov, asset, vault, strategy, add_debt_to_strategy
-):
-    vault_balance = asset.balanceOf(vault)
-    new_debt = vault_balance
-
-    add_debt_to_strategy(gov, strategy, vault, new_debt)
-
-    with ape.reverts("nothing to report"):
-        vault.process_report(strategy.address, sender=gov)
-
-
-def test_process_report__with_unhealthy_strategy__reverts():
-    # TODO: implement when health check is implemented
-    pass
-
-
 def test_process_report__with_gain_and_zero_fees(
     chain, gov, asset, vault, strategy, airdrop_asset, add_debt_to_strategy
 ):
