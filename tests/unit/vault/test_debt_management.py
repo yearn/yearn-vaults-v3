@@ -33,7 +33,6 @@ def test_update_debt__without_permission__reverts(gov, vault, asset, strategy, b
         vault.update_debt(strategy.address, new_debt, sender=bunny)
 
 
-
 def test_update_debt__with_strategy_max_debt_less_than_new_debt__reverts(
     gov, asset, vault, strategy
 ):
