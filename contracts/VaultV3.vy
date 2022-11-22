@@ -655,6 +655,7 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
 
         IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
         self.total_idle += assets_to_withdraw
+        self.total_debt -= assets_to_withdraw
         
         new_debt = current_debt - assets_to_withdraw
     else:
@@ -664,8 +665,8 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         max_deposit: uint256 = IStrategy(strategy).maxDeposit(self)
 
         assets_to_transfer: uint256 = new_debt - current_debt
-        assert assets_to_transfer < max_deposit, "strategy cannot take funds"
-
+        if assets_to_transfer > max_deposit:
+            assets_to_transfer = max_deposit
         # take into consideration minimum_total_idle
         # HACK: to save gas
         minimum_total_idle: uint256 = self.minimum_total_idle

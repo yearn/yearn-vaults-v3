@@ -1,7 +1,7 @@
 import ape
 import pytest
 from utils import checks
-from utils.constants import MAX_INT, ZERO_ADDRESS, WEEK
+from utils.constants import MAX_INT, ZERO_ADDRESS, WEEK, ROLES
 
 
 def test_deposit__with_invalid_recipient__reverts(fish, asset, create_vault):
@@ -485,7 +485,7 @@ def test_redeem__with_maximum_redemption__redeem_all(
 def test_set_deposit_limit__with_deposit_limit(project, gov, asset, deposit_limit):
     # TODO unpermissioned set deposit limit test
     vault = gov.deploy(project.VaultV3, asset, "VaultV3", "AV", gov, WEEK)
-
+    vault.set_role(gov, ROLES.ACCOUNTING_MANAGER, sender=gov)
     tx = vault.set_deposit_limit(deposit_limit, sender=gov)
     event = list(tx.decode_logs(vault.UpdateDepositLimit))
 

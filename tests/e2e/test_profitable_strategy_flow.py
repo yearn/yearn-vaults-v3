@@ -138,9 +138,6 @@ def test_profitable_strategy_flow(
     chain.pending_timestamp = initial_timestamp + days_to_secs(10)
     chain.mine(timestamp=chain.pending_timestamp)
 
-    with ape.reverts("nothing to report"):
-        vault.process_report(strategy.address, sender=gov)
-
     assert (
         pytest.approx(vault.totalAssets())
         == 2 * deposit_amount
