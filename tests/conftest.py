@@ -163,10 +163,9 @@ def vault_factory(project, gov, vault_blueprint):
 
 
 @pytest.fixture(scope="session")
-def create_vault(project, gov, accountant, flexible_accountant, vault_factory):
+def create_vault(project, gov, vault_factory):
     def create_vault(
         asset,
-        accountant=accountant,
         governance=gov,
         deposit_limit=MAX_INT,
         max_profit_locking_time=WEEK,
@@ -186,21 +185,19 @@ def create_vault(project, gov, accountant, flexible_accountant, vault_factory):
             vault_name,
             vault_symbol,
             governance,
+            max_profit_locking_time,
             sender=gov,
         )
         event = list(tx.decode_logs(vault_factory.NewVault))
         vault = project.VaultV3.at(event[0].vault_address)
-
-        # set vault deposit
-        vault.set_deposit_limit(deposit_limit, sender=gov)
-        # set up fee manager
-        vault.set_accountant(accountant.address, sender=gov)
-
         vault.set_role(
             gov.address,
             ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
             sender=gov,
         )
+
+        # set vault deposit
+        vault.set_deposit_limit(deposit_limit, sender=gov)
 
         return vault
 
@@ -266,15 +263,25 @@ def lossy_strategy(gov, vault, create_lossy_strategy):
 
 
 @pytest.fixture(scope="session")
-def accountant(project, gov, asset):
-    accountant = gov.deploy(project.Accountant, asset)
-    yield accountant
+def deploy_accountant(project, gov):
+    def deploy_accountant(vault):
+        accountant = gov.deploy(project.Accountant, vault)
+        # set up fee manager
+        vault.set_accountant(accountant.address, sender=gov)
+        return accountant
+
+    yield deploy_accountant
 
 
 @pytest.fixture(scope="session")
-def flexible_accountant(project, gov, asset):
-    flexible_accountant = gov.deploy(project.FlexibleAccountant, asset)
-    yield flexible_accountant
+def deploy_flexible_accountant(project, gov):
+    def deploy_flexible_accountant(vault):
+        flexible_accountant = gov.deploy(project.FlexibleAccountant, vault)
+        # set up fee manager
+        vault.set_accountant(flexible_accountant.address, sender=gov)
+        return flexible_accountant
+
+    yield deploy_flexible_accountant
 
 
 @pytest.fixture(scope="session")

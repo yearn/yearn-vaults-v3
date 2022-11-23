@@ -23,9 +23,14 @@ def test_update_max_debt__with_inactive_strategy(gov, vault, create_strategy):
         vault.update_max_debt_for_strategy(strategy.address, max_debt, sender=gov)
 
 
-def test_update_debt__without_permission__reverts():
-    # TODO: implement after access control for update debt is complete
-    pass
+def test_update_debt__without_permission__reverts(gov, vault, asset, strategy, bunny):
+    vault_balance = asset.balanceOf(vault)
+    new_debt = vault_balance // 2
+    current_debt = vault.strategies(strategy.address).current_debt
+
+    vault.update_max_debt_for_strategy(strategy.address, new_debt, sender=gov)
+    with ape.reverts():
+        vault.update_debt(strategy.address, new_debt, sender=bunny)
 
 
 def test_update_debt__with_strategy_max_debt_less_than_new_debt__reverts(

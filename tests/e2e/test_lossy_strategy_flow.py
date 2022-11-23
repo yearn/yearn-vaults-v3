@@ -68,7 +68,7 @@ def test_lossy_strategy_flow(
     assert vault.total_idle() == 0
     assert vault.total_debt() == 2 * deposit_amount - first_loss
 
-    strategy.setLoss(gov, second_loss, sender=gov)
+    tx = strategy.setLoss(gov, second_loss, sender=gov)
 
     assert strategy.totalAssets() == 2 * deposit_amount - first_loss - second_loss
 

@@ -4,8 +4,6 @@ from vyper.interfaces import ERC20
 from vyper.interfaces import ERC4626
 from vyper.interfaces import ERC20Detailed
 
-# TODO: external contract: factory
-
 # INTERFACES #
 interface IStrategy:
     def asset() -> address: view
@@ -103,7 +101,7 @@ struct StrategyParams:
     max_debt: uint256
 
 # CONSTANTS #
-MAX_BPS: constant(uint256) = 10_000
+MAX_BPS: constant(uint256) = 1_000_000_000_000
 
 # ENUMS #
 enum Roles:
@@ -115,6 +113,7 @@ enum Roles:
 # IMMUTABLE #
 ASSET: immutable(ERC20)
 DECIMALS: immutable(uint256)
+PROFIT_MAX_UNLOCK_TIME: immutable(uint256)
 
 # CONSTANTS #
 API_VERSION: constant(String[28]) = "0.1.0"
@@ -128,19 +127,16 @@ balance_of: HashMap[address, uint256]
 allowance: public(HashMap[address, HashMap[address, uint256]])
 
 # Total amount of shares that are currently minted
-total_supply: uint256
+total_supply: public(uint256)
 # Total amount of assets that has been deposited in strategies
-total_debt_: uint256
+total_debt: public(uint256)
 # Current assets held in the vault contract. Replacing balanceOf(this) to avoid price_per_share manipulation
 total_idle: public(uint256)
 # Minimum amount of assets that should be kept in the vault contract to allow for fast, cheap redeems
 minimum_total_idle: public(uint256)
 # Maximum amount of tokens that the vault can accept. If totalAssets > deposit_limit, deposits will revert
 deposit_limit: public(uint256)
-# TODO: remove
 accountant: public(address)
-# TODO: remove
-health_check: public(address)
 # HashMap mapping addresses to their roles
 roles: public(HashMap[address, Roles])
 # HashMap mapping roles to their permissioned state. If false, the role is not open to the public
@@ -157,6 +153,10 @@ name: public(String[64])
 # ERC20 - symbol of the token
 symbol: public(String[32])
 
+full_profit_unlock_date: public(uint256)
+profit_unlocking_rate: public(uint256)
+last_profit_update: uint256
+
 # `nonces` track `permit` approvals with signature.
 nonces: public(HashMap[address, uint256])
 DOMAIN_TYPE_HASH: constant(bytes32) = keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)')
@@ -164,10 +164,12 @@ PERMIT_TYPE_HASH: constant(bytes32) = keccak256("Permit(address owner,address sp
 
 # Constructor
 @external
-def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: address):
+def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: address, profit_max_unlock_time: uint256):
     ASSET = asset
     DECIMALS = convert(ERC20Detailed(asset.address).decimals(), uint256)
     assert 10 ** (2 * DECIMALS) <= max_value(uint256) # dev: token decimals too high
+    
+    PROFIT_MAX_UNLOCK_TIME = profit_max_unlock_time
 
     self.name = name
     self.symbol = symbol
@@ -188,7 +190,6 @@ def _spend_allowance(owner: address, spender: address, amount: uint256):
 @internal
 def _transfer(sender: address, receiver: address, amount: uint256):
     # Protect people from accidentally sending their shares to bad places
-    assert receiver not in [self, empty(address)]
     assert self.balance_of[sender] >= amount, "insufficient funds"
     self.balance_of[sender] -= amount
     self.balance_of[receiver] += amount
@@ -247,12 +248,50 @@ def _permit(owner: address, spender: address, amount: uint256, deadline: uint256
     return True
 
 @view
+@external
+def unlocked_shares() -> uint256:
+  return self._unlocked_shares()
+
+@view
+@internal
+def _unlocked_shares() -> uint256:
+  _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
+  unlocked_shares: uint256 = 0
+  if _full_profit_unlock_date > block.timestamp:
+    unlocked_shares = self.profit_unlocking_rate * (block.timestamp - self.last_profit_update) / MAX_BPS
+  elif _full_profit_unlock_date != 0:
+    # All shares have been unlocked
+    unlocked_shares = self.balance_of[self]
+
+  return unlocked_shares
+
+@view
+@internal
+def _total_supply() -> uint256:
+  return self.total_supply - self._unlocked_shares()
+
+@internal
+def _burn_unlocked_shares() -> uint256:
+  unlocked_shares: uint256 = self._unlocked_shares()
+  if unlocked_shares == 0:
+    return 0
+  
+  # update variables (done here to keep _unlocked_shares as a view function)
+  if self.full_profit_unlock_date > block.timestamp:
+    self.last_profit_update = block.timestamp
+  else:
+    self.profit_unlocking_rate = 0
+
+  self._burn_shares(unlocked_shares, self)
+  return unlocked_shares
+
+@view
 @internal
 def _total_assets() -> uint256:
     """
     Total amount of assets that are in the vault and in the strategies. 
     """
-    return self.total_idle + self._total_debt()
+    return self.total_idle + self.total_debt
 
 @internal
 def _burn_shares(shares: uint256, owner: address):
@@ -266,12 +305,12 @@ def _convert_to_assets(shares: uint256) -> uint256:
     """ 
     assets = shares * (total_assets / total_supply) --- (== price_per_share * shares)
     """
-    _total_supply: uint256 = self.total_supply
+    _total_supply: uint256 = self._total_supply()
     # if total_supply is 0, price_per_share is 1
     if _total_supply == 0: 
         return shares
 
-    amount: uint256 = shares * self._total_assets() / self.total_supply
+    amount: uint256 = shares * self._total_assets() / _total_supply
     return amount
 
 @view
@@ -280,7 +319,7 @@ def _convert_to_shares(assets: uint256) -> uint256:
     """
     shares = amount * (total_supply / total_assets) --- (== amount / price_per_share)
     """
-    _total_supply: uint256 = self.total_supply
+    _total_supply: uint256 = self._total_supply()
 
     # if total_supply is 0, price_per_share is 1
     if _total_supply == 0:
@@ -380,13 +419,12 @@ def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256
     assert self.shutdown == False # dev: shutdown
     assert _recipient not in [self, empty(address)], "invalid recipient"
     assets: uint256 = _assets
-
     # If the amount is max_value(uint256) we assume the user wants to deposit their whole balance
     if assets == max_value(uint256):
         assets = ASSET.balanceOf(_sender)
 
     assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
-
+    
     shares: uint256 = self._issue_shares_for_amount(assets, _recipient)
     assert shares > 0, "cannot mint zero"
 
@@ -438,7 +476,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
     # If there are not enough assets in the Vault contract, we try to free funds from strategies specified in the input
     if requested_assets > curr_total_idle:
         # load to memory to save gas
-        curr_total_debt: uint256 = self.total_debt_
+        curr_total_debt: uint256 = self.total_debt
 
         # Withdraw from strategies if insufficient total idle
         assets_needed: uint256 = requested_assets - curr_total_idle
@@ -467,7 +505,6 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
             # After losses are taken, vault asks what is the max amount to withdraw
             assets_to_withdraw = min(assets_to_withdraw, IStrategy(strategy).maxWithdraw(self))
 
-            # TODO: should this be before taking the losses? probably not
             # continue to next strategy if nothing to withdraw
             if assets_to_withdraw == 0:
                 continue
@@ -501,7 +538,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
         # if we exhaust the queue and still have insufficient total idle, revert
         assert curr_total_idle >= requested_assets, "insufficient assets in vault"
         # commit memory to storage
-        self.total_debt_ = curr_total_debt
+        self.total_debt = curr_total_debt
 
     self._burn_shares(shares, owner)
     # commit memory to storage
@@ -568,7 +605,6 @@ def _migrate_strategy(new_strategy: address, old_strategy: address):
     log StrategyMigrated(old_strategy, new_strategy)
 
 # DEBT MANAGEMENT #
-# TODO: allow the caller to specify the debt for the strategy, enforcing max_debt
 @internal
 def _update_debt(strategy: address, target_debt: uint256) -> uint256:
     """
@@ -582,8 +618,6 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
     The vault will not invest the funds into the underlying protocol, which is responsibility of the strategy. 
     """
     new_debt: uint256 = target_debt
-    # Revert if target_debt cannot be achieved due to configured max_debt for given strategy
-    assert new_debt <= self.strategies[strategy].max_debt, "target debt higher than max debt"
 
     current_debt: uint256 = self.strategies[strategy].current_debt
 
@@ -597,7 +631,6 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         assets_to_withdraw: uint256 = current_debt - new_debt
 
         # ensure we always have minimum_total_idle when updating debt
-        # HACK: to save gas
         minimum_total_idle: uint256 = self.minimum_total_idle
         total_idle: uint256 = self.total_idle
         
@@ -616,28 +649,23 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
             assets_to_withdraw = withdrawable
             new_debt = current_debt - withdrawable
 
-        # TODO: should we allow taking losses if we report them?
         # If there are unrealised losses we don't let the vault reduce its debt
         unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_to_withdraw)
         assert unrealised_losses_share == 0, "strategy has unrealised losses"
 
-        # TODO: check if ERC4626 reverts if not enough assets
         IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
         self.total_idle += assets_to_withdraw
-        # TODO: WARNING: we do this because there are rounding errors due to gradual profit unlocking
-        if assets_to_withdraw >= self.total_debt_:
-            self.total_debt_ = 0
-        else:
-            self.total_debt_ -= assets_to_withdraw
-
+        self.total_debt -= assets_to_withdraw
+        
         new_debt = current_debt - assets_to_withdraw
     else:
+        # Revert if target_debt cannot be achieved due to configured max_debt for given strategy
+        assert new_debt <= self.strategies[strategy].max_debt, "target debt higher than max debt"
         # Vault is increasing debt with the strategy by sending more funds
         max_deposit: uint256 = IStrategy(strategy).maxDeposit(self)
 
         assets_to_transfer: uint256 = new_debt - current_debt
         if assets_to_transfer > max_deposit:
-            # TODO: should we revert?
             assets_to_transfer = max_deposit
         # take into consideration minimum_total_idle
         # HACK: to save gas
@@ -651,12 +679,13 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         if assets_to_transfer > available_idle:
             assets_to_transfer = available_idle
             new_debt = current_debt + assets_to_transfer
+
         if assets_to_transfer > 0:
             self.erc20_safe_approve(ASSET.address, strategy, assets_to_transfer)
             IStrategy(strategy).deposit(assets_to_transfer, self)
             self.erc20_safe_approve(ASSET.address, strategy, 0)
             self.total_idle -= assets_to_transfer
-            self.total_debt_ += assets_to_transfer
+            self.total_debt += assets_to_transfer
 
         new_debt = current_debt + assets_to_transfer
     
@@ -684,8 +713,9 @@ def _process_report(strategy: address) -> (uint256, uint256):
     strategy_shares: uint256 = IStrategy(strategy).balanceOf(self)
     total_assets: uint256 = IStrategy(strategy).convertToAssets(strategy_shares)
     current_debt: uint256 = self.strategies[strategy].current_debt
-    # TODO: do we want to revert or we prefer to return?
-    assert total_assets != current_debt, "nothing to report"
+    
+    # Burn shares that have been unlocked since the last update
+    self._burn_unlocked_shares()
 
     gain: uint256 = 0
     loss: uint256 = 0
@@ -702,28 +732,65 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # if accountant is not set, fees and refunds are zero
     if accountant != empty(address):
         total_fees, total_refunds = IAccountant(accountant).report(strategy, gain, loss)
+    
+    # We calculate the amount of shares that could be insta unlocked to avoid pps changes
+    # NOTE: this needs to be done before any pps changes
+    shares_to_burn: uint256 = 0 
+    if loss + total_fees > 0:
+      shares_to_burn = self._convert_to_shares(loss + total_fees)
 
+    newly_locked_shares: uint256 = 0
     if gain > 0:
+        # NOTE: vault will issue shares worth the profit to avoid instant pps change
+        newly_locked_shares += self._issue_shares_for_amount(gain, self)
         # update current debt after processing management fee
+        # NOTE: this will increase total_assets
         self.strategies[strategy].current_debt += gain
-        self.total_debt_ += gain
+        self.total_debt += gain
 
-    # Minting fees after gain computation to ensure fees don't benefit from cheaper pps 
-    # if fees are non-zero, issue shares
     if total_fees > 0:
+        # if fees are non-zero, issue shares
         self._issue_shares_for_amount(total_fees, accountant)
-    # if refunds are non-zero, transfer assets
+    
     if total_refunds > 0:
-        # Accountant should approve transfer of assets
-        total_refunds = min(total_refunds, ASSET.balanceOf(accountant))
-        self.erc20_safe_transfer_from(ASSET.address, self.accountant, self, total_refunds)
-        # Assets coming from refunds are allocated as total_idle
-        self.total_idle += total_refunds
-
+        # if refunds are non-zero, transfer assets
+        total_refunds = min(total_refunds, self.balance_of[accountant])
+        # Shares received as a refund are locked to avoid sudden pps change (like profits)
+        self._transfer(accountant, self, total_refunds)
+        newly_locked_shares += total_refunds
+ 
     # Strategy is reporting a loss
     if loss > 0:
         self.strategies[strategy].current_debt -= loss
-        self.total_debt_ -= loss
+        self.total_debt -= loss
+ 
+    # Calculate how long until the full amount of shares is unlocked
+    remaining_time: uint256 = 0
+    previously_locked_shares: uint256 = 0
+    _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
+    if _full_profit_unlock_date > block.timestamp: 
+      remaining_time = _full_profit_unlock_date - block.timestamp
+      previously_locked_shares = self.balance_of[self] - newly_locked_shares
+
+    # Vault insta unlocks losses and fees to avoid pps decrease
+    # NOTE: it can only unlock shares that are previously locked. Any loss / fees over the amount of total locked shares will have an effect on pps
+    shares_to_burn = min(shares_to_burn, previously_locked_shares + newly_locked_shares)
+    if shares_to_burn > 0:
+      self._burn_shares(shares_to_burn, self)
+      # we burn first the newly locked shares, then the previously locked shares (the order in code is the inverse to save gas)
+      previously_locked_shares -= (shares_to_burn - min(shares_to_burn, newly_locked_shares))
+      newly_locked_shares -= min(shares_to_burn, newly_locked_shares)
+
+    # Update unlocking rate and time to fully unlocked
+    total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
+    if total_locked_shares > 0:
+      new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * PROFIT_MAX_UNLOCK_TIME) / total_locked_shares
+      self.profit_unlocking_rate = (previously_locked_shares + newly_locked_shares) * MAX_BPS / new_profit_locking_period
+      self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
+      self.last_profit_update = block.timestamp
+    else:
+      # NOTE: only setting this to 0 will turn in the desired effect, no need to update last_profit_update or full_profit_unlock_date
+      self.profit_unlocking_rate = 0
 
     self.strategies[strategy].last_report = block.timestamp
     log StrategyReported(
@@ -737,22 +804,16 @@ def _process_report(strategy: address) -> (uint256, uint256):
     return (gain, loss)
 
 
-@view
-@internal
-def _total_debt() -> uint256:
-    return self.total_debt_
-
-
 # SETTERS #
 @external
 def set_accountant(new_accountant: address):
-    # TODO: permissioning: CONFIG_MANAGER
+    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
     self.accountant = new_accountant
     log UpdateAccountant(new_accountant)
 
 @external
 def set_deposit_limit(deposit_limit: uint256):
-    # TODO: permissioning: CONFIG_MANAGER
+    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
     self.deposit_limit = deposit_limit
     log UpdateDepositLimit(deposit_limit)
 
@@ -804,7 +865,6 @@ def available_deposit_limit() -> uint256:
 ## ACCOUNTING MANAGEMENT ##
 @external
 def process_report(strategy: address) -> (uint256, uint256):
-    # TODO: should it be open?
     self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
     return self._process_report(strategy)
 
@@ -876,7 +936,6 @@ def mint(shares: uint256, receiver: address) -> uint256:
 @external
 def withdraw(assets: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
     shares: uint256 = self._convert_to_shares(assets)
-    # TODO: withdrawal queue is empty here. Do we need to implement a custom withdrawal queue?
     self._redeem(msg.sender, receiver, owner, shares, strategies)
     return shares
 
@@ -891,11 +950,13 @@ def approve(spender: address, amount: uint256) -> bool:
 
 @external
 def transfer(receiver: address, amount: uint256) -> bool:
+    assert receiver not in [self, empty(address)]
     self._transfer(msg.sender, receiver, amount)
     return True
 
 @external
 def transferFrom(sender: address, receiver: address, amount: uint256) -> bool:
+    assert receiver not in [self, empty(address)]
     return self._transfer_from(sender, receiver, amount)
 
 ## ERC20+4626 compatibility
@@ -914,12 +975,14 @@ def permit(owner: address, spender: address, amount: uint256, deadline: uint256,
 @view
 @external
 def balanceOf(addr: address) -> uint256:
+    if(addr == self):
+      return self.balance_of[addr] - self._unlocked_shares()
     return self.balance_of[addr]
 
 @view
 @external
 def totalSupply() -> uint256:
-    return self.total_supply
+    return self._total_supply()
 
 @view
 @external
@@ -930,11 +993,6 @@ def asset() -> address:
 @external
 def decimals() -> uint256:
     return DECIMALS
-
-@view
-@external
-def total_debt() -> uint256:
-    return self._total_debt()
 
 @view
 @external
