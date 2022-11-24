@@ -41,7 +41,7 @@ When deploying a new vault, it requires the following parameters:
 - name: name of Shares as described in ERC20
 - symbol: symbol of Shares ERC20
 - role_manager: account that can assign and revoke Roles
-- PROFIT_MAX_UNLOCK_TIME: max amount of time profit will be locked before being distributed
+- PROFIT_MAX_UNLOCK_TIME: max amount of time profit will be distributed over
 
 ## Normal Operation
 
@@ -79,19 +79,28 @@ Fee assessment and distribution is handled by the Accountant module.
 
 It will report the amount of fees that need to be charged and the vault will issue shares for that amount of fees.
 
+#### Refunds
+Refunds are positive inflows for the vault. They are sent to the vault to reward it or compensate in anyway. The Accountant module will take care of them. 
+
+An example is an insurance mechanism like different risk tranches where the accountant will send assets to the vault to compensate for losses (and in exchange, take higher fees).
+
+The refunds are paid in form of vault shares and will be instantly locked (and released gradually)
+
 ### Profit distribution 
 Profit from different process_report calls will accumulate in a buffer. This buffer will be linearly unlocked over the locking period seconds at profit_distribution_rate. 
 
-Profits will be locked for a max period of time of PROFIT_MAX_UNLOCK_TIME seconds and will be gradually distributed. To avoid spending too much gas for profit unlock, the amount of time a profit will be locked is a weighted average between the new profit and the previous profit. 
+Profits will be locked for a max period of time of PROFIT_MAX_UNLOCK_TIME seconds and will be gradually distributed. To avoid spending too much gas for profit unlock, the amount of time a profit will be locked is a weighted average between the new profit and the previous profit.
 
 new_locking_period = locked_profit * pending_time_to_unlock + new_profit * PROFIT_MAX_UNLOCK_TIME / (locked_profit + new_profit)
 new_profit_distribution_rate = (locked_profit + new_profit) / new_locking_period
 
-Losses will be offset by locked profit, if possible.
+Losses will be offset by locked profit, if possible. That makes frontrunning losses impossible (unless loss > locked profit)
 
-Issue of new shares due to fees will also unlock profit so that pps does not go down. 
+Issue of new shares due to fees will also insta-unlock profit so that pps does not go down.
 
 Both of this offsets will prevent frontrunning (as the profit was already earned and was not distributed yet)
+
+Instead of locking the profit, and in order to be more capital efficient (and avoid complex asset management), the vault issues shares that holds itself, and those are gradually burned over time (increasing pps). So instead of releasing assets, the vault will gradually burn shares.
 
 ## Vault Management
 Vault management is split in two fields: strategy management and debt management
