@@ -596,7 +596,8 @@ def _migrate_strategy(new_strategy: address, old_strategy: address, call_migrate
 
     migrated_strategy: StrategyParams = self.strategies[old_strategy]
 
-    IStrategy(old_strategy).migrate(new_strategy)
+    if call_migrate_strategy:
+      IStrategy(old_strategy).migrate(new_strategy)
 
     # NOTE: we add strategy with same params than the strategy being migrated
     self.strategies[new_strategy] = StrategyParams({
