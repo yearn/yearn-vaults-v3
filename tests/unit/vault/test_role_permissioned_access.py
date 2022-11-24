@@ -60,7 +60,7 @@ def test_migrate_strategy__set_strategy_role_open(vault, create_strategy, bunny,
     other_new_strategy = create_strategy(vault)
     vault.add_strategy(new_strategy, sender=gov)
     vault.set_open_role(ROLES.STRATEGY_MANAGER, sender=gov)
-    tx = vault.migrate_strategy(other_new_strategy, new_strategy, sender=bunny)
+    tx = vault.migrate_strategy(other_new_strategy, new_strategy, False, sender=bunny)
     event = list(tx.decode_logs(vault.StrategyMigrated))
     assert len(event) == 1
     assert (

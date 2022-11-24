@@ -54,7 +54,7 @@ def test_migrate_strategy__strategy_manager(
 
     new_strategy = create_strategy(vault)
 
-    tx = vault.migrate_strategy(new_strategy, strategy, sender=bunny)
+    tx = vault.migrate_strategy(new_strategy, strategy, False, sender=bunny)
 
     event = list(tx.decode_logs(vault.StrategyRevoked))
     assert len(event) == 1

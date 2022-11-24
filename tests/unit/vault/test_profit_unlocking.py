@@ -588,16 +588,16 @@ def test_gain_fees_refunds_no_existing_buffer(
     chain.mine(timestamp=chain.pending_timestamp)
 
     assert vault.balanceOf(vault) == 0
-    assert vault.price_per_share() / 10 ** vault.decimals() == (
-        2 * amount + first_profit
-    ) / (amount + fee_shares)
+    assert pytest.approx(
+        vault.price_per_share() / 10 ** vault.decimals(), rel=1e-4
+    ) == (2 * amount + first_profit) / (amount + fee_shares)
 
     add_debt_to_strategy(gov, strategy, vault, 0)
 
     assert vault.strategies(strategy).current_debt == 0
-    assert vault.price_per_share() / 10 ** vault.decimals() == (
-        2 * amount + first_profit
-    ) / (amount + fee_shares)
+    assert pytest.approx(
+        vault.price_per_share() / 10 ** vault.decimals(), rel=1e-4
+    ) == (2 * amount + first_profit) / (amount + fee_shares)
     assert vault.total_debt() == 0
     assert vault.total_idle() == 2 * amount + first_profit
 
@@ -1616,6 +1616,88 @@ def test_loss_fees_no_refunds_with_not_enough_buffer(
     assert (
         asset.balanceOf(accountant) + asset.balanceOf(fish)
         == fish_amount + first_profit - first_loss
+    )
+
+
+def test_loss_fees_refunds(
+    create_vault,
+    asset,
+    fish_amount,
+    create_lossy_strategy,
+    user_deposit,
+    fish,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    gov,
+    airdrop_asset,
+    deploy_accountant,
+    set_fees_for_strategy,
+):
+    amount = fish_amount // 10
+    first_loss = fish_amount // 10
+
+    management_fee = 500
+    performance_fee = 0
+    refund_ratio = 10_000  # Losses are covered 100%
+
+    vault = create_vault(asset)
+    accountant = deploy_accountant(vault)
+    airdrop_asset(gov, asset, gov, fish_amount)
+    strategy = create_lossy_strategy(vault)
+
+    # Deposit assets to vault and get strategy ready
+    user_deposit(fish, vault, asset, amount)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, amount)
+
+    set_fees_for_strategy(
+        gov, strategy, accountant, management_fee, performance_fee, refund_ratio
+    )
+    airdrop_asset(gov, asset, accountant, fish_amount)
+    user_deposit(accountant, vault, asset, amount)
+
+    assert vault.totalAssets() == 2 * amount
+
+    # We create a virtual loss. pps is affected as there is not enough buffer
+    strategy.setLoss(gov, first_loss, sender=gov)
+    tx = vault.process_report(strategy, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyReported))
+
+    assert event[0].total_fees > 0
+    assert event[0].current_debt == 0
+    assert vault.balanceOf(vault) == 0
+    assert vault.balanceOf(accountant) > 0
+    assert vault.balanceOf(accountant) == event[0].total_fees
+    assert vault.totalSupply() == amount + vault.balanceOf(accountant)
+    assert vault.totalAssets() == amount
+
+    price_per_share = vault.price_per_share() / 10 ** vault.decimals()
+    assert price_per_share < 1.0
+    assert price_per_share > 0.99
+
+    # Fish redeems shares
+    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+
+    assert vault.total_debt() == 0
+    assert vault.totalSupply() == vault.balanceOf(accountant)
+    assert asset.balanceOf(vault) == vault.convertToAssets(vault.balanceOf(accountant))
+
+    assert asset.balanceOf(fish) < fish_amount
+    assert asset.balanceOf(fish) > fish_amount - first_loss
+
+    # Accountant redeems shares
+    vault.redeem(
+        vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
+    )
+
+    assert vault.total_debt() == 0
+    assert vault.totalSupply() == 0
+    assert vault.totalAssets() == 0
+    assert asset.balanceOf(vault) == 0
+
+    assert (
+        asset.balanceOf(accountant) + asset.balanceOf(fish)
+        == 2 * fish_amount - first_loss
     )
 
 
