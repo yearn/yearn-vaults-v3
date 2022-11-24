@@ -97,6 +97,7 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
 
     if gain > 0:
         total_fees += (gain * fee.performance_fee) / MAX_BPS
+        total_refunds = gain * refund_ratio / MAX_BPS
     else:
         total_refunds = loss
         # Now taking loss from its own funds. In the future versions could be from different mecanisms
