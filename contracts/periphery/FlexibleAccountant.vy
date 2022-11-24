@@ -99,15 +99,15 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
         total_fees += (gain * fee.performance_fee) / MAX_BPS
         total_refunds = gain * refund_ratio / MAX_BPS
     else:
-        total_refunds = loss
+        # total_refunds = loss
         # Now taking loss from its own funds. In the future versions could be from different mecanisms
         asset_balance: uint256= ERC20(self.asset).balanceOf(self)
         total_refunds = loss * refund_ratio / MAX_BPS
         if total_refunds > asset_balance:
             total_refunds = asset_balance
-        if total_refunds != 0:
+        #if total_refunds != 0:
            # TODO: permissions implications. msg.sender should only be vault
-            ERC20(self.asset).approve(msg.sender, total_refunds)
+            #ERC20(self.asset).approve(msg.sender, total_refunds)
     return (total_fees, total_refunds)
 
 
