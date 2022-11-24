@@ -58,7 +58,7 @@ abstract contract ERC4626BaseStrategy is IStrategyERC4626, ERC4626 {
         // TODO: add permissioning ?
     }
 
-    function migrate(address _newStrategy) external override {
+    function migrate(address _newStrategy) external virtual override {
         // TODO: add permissioning
     }
 

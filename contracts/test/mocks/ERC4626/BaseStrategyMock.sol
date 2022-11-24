@@ -16,6 +16,10 @@ abstract contract ERC4626BaseStrategyMock is ERC4626BaseStrategy {
         ERC20("a", "a")
     {}
 
+    function migrate(address newStrategy) external override {
+        IERC20(asset()).transfer(newStrategy, IERC20(asset()).balanceOf(address(this)));
+    }
+
     function setMinDebt(uint256 _minDebt) external {
         minDebt = _minDebt;
     }
