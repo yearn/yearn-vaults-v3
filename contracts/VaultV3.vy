@@ -128,10 +128,8 @@ allowance: public(HashMap[address, HashMap[address, uint256]])
 
 # Total amount of shares that are currently minted
 total_supply: public(uint256)
-
 # Total amount of assets that has been deposited in strategies
 total_debt: public(uint256)
-
 # Current assets held in the vault contract. Replacing balanceOf(this) to avoid price_per_share manipulation
 total_idle: public(uint256)
 # Minimum amount of assets that should be kept in the vault contract to allow for fast, cheap redeems
@@ -286,7 +284,6 @@ def _burn_unlocked_shares() -> uint256:
 
   self._burn_shares(unlocked_shares, self)
   return unlocked_shares
-
 
 @view
 @internal
