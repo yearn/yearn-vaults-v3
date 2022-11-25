@@ -95,9 +95,7 @@ def test_migrate_strategy__with_no_debt(chain, gov, vault, strategy, create_stra
     old_max_debt = old_strategy_params.max_debt
 
     snapshot = chain.pending_timestamp
-    tx = vault.migrate_strategy(
-        new_strategy.address, old_strategy.address, False, sender=gov
-    )
+    tx = vault.migrate_strategy(new_strategy.address, old_strategy.address, sender=gov)
     event = list(tx.decode_logs(vault.StrategyMigrated))
 
     assert len(event) == 1

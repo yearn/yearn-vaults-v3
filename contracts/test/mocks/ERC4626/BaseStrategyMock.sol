@@ -4,9 +4,11 @@ pragma solidity 0.8.14;
 import {ERC4626BaseStrategy, IERC20} from "../../ERC4626BaseStrategy.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 abstract contract ERC4626BaseStrategyMock is ERC4626BaseStrategy {
     using Math for uint256;
+    using SafeERC20 for IERC20;
 
     uint256 public minDebt;
     uint256 public maxDebt = type(uint256).max;
@@ -17,7 +19,7 @@ abstract contract ERC4626BaseStrategyMock is ERC4626BaseStrategy {
     {}
 
     function migrate(address newStrategy) external override {
-        IERC20(asset()).transfer(newStrategy, IERC20(asset()).balanceOf(address(this)));
+        IERC20(asset()).safeTransfer(newStrategy, IERC20(asset()).balanceOf(address(this)));
     }
 
     function setMinDebt(uint256 _minDebt) external {
