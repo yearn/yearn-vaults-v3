@@ -120,7 +120,7 @@ enum Roles:
 ASSET: immutable(ERC20)
 DECIMALS: immutable(uint256)
 PROFIT_MAX_UNLOCK_TIME: immutable(uint256)
-FACTORY: immutable(address)
+FACTORY: public(immutable(address))
 
 # CONSTANTS #
 API_VERSION: constant(String[28]) = "0.1.0"
@@ -764,7 +764,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
       if(protocol_fee_bps > 0):
         # NOTE: charge fees since last report OR last fee change (this will mean less fees are charged after a change in protocol_fees, but fees should not change frequently)
         seconds_since_last_report = min(seconds_since_last_report, block.timestamp - convert(protocol_fee_last_change, uint256))
-        protocol_fees = convert(protocol_fee_bps, uint256) * self._total_assets() * seconds_since_last_report / MAX_BPS / 365 * 24 * 3600
+        protocol_fees = convert(protocol_fee_bps, uint256) * self._total_assets() * seconds_since_last_report / 24 / 365 / 3600 / MAX_BPS
         total_fees += protocol_fees
         self.last_report = block.timestamp
 
