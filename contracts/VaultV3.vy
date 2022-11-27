@@ -762,7 +762,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     protocol_fee_recipient: address = empty(address)
     seconds_since_last_report: uint256 = block.timestamp - self.last_report
     # to avoid wasting gas for minimal fees vault will only assess once every PROTOCOL_FEE_ASSESSMENT_PERIOD seconds
-    if(seconds_since_last_report > PROTOCOL_FEE_ASSESSMENT_PERIOD):
+    if(seconds_since_last_report >= PROTOCOL_FEE_ASSESSMENT_PERIOD):
       protocol_fee_bps: uint16 = 0
       protocol_fee_last_change: uint32 = 0
 
@@ -834,7 +834,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if total_fees - protocol_fees > 0:
       self._issue_shares_for_amount(total_fees - protocol_fees, accountant)
     
-
     # Update unlocking rate and time to fully unlocked
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
     if total_locked_shares > 0:
