@@ -66,6 +66,7 @@ event StrategyReported:
     gain: uint256
     loss: uint256
     current_debt: uint256
+    protocol_fees: uint256
     total_fees: uint256
     total_refunds: uint256
 
@@ -328,13 +329,13 @@ def _convert_to_shares(assets: uint256) -> uint256:
     """
     shares = amount * (total_supply / total_assets) --- (== amount / price_per_share)
     """
-    _total_supply: uint256 = self._total_supply()
+    total_assets: uint256 = self._total_assets()
 
     # if total_supply is 0, price_per_share is 1
-    if _total_supply == 0:
+    if total_assets == 0:
        return assets
 
-    shares: uint256 = assets * _total_supply / self._total_assets()
+    shares: uint256 = assets * self._total_supply() / total_assets
     return shares
 
 
@@ -388,13 +389,19 @@ def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
     if len(response) > 0:
         assert convert(response, bool), "Transfer failed!"
 
-
 @internal
 def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
     """
     Issues shares that are worth 'amount' in the underlying token (asset)
+    WARNING: this takes into account that any new assets are already taken into account
     """
-    new_shares: uint256 = self._convert_to_shares(amount)
+    total_assets: uint256 = self._total_assets()
+    new_shares: uint256 = 0
+
+    if total_assets > amount:
+      new_shares = amount * self._total_supply() / (total_assets - amount)
+    else:
+      new_shares = amount
 
     # We don't make the function revert
     if new_shares == 0:
@@ -434,12 +441,12 @@ def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256
         assets = ASSET.balanceOf(_sender)
 
     assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
-    
-    shares: uint256 = self._issue_shares_for_amount(assets, _recipient)
-    assert shares > 0, "cannot mint zero"
-
+ 
     self.erc20_safe_transfer_from(ASSET.address, msg.sender, self, assets)
     self.total_idle += assets
+   
+    shares: uint256 = self._issue_shares_for_amount(assets, _recipient)
+    assert shares > 0, "cannot mint zero"
 
     log Deposit(_sender, _recipient, assets, shares)
 
@@ -769,7 +776,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self.last_report = block.timestamp
 
     accountant: address = self.accountant
-    # if accountant is not set, fees and refunds are zero
+    # if accountant is not set, fees and refunds remain unchanged
     if accountant != empty(address):
         total_fees, total_refunds = IAccountant(accountant).report(strategy, gain, loss)
    
@@ -781,20 +788,13 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     newly_locked_shares: uint256 = 0
     if gain > 0:
-        # NOTE: vault will issue shares worth the profit to avoid instant pps change
-        newly_locked_shares += self._issue_shares_for_amount(gain, self)
-        # update current debt after processing management fee
         # NOTE: this will increase total_assets
         self.strategies[strategy].current_debt += gain
         self.total_debt += gain
 
-      # if fees are non-zero, issue shares
-    if protocol_fees > 0:
-      self._issue_shares_for_amount(protocol_fees, protocol_fee_recipient)
+        # NOTE: vault will issue shares worth the profit to avoid instant pps change
+        newly_locked_shares += self._issue_shares_for_amount(gain, self)
 
-    if total_fees - protocol_fees > 0:
-      self._issue_shares_for_amount(total_fees - protocol_fees, accountant)
-    
     if total_refunds > 0:
         # if refunds are non-zero, transfer assets
         total_refunds = min(total_refunds, self.balance_of[accountant])
@@ -806,7 +806,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if loss > 0:
         self.strategies[strategy].current_debt -= loss
         self.total_debt -= loss
- 
+
     # Calculate how long until the full amount of shares is unlocked
     remaining_time: uint256 = 0
     # NOTE: should be precise (no new unlocked shares due to above's burn of shares)
@@ -826,6 +826,14 @@ def _process_report(strategy: address) -> (uint256, uint256):
       shares_to_unlock: uint256 = min(shares_to_burn, newly_locked_shares)
       newly_locked_shares -= shares_to_unlock
       previously_locked_shares -= (shares_to_burn - shares_to_unlock)
+ 
+    # if fees are non-zero, issue shares
+    if protocol_fees > 0:
+      self._issue_shares_for_amount(protocol_fees, protocol_fee_recipient)
+
+    if total_fees - protocol_fees > 0:
+      self._issue_shares_for_amount(total_fees - protocol_fees, accountant)
+    
 
     # Update unlocking rate and time to fully unlocked
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
@@ -840,11 +848,13 @@ def _process_report(strategy: address) -> (uint256, uint256):
       self.profit_unlocking_rate = 0
 
     self.strategies[strategy].last_report = block.timestamp
+
     log StrategyReported(
         strategy,
         gain,
         loss,
         self.strategies[strategy].current_debt,
+        protocol_fees,
         total_fees,
         total_refunds
     )

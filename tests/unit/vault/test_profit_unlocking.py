@@ -581,13 +581,11 @@ def test_gain_fees_no_refunds_not_enough_buffer(
         < price_per_share_before_2nd_profit
     )
 
-    assert (
-        pytest.approx(vault.balanceOf(accountant), rel=1e-4)
-        == accountant_shares_before_2nd_profit
-        + second_profit
-        * second_performance_fee
-        // MAX_BPS_ACCOUNTANT
-        / price_per_share_before_2nd_profit
+    assert pytest.approx(
+        vault.convertToAssets(vault.balanceOf(accountant)), rel=1e-4
+    ) == vault.convertToAssets(
+        accountant_shares_before_2nd_profit
+        + second_profit * second_performance_fee // MAX_BPS_ACCOUNTANT
     )
 
     assert vault.balanceOf(vault) == 0

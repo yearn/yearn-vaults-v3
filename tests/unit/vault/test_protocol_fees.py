@@ -36,7 +36,9 @@ def test__report_with_protocol_fees(
     chain.pending_timestamp = vault.last_report() + days_to_secs(days_passed)
     tx = vault.process_report(strategy, sender=gov)
 
-    assert vault.balanceOf(gov.address) == amount * 0.0025 * days_passed / 365
-    assert pytest.approx(vault.price_per_share(), rel=1e-5) == int(10**18) * (
-        1 - 0.0025 * days_passed / 365
+    shares_protocol = vault.balanceOf(gov.address)
+    assert (
+        pytest.approx(vault.convertToAssets(shares_protocol), rel=1e-7)
+        == amount * 0.0025 * days_passed / 365
     )
+    assert vault.price_per_share() == int(10**18) * (1 - 0.0025 * days_passed / 365)
