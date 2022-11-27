@@ -5,6 +5,14 @@ from vyper.interfaces import ERC20
 event NewVault:
     vault_address: indexed(address)
 
+event UpdateProtocolFeeBps:
+    old_fee_bps: uint16
+    new_fee_bps: uint16
+
+event UpdateProtocolFeeRecipient:
+    old_fee_recipient: address
+    new_fee_recipient: address
+
 struct PFConfig:
   fee_bps: uint16
   fee_last_change: uint32
@@ -39,11 +47,16 @@ def vault_blueprint()-> address:
 def set_protocol_fee_bps(new_protocol_fee_bps: uint16):
     assert msg.sender == GOVERNANCE, "not governance"
     assert new_protocol_fee_bps <= MAX_FEE_BPS, "fee too high"
+
+    log UpdateProtocolFeeBps(self.protocol_fee_config.fee_bps, new_protocol_fee_bps)
+
     self.protocol_fee_config.fee_bps = new_protocol_fee_bps
     self.protocol_fee_config.fee_last_change = convert(block.timestamp, uint32)  
 
 @external
 def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
     assert msg.sender == GOVERNANCE, "not governance"
+    log UpdateProtocolFeeRecipient(self.protocol_fee_config.fee_recipient, new_protocol_fee_recipient)
     self.protocol_fee_config.fee_recipient = new_protocol_fee_recipient
+
 
