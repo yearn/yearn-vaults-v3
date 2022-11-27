@@ -36,10 +36,9 @@ def test__report_with_no_protocol_fees(
     assert event[0].protocol_fees == 0
 
     shares_protocol = vault.balanceOf(gov.address)
-    assert (
-        vault.convertToAssets(shares_protocol) == 0
-    )
+    assert vault.convertToAssets(shares_protocol) == 0
     assert vault.price_per_share() == int(10**18)
+
 
 def test__report_with_protocol_fees__set_pre_vault_deploy(
     vault_factory,
@@ -74,13 +73,14 @@ def test__report_with_protocol_fees__set_pre_vault_deploy(
 
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].protocol_fees == int(amount * 0.0025)
-    
+
     shares_protocol = vault.balanceOf(gov.address)
     assert (
         pytest.approx(vault.convertToAssets(shares_protocol), rel=1e-7)
         == amount * 0.0025 * days_passed / 365
     )
     assert vault.price_per_share() == int(10**18) * (1 - 0.0025 * days_passed / 365)
+
 
 def test__report_with_protocol_fees__set_post_vault_deploy(
     vault_factory,
@@ -114,18 +114,21 @@ def test__report_with_protocol_fees__set_post_vault_deploy(
     assert vault.price_per_share() == int(10**18)
     days_passed = 365
     # We increase time after profit has been released and check estimation
-    chain.pending_timestamp = vault_factory.protocol_fee_config().fee_last_change + days_to_secs(days_passed)
+    chain.pending_timestamp = (
+        vault_factory.protocol_fee_config().fee_last_change + days_to_secs(days_passed)
+    )
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].protocol_fees == int(amount * 0.0025)
-    
+
     shares_protocol = vault.balanceOf(gov.address)
     assert (
         pytest.approx(vault.convertToAssets(shares_protocol), rel=1e-7)
         == amount * 0.0025 * days_passed / 365
     )
     assert vault.price_per_share() == int(10**18) * (1 - 0.0025 * days_passed / 365)
+
 
 def test__report_several_times_in_a_day(
     vault_factory,
@@ -160,7 +163,7 @@ def test__report_several_times_in_a_day(
 
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].protocol_fees == int(amount * 0.0025)
-    
+
     shares_protocol = vault.balanceOf(gov.address)
     assert (
         pytest.approx(vault.convertToAssets(shares_protocol), rel=1e-7)
@@ -179,8 +182,3 @@ def test__report_several_times_in_a_day(
 
     event = list(tx.decode_logs(vault.StrategyReported))
     assert pytest.approx(event[0].protocol_fees, abs=1) == int(amount * 0.0025 / 365)
-
-
-    
-
-
