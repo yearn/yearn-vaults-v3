@@ -393,15 +393,19 @@ def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
 def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
     """
     Issues shares that are worth 'amount' in the underlying token (asset)
-    WARNING: this takes into account that any new assets are already taken into account
+    WARNING: this takes into account that any new assets have been summed to total_assets (otherwise pps will go down)
     """
     total_assets: uint256 = self._total_assets()
     new_shares: uint256 = 0
 
     if total_assets > amount:
       new_shares = amount * self._total_supply() / (total_assets - amount)
-    else:
+    elif self._total_supply() == 0:
+      # NOTE: this should only happen in the first deposit (where total_assets == amount
       new_shares = amount
+    else:
+      # after first deposit, getting here would mean that the rest of the shares would be diluted to ~0
+      assert total_assets > amount, "amount too high"
 
     # We don't make the function revert
     if new_shares == 0:

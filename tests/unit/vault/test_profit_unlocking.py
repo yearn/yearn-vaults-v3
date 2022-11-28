@@ -498,7 +498,7 @@ def test_gain_fees_no_refunds_not_enough_buffer(
     management_fee = 0
     first_performance_fee = 1_000
     # Huge fee that profit cannot damp
-    second_performance_fee = 50_000
+    second_performance_fee = 20_000
 
     vault = create_vault(asset)
     accountant = deploy_flexible_accountant(vault)
@@ -561,7 +561,7 @@ def test_gain_fees_no_refunds_not_enough_buffer(
         refund_ratio=0,
     )
     assert accountant.fees(strategy).performance_fee == second_performance_fee
-
+    
     asset.transfer(strategy, second_profit, sender=gov)
     tx = vault.process_report(strategy, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
@@ -575,7 +575,8 @@ def test_gain_fees_no_refunds_not_enough_buffer(
         second_profit * second_performance_fee // MAX_BPS_ACCOUNTANT,
         0,
     )
-    # # pps doesn't change as profit goes directly to buffer and fees are damped
+
+    # pps doesn't change as profit goes directly to buffer and fees are damped
     assert (
         vault.price_per_share() / 10 ** vault.decimals()
         < price_per_share_before_2nd_profit
@@ -583,10 +584,7 @@ def test_gain_fees_no_refunds_not_enough_buffer(
 
     assert pytest.approx(
         vault.convertToAssets(vault.balanceOf(accountant)), rel=1e-4
-    ) == vault.convertToAssets(
-        accountant_shares_before_2nd_profit
-        + second_profit * second_performance_fee // MAX_BPS_ACCOUNTANT
-    )
+    ) == vault.convertToAssets(accountant_shares_before_2nd_profit) + second_profit * second_performance_fee // MAX_BPS_ACCOUNTANT
 
     assert vault.balanceOf(vault) == 0
 
