@@ -1,3 +1,4 @@
+from _pytest.warning_types import warn_explicit_for
 from utils.utils import days_to_secs
 from utils.constants import MAX_BPS, MAX_BPS_ACCOUNTANT, WEEK, YEAR, DAY
 from ape import chain, reverts
@@ -78,9 +79,9 @@ def increase_time_and_check_profit_buffer(
     chain, vault, secs=days_to_secs(10), expected_buffer=0
 ):
     # We increase time after profit has been released and update strategy debt to 0
-    chain.pending_timestamp = chain.pending_timestamp + secs
+    chain.pending_timestamp = chain.pending_timestamp + secs - 1
     chain.mine(timestamp=chain.pending_timestamp)
-    assert pytest.approx(vault.balanceOf(vault), rel=1e-3) == expected_buffer
+    assert pytest.approx(vault.balanceOf(vault), rel=1e-4) == expected_buffer
 
 
 ############ TESTS ############
@@ -1106,7 +1107,6 @@ def test_gain_fees_no_refunds_not_enough_buffer(
     # Huge fee that profit cannot damp
     second_performance_fee = 20_000
     refund_ratio = 0
-
     # Deposit assets to vault and get strategy ready
     vault, strategy, accountant = initial_set_up(
         asset,
@@ -1200,18 +1200,19 @@ def test_gain_fees_no_refunds_not_enough_buffer(
         == vault.convertToAssets(accountant_shares_before_2nd_profit)
         + second_profit * second_performance_fee // MAX_BPS_ACCOUNTANT
     )
+
     assert vault.balanceOf(vault) == 0
+
     check_vault_totals(
         vault,
         total_debt=amount + first_profit + second_profit,
         total_idle=0,
         total_assets=amount + first_profit + second_profit,
         total_supply=amount
-        + first_profit * first_performance_fee / MAX_BPS_ACCOUNTANT
+        + accountant_shares_before_2nd_profit
         + second_profit
         * second_performance_fee
-        / MAX_BPS_ACCOUNTANT
-        / price_per_share_before_2nd_profit,
+        / MAX_BPS_ACCOUNTANT / vault.price_per_share() * 1e18,
     )
 
     # We update strategy debt to 0
@@ -1230,7 +1231,7 @@ def test_gain_fees_no_refunds_not_enough_buffer(
         + second_profit
         * second_performance_fee
         / MAX_BPS_ACCOUNTANT
-        / price_per_share_before_2nd_profit,
+        / vault.price_per_share() * 1e18,
     )
 
     # Fish redeems shares
@@ -1245,7 +1246,7 @@ def test_gain_fees_no_refunds_not_enough_buffer(
         + second_profit
         * second_performance_fee
         / MAX_BPS_ACCOUNTANT
-        / price_per_share_before_2nd_profit,
+        / vault.price_per_share() * 1e18,
     )
 
     assert asset.balanceOf(fish) < fish_amount
@@ -1410,9 +1411,9 @@ def test_loss_fees_no_refunds_no_existing_buffer(
     check_vault_totals(
         vault,
         total_debt=0,
-        total_idle=vault.convertToAssets(total_fees),
-        total_assets=vault.convertToAssets(total_fees),
-        total_supply=total_fees,
+        total_idle=total_fees,
+        total_assets=total_fees,
+        total_supply=vault.convertToShares(total_fees),
     )
     assert asset.balanceOf(fish) < fish_amount - first_loss
 
@@ -2125,7 +2126,7 @@ def test_loss_fees_no_refunds_with_not_enough_buffer(
         first_loss,
         0,
     )
-    total_loss_fees = total_loss_fees / price_per_share
+
     assert (
         vault.price_per_share() / 10 ** vault.decimals()
         < (amount + first_profit - first_loss) / amount
@@ -2139,7 +2140,7 @@ def test_loss_fees_no_refunds_with_not_enough_buffer(
         total_debt=amount + first_profit - first_loss,
         total_idle=0,
         total_assets=amount + first_profit - first_loss,
-        total_supply=amount + total_profit_fees + total_loss_fees,
+        total_supply=amount + vault.balanceOf(accountant)
     )
 
     assert pytest.approx(
@@ -2159,12 +2160,13 @@ def test_loss_fees_no_refunds_with_not_enough_buffer(
 
     assert vault.strategies(strategy).current_debt == 0
     assert_price_per_share(vault, price_per_share)
+
     check_vault_totals(
         vault,
         total_debt=0,
         total_idle=amount + first_profit - first_loss,
         total_assets=amount + first_profit - first_loss,
-        total_supply=amount + total_loss_fees + total_profit_fees,
+        total_supply=amount + vault.balanceOf(accountant)
     )
 
     # Fish redeems shares
@@ -2175,7 +2177,7 @@ def test_loss_fees_no_refunds_with_not_enough_buffer(
         total_debt=0,
         total_idle=vault.convertToAssets(vault.balanceOf(accountant)),
         total_assets=vault.convertToAssets(vault.balanceOf(accountant)),
-        total_supply=total_loss_fees + total_profit_fees,
+        total_supply= vault.balanceOf(accountant),
     )
 
     assert asset.balanceOf(fish) < fish_amount
@@ -2231,7 +2233,7 @@ def test_loss_fees_refunds(
         gov,
         vault,
         first_loss,
-        total_refunds=first_loss * refund_ratio / MAX_BPS_ACCOUNTANT,
+        total_refunds = first_loss * refund_ratio / MAX_BPS_ACCOUNTANT,
     )
 
     assert total_loss_fees > 0
@@ -2247,7 +2249,7 @@ def test_loss_fees_refunds(
 
     assert_price_per_share(vault, 1.0)
 
-    assert vault.balanceOf(accountant) == total_loss_fees
+    assert pytest.approx(vault.convertToAssets(vault.balanceOf(accountant)), abs=1) == total_loss_fees
 
     # Fish redeems shares
     vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
@@ -2256,9 +2258,9 @@ def test_loss_fees_refunds(
     check_vault_totals(
         vault,
         total_debt=0,
-        total_idle=vault.convertToAssets(total_loss_fees),
-        total_assets=vault.convertToAssets(total_loss_fees),
-        total_supply=total_loss_fees,
+        total_idle=total_loss_fees,
+        total_assets=total_loss_fees,
+        total_supply=vault.convertToShares(total_loss_fees),
     )
 
     assert pytest.approx(asset.balanceOf(fish), rel=1e-4) == fish_amount

@@ -800,10 +800,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
         # NOTE: vault will issue shares worth the profit to avoid instant pps change
         newly_locked_shares += self._issue_shares_for_amount(gain, self)
-
-    if total_fees > 0:
-        # if fees are non-zero, issue shares
-        self._issue_shares_for_amount(total_fees, accountant)
     
     if total_refunds > 0:
         # if refunds are non-zero, transfer assets
@@ -836,14 +832,14 @@ def _process_report(strategy: address) -> (uint256, uint256):
       shares_to_unlock: uint256 = min(shares_to_burn, newly_locked_shares)
       newly_locked_shares -= shares_to_unlock
       previously_locked_shares -= (shares_to_burn - shares_to_unlock)
- 
+    
     # if fees are non-zero, issue shares
     if protocol_fees > 0:
       self._issue_shares_for_amount(protocol_fees, protocol_fee_recipient)
 
     if total_fees - protocol_fees > 0:
       self._issue_shares_for_amount(total_fees - protocol_fees, accountant)
-    
+ 
     # Update unlocking rate and time to fully unlocked
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
     if total_locked_shares > 0:
@@ -855,35 +851,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
     else:
       # NOTE: only setting this to 0 will turn in the desired effect, no need to update last_profit_update or full_profit_unlock_date
       self.profit_unlocking_rate = 0
-
-    remaining_time: uint256 = 0
-    _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
-    if _full_profit_unlock_date > block.timestamp: 
-      remaining_time = _full_profit_unlock_date - block.timestamp
-    else:
-      remaining_time = 0
-
-    previously_locked_shares: uint256 = remaining_time * self.profit_unlocking_rate
-
-    shares_to_burn: uint256 = 0
-    # Vault insta unlocks losses and fees to avoid pps decrease
-    if loss + total_fees > 0:
-        shares_to_unlock: uint256 = self._convert_to_shares(loss + total_fees)
-        # TODO: second min needed to avoid reverts?
-        shares_to_burn = min(shares_to_unlock, min(previously_locked_shares, self.balance_of[self]) + newly_locked_shares)
-        self._burn_shares(shares_to_burn, self)
-        if newly_locked_shares > shares_to_burn:
-          newly_locked_shares -= shares_to_burn
-        else:
-          newly_locked_shares = 0
-          # unlocking previously locked shares
-          previously_locked_shares -= shares_to_burn - newly_locked_shares
-
-    new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * PROFIT_MAX_UNLOCK_TIME) / (previously_locked_shares + newly_locked_shares)
-
-    self.profit_unlocking_rate = (previously_locked_shares + newly_locked_shares) * MAX_BPS / new_profit_locking_period
-    self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
-    self.last_profit_update = block.timestamp
 
     self.strategies[strategy].last_report = block.timestamp
 
