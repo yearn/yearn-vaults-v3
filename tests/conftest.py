@@ -11,6 +11,7 @@ from hexbytes import HexBytes
 # we default to local node
 w3 = Web3(HTTPProvider(os.getenv("CHAIN_PROVIDER", "http://127.0.0.1:8545")))
 
+
 # Accounts
 @pytest.fixture(scope="session")
 def gov(accounts):
@@ -190,6 +191,7 @@ def create_vault(project, gov, vault_factory):
         )
         event = list(tx.decode_logs(vault_factory.NewVault))
         vault = project.VaultV3.at(event[0].vault_address)
+
         vault.set_role(
             gov.address,
             ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
@@ -420,3 +422,107 @@ def set_fees_for_strategy():
         accountant.set_refund_ratio(strategy.address, refund_ratio, sender=gov)
 
     return set_fees_for_strategy
+
+
+@pytest.fixture(scope="session")
+def initial_set_up(
+    create_vault,
+    create_strategy,
+    user_deposit,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    airdrop_asset,
+    fish_amount,
+    deploy_flexible_accountant,
+    set_fees_for_strategy,
+):
+    def initial_set_up(
+        asset,
+        gov,
+        debt_amount,
+        user,
+        management_fee=0,
+        performance_fee=0,
+        refund_ratio=0,
+        accountant_deposit=fish_amount // 10,
+    ):
+        """ """
+        vault = create_vault(asset)
+        airdrop_asset(gov, asset, gov, fish_amount)
+        strategy = create_strategy(vault)
+
+        accountant = None
+        if management_fee or performance_fee or refund_ratio:
+            accountant = deploy_flexible_accountant(vault)
+            set_fees_for_strategy(
+                gov,
+                strategy,
+                accountant,
+                management_fee,
+                performance_fee,
+                refund_ratio,
+            )
+            airdrop_asset(gov, asset, accountant, fish_amount)
+            if accountant_deposit:
+                user_deposit(accountant, vault, asset, accountant_deposit)
+
+        # Deposit assets to vault and get strategy ready
+        user_deposit(user, vault, asset, debt_amount)
+        add_strategy_to_vault(gov, strategy, vault)
+        add_debt_to_strategy(gov, strategy, vault, debt_amount)
+
+        return vault, strategy, accountant
+
+    return initial_set_up
+
+
+@pytest.fixture(scope="session")
+def initial_set_up_lossy(
+    create_vault,
+    create_lossy_strategy,
+    user_deposit,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    airdrop_asset,
+    fish_amount,
+    deploy_flexible_accountant,
+    set_fees_for_strategy,
+):
+    def initial_set_up_lossy(
+        asset,
+        gov,
+        debt_amount,
+        user,
+        management_fee=0,
+        performance_fee=0,
+        refund_ratio=0,
+        accountant_deposit=fish_amount // 10,
+    ):
+        """ """
+        vault = create_vault(asset)
+        airdrop_asset(gov, asset, gov, fish_amount)
+        strategy = create_lossy_strategy(vault)
+
+        accountant = None
+        if management_fee or performance_fee or refund_ratio:
+            accountant = deploy_flexible_accountant(vault)
+            set_fees_for_strategy(
+                gov,
+                strategy,
+                accountant,
+                management_fee,
+                performance_fee,
+                refund_ratio,
+            )
+            airdrop_asset(gov, asset, accountant, fish_amount)
+            if accountant_deposit:
+                user_deposit(accountant, vault, asset, accountant_deposit)
+
+        # Deposit assets to vault and get strategy ready
+        user_deposit(user, vault, asset, debt_amount)
+        add_strategy_to_vault(gov, strategy, vault)
+        add_debt_to_strategy(gov, strategy, vault, debt_amount)
+
+        return vault, strategy, accountant
+
+    return initial_set_up_lossy

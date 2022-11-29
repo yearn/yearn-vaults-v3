@@ -64,12 +64,10 @@ def test_profitable_strategy_flow(
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].gain == first_profit
     assert pytest.approx(deposit_amount + first_profit, 1e-5) == vault.totalAssets()
-    # Vault unlocks from profit the total_fee amount to avoid decreasing pps because of fees
-    share_price_before_minting_fees = (initial_total_assets) / initial_total_supply
 
     assert (
-        pytest.approx(vault.balanceOf(accountant), 1e-5)
-        == total_fee / share_price_before_minting_fees
+        pytest.approx(vault.convertToAssets(vault.balanceOf(accountant)), 1e-5)
+        == total_fee
     )
 
     pps = vault.price_per_share()
