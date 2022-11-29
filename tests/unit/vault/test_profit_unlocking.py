@@ -1107,6 +1107,7 @@ def test_gain_fees_no_refunds_not_enough_buffer(
     # Huge fee that profit cannot damp
     second_performance_fee = 20_000
     refund_ratio = 0
+
     # Deposit assets to vault and get strategy ready
     vault, strategy, accountant = initial_set_up(
         asset,

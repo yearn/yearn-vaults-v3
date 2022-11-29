@@ -279,6 +279,7 @@ def test_process_report__with_fees_exceeding_fee_cap(
     # Vault mints shares worth the fees to the accountant
     accountant_balance = vault.balanceOf(accountant)
     assert pytest.approx(vault.convertToAssets(accountant_balance), rel=1e-5) == max_fee
+    
 
 def test_process_report__with_loss(
     chain, gov, asset, vault, lossy_strategy, add_debt_to_strategy

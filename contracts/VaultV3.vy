@@ -621,6 +621,7 @@ def _migrate_strategy(new_strategy: address, old_strategy: address, call_migrate
     if call_migrate_strategy:
       IStrategy(old_strategy).migrate(new_strategy)
 
+
     # NOTE: we add strategy with same params than the strategy being migrated
     self.strategies[new_strategy] = StrategyParams({
        activation: block.timestamp,
@@ -800,7 +801,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
         # NOTE: vault will issue shares worth the profit to avoid instant pps change
         newly_locked_shares += self._issue_shares_for_amount(gain, self)
-    
+
     if total_refunds > 0:
         # if refunds are non-zero, transfer assets
         total_refunds = min(total_refunds, self.balance_of[accountant])
@@ -832,14 +833,14 @@ def _process_report(strategy: address) -> (uint256, uint256):
       shares_to_unlock: uint256 = min(shares_to_burn, newly_locked_shares)
       newly_locked_shares -= shares_to_unlock
       previously_locked_shares -= (shares_to_burn - shares_to_unlock)
-    
+
     # if fees are non-zero, issue shares
     if protocol_fees > 0:
       self._issue_shares_for_amount(protocol_fees, protocol_fee_recipient)
 
     if total_fees - protocol_fees > 0:
       self._issue_shares_for_amount(total_fees - protocol_fees, accountant)
- 
+
     # Update unlocking rate and time to fully unlocked
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
     if total_locked_shares > 0:
