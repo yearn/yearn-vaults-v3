@@ -67,7 +67,7 @@ def test_profitable_strategy_flow(
 
     assert (
         pytest.approx(vault.convertToAssets(vault.balanceOf(accountant)), 1e-5)
-        == total_fee 
+        == total_fee
     )
 
     pps = vault.price_per_share()
@@ -167,7 +167,9 @@ def test_profitable_strategy_flow(
 
     assert asset.balanceOf(user_1) > user_1_initial_balance
 
-    vault.redeem(vault.balanceOf(user_2), user_2, user_2, [strategy.address], sender=user_2)
+    vault.redeem(
+        vault.balanceOf(user_2), user_2, user_2, [strategy.address], sender=user_2
+    )
 
     assert vault.total_idle() == 0
     assert pytest.approx(0, abs=1) == vault.balanceOf(user_2)
