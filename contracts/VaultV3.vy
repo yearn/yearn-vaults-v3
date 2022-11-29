@@ -21,6 +21,9 @@ interface IStrategy:
 interface IAccountant:
     def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
 
+interface IFactory:
+    def protocol_fee_config() -> (uint16, uint32, address): view
+
 # EVENTS #
 # ERC4626 EVENTS
 event Deposit:
@@ -63,6 +66,7 @@ event StrategyReported:
     gain: uint256
     loss: uint256
     current_debt: uint256
+    protocol_fees: uint256
     total_fees: uint256
     total_refunds: uint256
 
@@ -102,7 +106,9 @@ struct StrategyParams:
     max_debt: uint256
 
 # CONSTANTS #
-MAX_BPS: constant(uint256) = 1_000_000_000_000
+MAX_BPS: constant(uint256) = 10_000
+MAX_BPS_EXTENDED: constant(uint256) = 1_000_000_000_000
+PROTOCOL_FEE_ASSESSMENT_PERIOD: constant(uint256) = 24 * 3600 # assess once a day
 
 # ENUMS #
 enum Roles:
@@ -115,6 +121,7 @@ enum Roles:
 ASSET: immutable(ERC20)
 DECIMALS: immutable(uint256)
 PROFIT_MAX_UNLOCK_TIME: immutable(uint256)
+FACTORY: public(immutable(address))
 
 # CONSTANTS #
 API_VERSION: constant(String[28]) = "0.1.0"
@@ -158,6 +165,8 @@ full_profit_unlock_date: public(uint256)
 profit_unlocking_rate: public(uint256)
 last_profit_update: uint256
 
+last_report: public(uint256)
+
 # `nonces` track `permit` approvals with signature.
 nonces: public(HashMap[address, uint256])
 DOMAIN_TYPE_HASH: constant(bytes32) = keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)')
@@ -169,12 +178,14 @@ def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: a
     ASSET = asset
     DECIMALS = convert(ERC20Detailed(asset.address).decimals(), uint256)
     assert 10 ** (2 * DECIMALS) <= max_value(uint256) # dev: token decimals too high
-    
+
+    FACTORY = msg.sender
+
     PROFIT_MAX_UNLOCK_TIME = profit_max_unlock_time
 
     self.name = name
     self.symbol = symbol
-
+    self.last_report = block.timestamp
     self.role_manager = role_manager
     self.shutdown = False
 
@@ -260,7 +271,7 @@ def _unlocked_shares() -> uint256:
   _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
   unlocked_shares: uint256 = 0
   if _full_profit_unlock_date > block.timestamp:
-    unlocked_shares = self.profit_unlocking_rate * (block.timestamp - self.last_profit_update) / MAX_BPS
+    unlocked_shares = self.profit_unlocking_rate * (block.timestamp - self.last_profit_update) / MAX_BPS_EXTENDED
   elif _full_profit_unlock_date != 0:
     # All shares have been unlocked
     unlocked_shares = self.balance_of[self]
@@ -318,13 +329,13 @@ def _convert_to_shares(assets: uint256) -> uint256:
     """
     shares = amount * (total_supply / total_assets) --- (== amount / price_per_share)
     """
-    _total_supply: uint256 = self._total_supply()
+    total_assets: uint256 = self._total_assets()
 
     # if total_supply is 0, price_per_share is 1
-    if _total_supply == 0:
+    if total_assets == 0:
        return assets
 
-    shares: uint256 = assets * _total_supply / self._total_assets()
+    shares: uint256 = assets * self._total_supply() / total_assets
     return shares
 
 
@@ -378,13 +389,23 @@ def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
     if len(response) > 0:
         assert convert(response, bool), "Transfer failed!"
 
-
 @internal
 def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
     """
     Issues shares that are worth 'amount' in the underlying token (asset)
+    WARNING: this takes into account that any new assets have been summed to total_assets (otherwise pps will go down)
     """
-    new_shares: uint256 = self._convert_to_shares(amount)
+    total_assets: uint256 = self._total_assets()
+    new_shares: uint256 = 0
+
+    if total_assets > amount:
+      new_shares = amount * self._total_supply() / (total_assets - amount)
+    elif self._total_supply() == 0:
+      # NOTE: this should only happen in the first deposit (where total_assets == amount
+      new_shares = amount
+    else:
+      # after first deposit, getting here would mean that the rest of the shares would be diluted to ~0
+      assert total_assets > amount, "amount too high"
 
     # We don't make the function revert
     if new_shares == 0:
@@ -424,12 +445,12 @@ def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256
         assets = ASSET.balanceOf(_sender)
 
     assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
-    
-    shares: uint256 = self._issue_shares_for_amount(assets, _recipient)
-    assert shares > 0, "cannot mint zero"
-
+ 
     self.erc20_safe_transfer_from(ASSET.address, msg.sender, self, assets)
     self.total_idle += assets
+   
+    shares: uint256 = self._issue_shares_for_amount(assets, _recipient)
+    assert shares > 0, "cannot mint zero"
 
     log Deposit(_sender, _recipient, assets, shares)
 
@@ -722,6 +743,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     """
     assert self.strategies[strategy].activation != 0, "inactive strategy"
     # Vault needs to assess 
+    # Using strategy shares because some may be a ERC4626 vault
     strategy_shares: uint256 = IStrategy(strategy).balanceOf(self)
     total_assets: uint256 = IStrategy(strategy).convertToAssets(strategy_shares)
     current_debt: uint256 = self.strategies[strategy].current_debt
@@ -737,14 +759,32 @@ def _process_report(strategy: address) -> (uint256, uint256):
     else:
         loss = current_debt - total_assets
 
-    # TODO: should we add a very low protocol management fee? (set to factory contract)
     total_fees: uint256 = 0
     total_refunds: uint256 = 0
+   
+    # Protocol fee assessment
+    protocol_fees: uint256 = 0
+    protocol_fee_recipient: address = empty(address)
+    seconds_since_last_report: uint256 = block.timestamp - self.last_report
+    # to avoid wasting gas for minimal fees vault will only assess once every PROTOCOL_FEE_ASSESSMENT_PERIOD seconds
+    if(seconds_since_last_report >= PROTOCOL_FEE_ASSESSMENT_PERIOD):
+      protocol_fee_bps: uint16 = 0
+      protocol_fee_last_change: uint32 = 0
+
+      protocol_fee_bps, protocol_fee_last_change, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
+
+      if(protocol_fee_bps > 0):
+        # NOTE: charge fees since last report OR last fee change (this will mean less fees are charged after a change in protocol_fees, but fees should not change frequently)
+        seconds_since_last_report = min(seconds_since_last_report, block.timestamp - convert(protocol_fee_last_change, uint256))
+        protocol_fees = convert(protocol_fee_bps, uint256) * self._total_assets() * seconds_since_last_report / 24 / 365 / 3600 / MAX_BPS
+        total_fees += protocol_fees
+        self.last_report = block.timestamp
+
     accountant: address = self.accountant
-    # if accountant is not set, fees and refunds are zero
+    # if accountant is not set, fees and refunds remain unchanged
     if accountant != empty(address):
         total_fees, total_refunds = IAccountant(accountant).report(strategy, gain, loss)
-    
+   
     # We calculate the amount of shares that could be insta unlocked to avoid pps changes
     # NOTE: this needs to be done before any pps changes
     shares_to_burn: uint256 = 0 
@@ -753,17 +793,13 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     newly_locked_shares: uint256 = 0
     if gain > 0:
-        # NOTE: vault will issue shares worth the profit to avoid instant pps change
-        newly_locked_shares += self._issue_shares_for_amount(gain, self)
-        # update current debt after processing management fee
         # NOTE: this will increase total_assets
         self.strategies[strategy].current_debt += gain
         self.total_debt += gain
 
-    if total_fees > 0:
-        # if fees are non-zero, issue shares
-        self._issue_shares_for_amount(total_fees, accountant)
-    
+        # NOTE: vault will issue shares worth the profit to avoid instant pps change
+        newly_locked_shares += self._issue_shares_for_amount(gain, self)
+
     if total_refunds > 0:
         # if refunds are non-zero, transfer assets
         total_refunds = min(total_refunds, self.balance_of[accountant])
@@ -775,7 +811,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if loss > 0:
         self.strategies[strategy].current_debt -= loss
         self.total_debt -= loss
- 
+
     # Calculate how long until the full amount of shares is unlocked
     remaining_time: uint256 = 0
     # NOTE: should be precise (no new unlocked shares due to above's burn of shares)
@@ -795,13 +831,20 @@ def _process_report(strategy: address) -> (uint256, uint256):
       shares_to_unlock: uint256 = min(shares_to_burn, newly_locked_shares)
       newly_locked_shares -= shares_to_unlock
       previously_locked_shares -= (shares_to_burn - shares_to_unlock)
+ 
+    # if fees are non-zero, issue shares
+    if protocol_fees > 0:
+      self._issue_shares_for_amount(protocol_fees, protocol_fee_recipient)
 
+    if total_fees - protocol_fees > 0:
+      self._issue_shares_for_amount(total_fees - protocol_fees, accountant)
+    
     # Update unlocking rate and time to fully unlocked
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
     if total_locked_shares > 0:
       # new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the PROFIT_MAX_UNLOCK_TIME
       new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * PROFIT_MAX_UNLOCK_TIME) / total_locked_shares
-      self.profit_unlocking_rate = (previously_locked_shares + newly_locked_shares) * MAX_BPS / new_profit_locking_period
+      self.profit_unlocking_rate = (previously_locked_shares + newly_locked_shares) * MAX_BPS_EXTENDED / new_profit_locking_period
       self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
       self.last_profit_update = block.timestamp
     else:
@@ -809,11 +852,13 @@ def _process_report(strategy: address) -> (uint256, uint256):
       self.profit_unlocking_rate = 0
 
     self.strategies[strategy].last_report = block.timestamp
+
     log StrategyReported(
         strategy,
         gain,
         loss,
         self.strategies[strategy].current_debt,
+        protocol_fees,
         total_fees,
         total_refunds
     )

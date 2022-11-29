@@ -1,6 +1,7 @@
 import ape
 import pytest
 from utils.constants import YEAR, DAY, ROLES, MAX_BPS_ACCOUNTANT, WEEK, MAX_INT
+from utils.utils import days_to_secs
 
 
 @pytest.fixture(autouse=True)
@@ -77,8 +78,6 @@ def test_process_report__with_gain_and_zero_management_fees(
     performance_fee = 5_000
     total_fee = gain // 2
 
-    initial_total_assets = vault.totalAssets()
-    initial_total_supply = vault.totalSupply()
     accountant = deploy_accountant(vault)
     # add debt to strategy
     add_debt_to_strategy(gov, strategy, vault, new_debt)
@@ -107,11 +106,12 @@ def test_process_report__with_gain_and_zero_management_fees(
         snapshot, abs=1
     )
 
+    chain.pending_timestamp = chain.pending_timestamp + days_to_secs(14)
+    # chain.mine(timestamp=chain.pending_timestamp)
     # Vault mints shares worth the fees to the accountant
-    share_price_before_minting_fees = (initial_total_assets) / initial_total_supply
+    accountant_balance = vault.balanceOf(accountant)
     assert (
-        pytest.approx(vault.balanceOf(accountant), rel=1e-5)
-        == total_fee / share_price_before_minting_fees
+        pytest.approx(vault.convertToAssets(accountant_balance), rel=1e-5) == total_fee
     )
 
 
@@ -166,10 +166,9 @@ def test_process_report__with_gain_and_zero_performance_fees(
     )
 
     # Vault mints shares worth the fees to the accountant
-    share_price_before_minting_fees = (initial_total_assets) / initial_total_supply
+    accountant_balance = vault.balanceOf(accountant)
     assert (
-        pytest.approx(vault.balanceOf(accountant), rel=1e-5)
-        == total_fee / share_price_before_minting_fees
+        pytest.approx(vault.convertToAssets(accountant_balance), rel=1e-5) == total_fee
     )
 
 
@@ -223,10 +222,9 @@ def test_process_report__with_gain_and_both_fees(
     )
 
     # Vault mints shares worth the fees to the accountant
-    share_price_before_minting_fees = (initial_total_assets) / initial_total_supply
+    accountant_balance = vault.balanceOf(accountant)
     assert (
-        pytest.approx(vault.balanceOf(accountant), rel=1e-5)
-        == total_fee / share_price_before_minting_fees
+        pytest.approx(vault.convertToAssets(accountant_balance), rel=1e-5) == total_fee
     )
 
 
@@ -248,9 +246,6 @@ def test_process_report__with_fees_exceeding_fee_cap(
     management_fee = 5000
     performance_fee = 5000
     max_fee = gain * 3 // 4  # max fee set at 3/4
-
-    initial_total_assets = vault.totalAssets()
-    initial_total_supply = vault.totalSupply()
 
     accountant = deploy_accountant(vault)
     # add debt to strategy
@@ -282,11 +277,8 @@ def test_process_report__with_fees_exceeding_fee_cap(
     )
 
     # Vault mints shares worth the fees to the accountant
-    share_price_before_minting_fees = initial_total_assets / initial_total_supply
-    assert (
-        pytest.approx(vault.balanceOf(accountant), rel=1e-5)
-        == max_fee / share_price_before_minting_fees
-    )
+    accountant_balance = vault.balanceOf(accountant)
+    assert pytest.approx(vault.convertToAssets(accountant_balance), rel=1e-5) == max_fee
 
 
 def test_process_report__with_loss(
@@ -359,7 +351,6 @@ def test_process_report__with_loss_and_management_fees(
     initial_total_assets = vault.totalAssets()
 
     expected_management_fees = vault_balance // 10
-    expected_management_shares = vault.convertToShares(expected_management_fees)
     snapshot = chain.pending_timestamp
 
     tx = vault.process_report(lossy_strategy.address, sender=gov)
@@ -378,8 +369,8 @@ def test_process_report__with_loss_and_management_fees(
     assert vault.strategies(lossy_strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
-    assert vault.balanceOf(accountant) == pytest.approx(
-        expected_management_shares, rel=1e-5
+    assert vault.convertToAssets(vault.balanceOf(accountant)) == pytest.approx(
+        expected_management_fees, rel=1e-5
     )
 
     # Without fees, pps would be 0.5, as loss is half of debt, but with fees pps should be even lower
@@ -509,7 +500,9 @@ def test_process_report__with_loss_management_fees_and_refunds(
     # Due to fees, pps should be slightly below 1
     assert vault.price_per_share() < pps_before_loss
     # Shares were minted at 1:1
-    assert vault.balanceOf(accountant) == pytest.approx(expected_management_fees, 1e-4)
+    assert vault.convertToAssets(vault.balanceOf(accountant)) == pytest.approx(
+        expected_management_fees, 1e-4
+    )
 
 
 def test_set_accountant__with_accountant(gov, vault, deploy_accountant):
