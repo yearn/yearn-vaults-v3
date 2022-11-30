@@ -94,25 +94,23 @@ def keeper(accounts):
     yield accounts[11]
 
 
-# TODO: uncomment decimals to check different tokens
+# Expects a comma separated string of token decimals or real tokens to test with (e.g. "6,8,18,usdt")
+# Set you ENV variable 'TOKENS_TO_TEST' to desire decimals for local testing
+TOKENS_TO_TEST = os.getenv("TOKENS_TO_TEST", default="6").split(",")
+
+
 @pytest.fixture(
     scope="session",
-    params=[
-        ("create", 18),
-        # ("create", 8),
-        # ("create", 6),
-        # ("mock", "usdt"),
-    ],
+    params=TOKENS_TO_TEST,
 )
 def asset(create_token, mock_real_token, request):
-    operation = request.param[0]
-    arg = request.param[1]
-    assert operation in ("create", "mock")
-
-    if operation == "create":
-        return create_token("asset", decimals=arg)
-    elif operation == "mock":
-        return mock_real_token(name=arg)
+    try:
+        token_decimals = int(request.param)
+        # We assume is the number of decimals of the token
+        return create_token("asset", decimals=token_decimals)
+    except:
+        # We assume is the name of the real token to test with
+        return mock_real_token(name=request.param)
 
 
 # use this for token mock
