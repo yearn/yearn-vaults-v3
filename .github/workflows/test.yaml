@@ -12,8 +12,8 @@ concurrency:
 
 jobs:
   tests:
-    continue-on-error: true
     strategy:
+      fail-fast: false
       matrix:
         tokens_to_test: [6, 8, 18, usdt]
     runs-on: ubuntu-latest
