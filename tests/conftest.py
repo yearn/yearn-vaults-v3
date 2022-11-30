@@ -94,9 +94,9 @@ def keeper(accounts):
     yield accounts[11]
 
 
-# Expects a comma separated string of token decimals or real tokens to test with (e.g. 'usdt')
+# Expects a comma separated string of token decimals or real tokens to test with (e.g. "6,8,18,usdt")
 # Set you ENV variable 'TOKENS_TO_TEST' to desire decimals for local testing
-TOKENS_TO_TEST = os.getenv("TOKENS_TO_TEST", default="6,8,18,usdt").split(",")
+TOKENS_TO_TEST = os.getenv("TOKENS_TO_TEST", default="6").split(",")
 
 
 @pytest.fixture(
