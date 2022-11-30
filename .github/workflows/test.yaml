@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   tests:
+    continue-on-error: true
     strategy:
       matrix:
         tokens_to_test: [6, 8, 18, usdt]
