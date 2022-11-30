@@ -12,6 +12,9 @@ concurrency:
 
 jobs:
   tests:
+    strategy:
+      matrix:
+        tokens_to_run: [6, usdt]
     runs-on: ubuntu-latest
 
     steps:
@@ -43,4 +46,4 @@ jobs:
       run: ape test -s
       timeout-minutes: 15
       env:
-        TOKENS_TO_RUN: "6,8"
+        TOKENS_TO_RUN: ${{ matrix.tokens_to_run }}

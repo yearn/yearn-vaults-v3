@@ -94,7 +94,7 @@ def keeper(accounts):
     yield accounts[11]
 
 
-# Expects a list of token decimals or real tokens to test with (e.g. 'usdt')
+# Expects a comma separated string of token decimals or real tokens to test with (e.g. 'usdt')
 TOKENS_TO_RUN = os.getenv("TOKENS_TO_RUN", default="18,8,6,usdt").split(",")
 
 
