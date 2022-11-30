@@ -1,4 +1,3 @@
-from _pytest.warning_types import warn_explicit_for
 from utils.utils import days_to_secs
 from utils.constants import MAX_BPS, MAX_BPS_ACCOUNTANT, WEEK, YEAR, DAY
 from ape import chain, reverts
@@ -1128,7 +1127,6 @@ def test_gain_fees_no_refunds_not_enough_buffer(
         first_profit,
         first_profit * first_performance_fee / MAX_BPS_ACCOUNTANT,
     )
-
     assert_price_per_share(vault, 1.0)
     check_vault_totals(
         vault,
@@ -1203,7 +1201,6 @@ def test_gain_fees_no_refunds_not_enough_buffer(
     )
 
     assert vault.balanceOf(vault) == 0
-
     check_vault_totals(
         vault,
         total_debt=amount + first_profit + second_profit,
@@ -1215,7 +1212,7 @@ def test_gain_fees_no_refunds_not_enough_buffer(
         * second_performance_fee
         / MAX_BPS_ACCOUNTANT
         / vault.price_per_share()
-        * 1e18,
+        * 10 ** vault.decimals(),
     )
 
     # We update strategy debt to 0
@@ -1235,7 +1232,7 @@ def test_gain_fees_no_refunds_not_enough_buffer(
         * second_performance_fee
         / MAX_BPS_ACCOUNTANT
         / vault.price_per_share()
-        * 1e18,
+        * 10 ** vault.decimals(),
     )
 
     # Fish redeems shares
@@ -1251,7 +1248,7 @@ def test_gain_fees_no_refunds_not_enough_buffer(
         * second_performance_fee
         / MAX_BPS_ACCOUNTANT
         / vault.price_per_share()
-        * 1e18,
+        * 10 ** vault.decimals(),
     )
 
     assert asset.balanceOf(fish) < fish_amount
