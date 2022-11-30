@@ -42,3 +42,5 @@ jobs:
     - name: Run tests
       run: ape test -s
       timeout-minutes: 15
+      env:
+        TOKENS_TO_RUN: "6,8"
