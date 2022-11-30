@@ -28,7 +28,7 @@ def test__report_with_no_protocol_fees(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, amount)
 
-    assert vault.price_per_share() == int(10**18)
+    assert vault.price_per_share() == int(10 ** vault.decimals())
     # We increase time after profit has been released and check estimation
     tx = vault.process_report(strategy, sender=gov)
 
@@ -37,7 +37,7 @@ def test__report_with_no_protocol_fees(
 
     shares_protocol = vault.balanceOf(gov.address)
     assert vault.convertToAssets(shares_protocol) == 0
-    assert vault.price_per_share() == int(10**18)
+    assert vault.price_per_share() == int(10 ** vault.decimals())
 
 
 def test__report_with_protocol_fees__set_pre_vault_deploy(
@@ -65,7 +65,7 @@ def test__report_with_protocol_fees__set_pre_vault_deploy(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, amount)
 
-    assert vault.price_per_share() == int(10**18)
+    assert vault.price_per_share() == int(10 ** vault.decimals())
     days_passed = 365
     # We increase time after profit has been released and check estimation
     chain.pending_timestamp = vault.last_report() + days_to_secs(days_passed)
@@ -76,10 +76,12 @@ def test__report_with_protocol_fees__set_pre_vault_deploy(
 
     shares_protocol = vault.balanceOf(gov.address)
     assert (
-        pytest.approx(vault.convertToAssets(shares_protocol), rel=1e-7)
+        pytest.approx(vault.convertToAssets(shares_protocol), rel=1e-6)
         == amount * 0.0025 * days_passed / 365
     )
-    assert vault.price_per_share() == int(10**18) * (1 - 0.0025 * days_passed / 365)
+    assert vault.price_per_share() == int(10 ** vault.decimals()) * (
+        1 - 0.0025 * days_passed / 365
+    )
 
 
 def test__report_with_protocol_fees__set_post_vault_deploy(
@@ -111,7 +113,7 @@ def test__report_with_protocol_fees__set_post_vault_deploy(
     vault_factory.set_protocol_fee_bps(25, sender=gov)
     vault_factory.set_protocol_fee_recipient(gov.address, sender=gov)
 
-    assert vault.price_per_share() == int(10**18)
+    assert vault.price_per_share() == int(10 ** vault.decimals())
     days_passed = 365
     # We increase time after profit has been released and check estimation
     chain.pending_timestamp = (
@@ -124,10 +126,12 @@ def test__report_with_protocol_fees__set_post_vault_deploy(
 
     shares_protocol = vault.balanceOf(gov.address)
     assert (
-        pytest.approx(vault.convertToAssets(shares_protocol), rel=1e-7)
+        pytest.approx(vault.convertToAssets(shares_protocol), rel=1e-6)
         == amount * 0.0025 * days_passed / 365
     )
-    assert vault.price_per_share() == int(10**18) * (1 - 0.0025 * days_passed / 365)
+    assert vault.price_per_share() == int(10 ** vault.decimals()) * (
+        1 - 0.0025 * days_passed / 365
+    )
 
 
 def test__report_several_times_in_a_day(
@@ -155,7 +159,7 @@ def test__report_several_times_in_a_day(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, amount)
 
-    assert vault.price_per_share() == int(10**18)
+    assert vault.price_per_share() == int(10 ** vault.decimals())
     days_passed = 365
     # We increase time after profit has been released and check estimation
     chain.pending_timestamp = vault.last_report() + days_to_secs(days_passed)
@@ -166,10 +170,12 @@ def test__report_several_times_in_a_day(
 
     shares_protocol = vault.balanceOf(gov.address)
     assert (
-        pytest.approx(vault.convertToAssets(shares_protocol), rel=1e-7)
+        pytest.approx(vault.convertToAssets(shares_protocol), rel=1e-6)
         == amount * 0.0025 * days_passed / 365
     )
-    assert vault.price_per_share() == int(10**18) * (1 - 0.0025 * days_passed / 365)
+    assert vault.price_per_share() == int(10 ** vault.decimals()) * (
+        1 - 0.0025 * days_passed / 365
+    )
     # When a day has not passed, no new protocol fees are charged
     chain.pending_timestamp = vault.last_report() + int(days_to_secs(0.75))
     tx = vault.process_report(strategy, sender=gov)
