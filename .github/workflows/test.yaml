@@ -14,7 +14,7 @@ jobs:
   tests:
     strategy:
       matrix:
-        tokens_to_run: [6, usdt]
+        tokens_to_test: [6, 8, 18, usdt]
     runs-on: ubuntu-latest
 
     steps:
@@ -46,4 +46,4 @@ jobs:
       run: ape test -s
       timeout-minutes: 15
       env:
-        TOKENS_TO_RUN: ${{ matrix.tokens_to_run }}
+        TOKENS_TO_TEST: ${{ matrix.tokens_to_test }}

@@ -95,12 +95,13 @@ def keeper(accounts):
 
 
 # Expects a comma separated string of token decimals or real tokens to test with (e.g. 'usdt')
-TOKENS_TO_RUN = os.getenv("TOKENS_TO_RUN", default="18,8,6,usdt").split(",")
+# Set you ENV variable 'TOKENS_TO_TEST' to desire decimals for local testing
+TOKENS_TO_TEST = os.getenv("TOKENS_TO_TEST", default="6,8,18,usdt").split(",")
 
 
 @pytest.fixture(
     scope="session",
-    params=TOKENS_TO_RUN,
+    params=TOKENS_TO_TEST,
 )
 def asset(create_token, mock_real_token, request):
     try:
