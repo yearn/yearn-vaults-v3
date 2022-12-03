@@ -493,7 +493,6 @@ def test_set_deposit_limit__with_deposit_limit(project, gov, asset, deposit_limi
     assert vault.deposit_limit() == deposit_limit
 
 
-
 def create_profit(
     asset,
     strategy,
@@ -522,7 +521,9 @@ def test__mint_shares_with_zero_total_supply_positive_assets(
     vault, strategy, _ = initial_set_up(asset, gov, amount, fish)
     create_profit(asset, strategy, gov, vault, first_profit)
     vault.update_debt(strategy, int(0), sender=gov)
-    assert vault.totalSupply() > amount # there are more shares than deposits (due to profit unlock)
+    assert (
+        vault.totalSupply() > amount
+    )  # there are more shares than deposits (due to profit unlock)
 
     # User redeems shares
     vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
