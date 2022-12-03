@@ -491,3 +491,50 @@ def test_set_deposit_limit__with_deposit_limit(project, gov, asset, deposit_limi
 
     assert event[0].deposit_limit == deposit_limit
     assert vault.deposit_limit() == deposit_limit
+
+
+
+def create_profit(
+    asset,
+    strategy,
+    gov,
+    vault,
+    profit,
+    total_fees=0,
+    total_refunds=0,
+    by_pass_fees=False,
+):
+    # We create a virtual profit
+    initial_debt = vault.strategies(strategy).current_debt
+    asset.transfer(strategy, profit, sender=gov)
+    tx = vault.process_report(strategy, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyReported))
+
+    return event[0].total_fees
+
+
+def test__mint_shares_with_zero_total_supply_positive_assets(
+    asset, fish_amount, fish, initial_set_up, gov
+):
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
+
+    vault, strategy, _ = initial_set_up(asset, gov, amount, fish)
+    create_profit(asset, strategy, gov, vault, first_profit)
+    vault.update_debt(strategy, int(0), sender=gov)
+    assert vault.totalSupply() > amount # there are more shares than deposits (due to profit unlock)
+
+    # User redeems shares
+    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+
+    assert vault.totalSupply() > 0
+
+    ape.chain.mine(timestamp=ape.chain.pending_timestamp + 14 * 24 * 3600)
+
+    assert vault.totalSupply() == 0
+
+    vault.deposit(amount, fish, sender=fish)
+
+    # shares should be minted at 1:1
+    assert vault.balanceOf(fish) == amount
+    assert vault.price_per_share() > (10 ** vault.decimals())
