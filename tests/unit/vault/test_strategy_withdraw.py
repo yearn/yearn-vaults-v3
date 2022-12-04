@@ -627,3 +627,59 @@ def test_withdraw__half_of_strategy_assets_from_lossy_strategy_with_unrealised_l
         asset.balanceOf(fish) == amount_to_withdraw - amount_to_lose // 2
     )  # it only takes half loss
     assert vault.balanceOf(fish) == amount - amount_to_withdraw
+
+
+def test_withdraw__with_multiple_liquid_strategies_more_assets_than_debt__withdraws(
+    gov,
+    fish,
+    fish_amount,
+    asset,
+    create_vault,
+    create_strategy,
+    airdrop_asset,
+    user_deposit,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+):
+    vault = create_vault(asset)
+    amount = fish_amount
+    amount_per_strategy = amount // 2  # deposit half of amount per strategy
+    shares = amount
+    first_strategy = create_strategy(vault)
+    second_strategy = create_strategy(vault)
+    strategies = [first_strategy, second_strategy]
+    profit = (
+        amount_per_strategy + 1
+    )  # enough so that it could serve a full withdraw with the profit
+    # deposit assets to vault
+    user_deposit(fish, vault, asset, amount)
+
+    # set up strategies
+    vault.set_role(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
+    for strategy in strategies:
+        add_strategy_to_vault(gov, strategy, vault)
+        add_debt_to_strategy(gov, strategy, vault, amount_per_strategy)
+
+    airdrop_asset(gov, asset, gov, fish_amount)
+    asset.transfer(first_strategy, profit, sender=gov)
+
+    tx = vault.withdraw(
+        shares, fish.address, fish.address, [s.address for s in strategies], sender=fish
+    )
+    event = list(tx.decode_logs(vault.Withdraw))
+
+    assert vault.totalAssets() == 0
+    assert len(event) >= 1
+    n = len(event) - 1
+    assert event[n].sender == fish
+    assert event[n].receiver == fish
+    assert event[n].owner == fish
+    assert event[n].shares == shares
+    assert event[n].assets == amount
+
+    checks.check_vault_empty(vault)
+    assert asset.balanceOf(vault) == 0
+    assert first_strategy.totalAssets() == profit
+    assert asset.balanceOf(first_strategy) == profit
+    assert asset.balanceOf(second_strategy) == 0
+    assert asset.balanceOf(fish) == amount
