@@ -530,7 +530,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
                 curr_total_debt -= unrealised_losses_share
             
             # After losses are taken, vault asks what is the max amount to withdraw
-            assets_to_withdraw = min(assets_to_withdraw, IStrategy(strategy).maxWithdraw(self))
+            assets_to_withdraw = min(assets_to_withdraw, min(self.strategies[strategy].current_debt, IStrategy(strategy).maxWithdraw(self)))
 
             # continue to next strategy if nothing to withdraw
             if assets_to_withdraw == 0:
