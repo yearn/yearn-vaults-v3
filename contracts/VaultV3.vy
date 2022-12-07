@@ -17,6 +17,7 @@ interface IStrategy:
     def convertToAssets(shares: uint256) -> (uint256): view
     def convertToShares(assets: uint256) -> (uint256): view
     def migrate(strategy: address): nonpayable
+    def tend(): nonpayable
 
 interface IAccountant:
     def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
@@ -639,7 +640,7 @@ def _migrate_strategy(new_strategy: address, old_strategy: address, call_migrate
 def _tend_strategy(strategy: address):
   assert self.strategies[strategy].activation != 0, "strategy not active"
 
-  strategy.tend()
+  IStrategy(strategy).tend()
 
 # DEBT MANAGEMENT #
 @internal
