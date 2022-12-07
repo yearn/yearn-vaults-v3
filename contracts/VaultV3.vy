@@ -116,6 +116,7 @@ enum Roles:
     DEBT_MANAGER
     EMERGENCY_MANAGER
     ACCOUNTING_MANAGER
+    KEEPER
 
 # IMMUTABLE #
 ASSET: immutable(ERC20)
@@ -634,6 +635,12 @@ def _migrate_strategy(new_strategy: address, old_strategy: address, call_migrate
 
     log StrategyMigrated(old_strategy, new_strategy)
 
+@internal
+def _tend_strategy(strategy: address):
+  assert self.strategies[strategy].activation != 0, "strategy not active"
+
+  strategy.tend()
+
 # DEBT MANAGEMENT #
 @internal
 def _update_debt(strategy: address, target_debt: uint256) -> uint256:
@@ -965,6 +972,11 @@ def revoke_strategy(old_strategy: address):
 def migrate_strategy(new_strategy: address, old_strategy: address, call_migrate_strategy: bool=True):
     self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
     self._migrate_strategy(new_strategy, old_strategy, call_migrate_strategy)
+
+@external
+def tend_strategy(strategy: address):
+    self._enforce_role(msg.sender, Roles.KEEPER)
+    self._tend_strategy(strategy)
 
 ## DEBT MANAGEMENT ##
 @external
