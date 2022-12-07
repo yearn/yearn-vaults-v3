@@ -13,10 +13,16 @@ abstract contract ERC4626BaseStrategyMock is ERC4626BaseStrategy {
     uint256 public minDebt;
     uint256 public maxDebt = type(uint256).max;
 
+    event Tend();
+
     constructor(address _vault, address _asset)
         ERC4626BaseStrategy(_vault, _asset)
         ERC20("a", "a")
     {}
+
+    function tend() external {
+        emit Tend();
+    }
 
     function migrate(address newStrategy) external override {
         IERC20(asset()).safeTransfer(newStrategy, IERC20(asset()).balanceOf(address(this)));
