@@ -96,7 +96,7 @@ def keeper(accounts):
 
 # Expects a comma separated string of token decimals or real tokens to test with (e.g. "6,8,18,usdt")
 # Set you ENV variable 'TOKENS_TO_TEST' to desire decimals for local testing
-TOKENS_TO_TEST = os.getenv("TOKENS_TO_TEST", default="6").split(",")
+TOKENS_TO_TEST = os.getenv("TOKENS_TO_TEST", default="18").split(",")
 
 
 @pytest.fixture(

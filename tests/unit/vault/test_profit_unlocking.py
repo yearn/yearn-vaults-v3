@@ -601,10 +601,10 @@ def test_gain_fees_no_refunds_no_existing_buffer(
     # Fish redeems shares
     tx = vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
     withdraw_assets = list(tx.decode_logs(vault.Withdraw))[0].assets
-    withdrawn_diff = (
+    withdrawn_diff = int(
         amount
         + first_profit
-        - first_profit * performance_fee / MAX_BPS_ACCOUNTANT
+        - first_profit * performance_fee // MAX_BPS_ACCOUNTANT
         - withdraw_assets
     )
 
