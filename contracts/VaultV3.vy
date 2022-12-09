@@ -802,6 +802,13 @@ def _process_report(strategy: address) -> (uint256, uint256):
       shares_to_burn = self._convert_to_shares(loss + total_fees)
 
     newly_locked_shares: uint256 = 0
+    if total_refunds > 0:
+        # if refunds are non-zero, transfer shares worth of assets
+        total_refunds_shares: uint256 = min(self._convert_to_shares(total_refunds), self.balance_of[accountant])
+        # Shares received as a refund are locked to avoid sudden pps change (like profits)
+        self._transfer(accountant, self, total_refunds_shares)
+        newly_locked_shares += total_refunds_shares
+
     if gain > 0:
         # NOTE: this will increase total_assets
         self.strategies[strategy].current_debt += gain
@@ -810,13 +817,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
         # NOTE: vault will issue shares worth the profit to avoid instant pps change
         newly_locked_shares += self._issue_shares_for_amount(gain, self)
 
-    if total_refunds > 0:
-        # if refunds are non-zero, transfer assets
-        total_refunds = min(total_refunds, self.balance_of[accountant])
-        # Shares received as a refund are locked to avoid sudden pps change (like profits)
-        self._transfer(accountant, self, total_refunds)
-        newly_locked_shares += total_refunds
- 
     # Strategy is reporting a loss
     if loss > 0:
         self.strategies[strategy].current_debt -= loss

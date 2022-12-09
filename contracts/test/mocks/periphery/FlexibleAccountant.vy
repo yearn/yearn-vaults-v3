@@ -1,4 +1,4 @@
-# @version 0.3.4
+# @version 0.3.7
 
 # FeeManager without any fee threshold
 
@@ -13,6 +13,8 @@ struct StrategyParams:
 
 interface IVault:
     def strategies(strategy: address) -> StrategyParams: view
+    def asset() -> address: view
+    def deposit(assets: uint256, receiver: address) -> uint256: nonpayable
 
 interface IStrategy:
     def delegatedAssets() -> uint256: view
@@ -95,20 +97,39 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
         / SECS_PER_YEAR
     )
 
+    asset_balance: uint256= ERC20(IVault(self.asset).asset()).balanceOf(self)
+
     if gain > 0:
         total_fees += (gain * fee.performance_fee) / MAX_BPS
-        total_refunds = gain * refund_ratio / MAX_BPS
+        total_refunds = min(asset_balance, gain * refund_ratio / MAX_BPS)
     else:
-        # total_refunds = loss
         # Now taking loss from its own funds. In the future versions could be from different mecanisms
-        asset_balance: uint256= ERC20(self.asset).balanceOf(self)
-        total_refunds = loss * refund_ratio / MAX_BPS
-        if total_refunds > asset_balance:
-            total_refunds = asset_balance
-        #if total_refunds != 0:
-           # TODO: permissions implications. msg.sender should only be vault
-            #ERC20(self.asset).approve(msg.sender, total_refunds)
+        total_refunds = min(asset_balance, loss * refund_ratio / MAX_BPS)
+        
+    # accountant will deposit whatever it needs to avoid complex math in tests
+    # WARNING: do not use this in production
+    if total_refunds > 0:
+      self.erc20_safe_approve(IVault(self.asset).asset(), msg.sender, total_refunds)
+      IVault(msg.sender).deposit(total_refunds, self) 
+
     return (total_fees, total_refunds)
+
+@internal
+def erc20_safe_approve(token: address, spender: address, amount: uint256):
+    # Used only to send tokens that are not the type managed by this Vault.
+    # HACK: Used to handle non-compliant tokens like USDT
+    response: Bytes[32] = raw_call(
+        token,
+        concat(
+            method_id("approve(address,uint256)"),
+            convert(spender, bytes32),
+            convert(amount, bytes32),
+        ),
+        max_outsize=32,
+    )
+    if len(response) > 0:
+        assert convert(response, bool), "Transfer failed!"
+
 
 
 @external
@@ -149,7 +170,7 @@ def commit_fee_manager(future_fee_manager: address):
 @external
 def apply_fee_manager():
     assert msg.sender == self.fee_manager, "not fee manager"
-    assert self.future_fee_manager != ZERO_ADDRESS, "future fee manager != zero address"
+    assert self.future_fee_manager != empty(address), "future fee manager != zero address"
     future_fee_manager: address = self.future_fee_manager
     self.fee_manager = future_fee_manager
     log ApplyFeeManager(future_fee_manager)
