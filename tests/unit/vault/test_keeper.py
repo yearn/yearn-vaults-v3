@@ -52,5 +52,3 @@ def test_keeper_tends(
     event = list(tx.decode_logs(strategy.Tend))
 
     assert len(event) == 1
-
-    
