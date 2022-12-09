@@ -48,4 +48,9 @@ def test_keeper_tends(
 
     vault.set_role(fish.address, ROLES.KEEPER, sender=gov)
 
-    vault.tend_strategy(strategy, sender=fish)
+    tx = vault.tend_strategy(strategy, sender=fish)
+    event = list(tx.decode_logs(strategy.Tend))
+
+    assert len(event) == 1
+
+    
