@@ -17,6 +17,7 @@ interface IStrategy:
     def convertToAssets(shares: uint256) -> (uint256): view
     def convertToShares(assets: uint256) -> (uint256): view
     def migrate(strategy: address): nonpayable
+    def tend(): nonpayable
 
 interface IAccountant:
     def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
@@ -116,6 +117,7 @@ enum Roles:
     DEBT_MANAGER
     EMERGENCY_MANAGER
     ACCOUNTING_MANAGER
+    KEEPER
 
 # IMMUTABLE #
 ASSET: immutable(ERC20)
@@ -634,6 +636,12 @@ def _migrate_strategy(new_strategy: address, old_strategy: address, call_migrate
 
     log StrategyMigrated(old_strategy, new_strategy)
 
+@internal
+def _tend_strategy(strategy: address):
+  assert self.strategies[strategy].activation != 0, "strategy not active"
+
+  IStrategy(strategy).tend()
+
 # DEBT MANAGEMENT #
 @internal
 def _update_debt(strategy: address, target_debt: uint256) -> uint256:
@@ -794,6 +802,13 @@ def _process_report(strategy: address) -> (uint256, uint256):
       shares_to_burn = self._convert_to_shares(loss + total_fees)
 
     newly_locked_shares: uint256 = 0
+    if total_refunds > 0:
+        # if refunds are non-zero, transfer shares worth of assets
+        total_refunds_shares: uint256 = min(self._convert_to_shares(total_refunds), self.balance_of[accountant])
+        # Shares received as a refund are locked to avoid sudden pps change (like profits)
+        self._transfer(accountant, self, total_refunds_shares)
+        newly_locked_shares += total_refunds_shares
+
     if gain > 0:
         # NOTE: this will increase total_assets
         self.strategies[strategy].current_debt += gain
@@ -802,13 +817,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
         # NOTE: vault will issue shares worth the profit to avoid instant pps change
         newly_locked_shares += self._issue_shares_for_amount(gain, self)
 
-    if total_refunds > 0:
-        # if refunds are non-zero, transfer assets
-        total_refunds = min(total_refunds, self.balance_of[accountant])
-        # Shares received as a refund are locked to avoid sudden pps change (like profits)
-        self._transfer(accountant, self, total_refunds)
-        newly_locked_shares += total_refunds
- 
     # Strategy is reporting a loss
     if loss > 0:
         self.strategies[strategy].current_debt -= loss
@@ -965,6 +973,11 @@ def revoke_strategy(old_strategy: address):
 def migrate_strategy(new_strategy: address, old_strategy: address, call_migrate_strategy: bool=True):
     self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
     self._migrate_strategy(new_strategy, old_strategy, call_migrate_strategy)
+
+@external
+def tend_strategy(strategy: address):
+    self._enforce_role(msg.sender, Roles.KEEPER)
+    self._tend_strategy(strategy)
 
 ## DEBT MANAGEMENT ##
 @external

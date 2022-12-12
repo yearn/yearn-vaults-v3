@@ -96,7 +96,7 @@ def keeper(accounts):
 
 # Expects a comma separated string of token decimals or real tokens to test with (e.g. "6,8,18,usdt")
 # Set you ENV variable 'TOKENS_TO_TEST' to desire decimals for local testing
-TOKENS_TO_TEST = os.getenv("TOKENS_TO_TEST", default="6").split(",")
+TOKENS_TO_TEST = os.getenv("TOKENS_TO_TEST", default="18").split(",")
 
 
 @pytest.fixture(
@@ -442,7 +442,7 @@ def initial_set_up(
         management_fee=0,
         performance_fee=0,
         refund_ratio=0,
-        accountant_deposit=fish_amount // 10,
+        accountant_mint=fish_amount // 10,
     ):
         """ """
         vault = create_vault(asset)
@@ -460,9 +460,9 @@ def initial_set_up(
                 performance_fee,
                 refund_ratio,
             )
-            airdrop_asset(gov, asset, accountant, fish_amount)
-            if accountant_deposit:
-                user_deposit(accountant, vault, asset, accountant_deposit)
+
+            if accountant_mint:
+                airdrop_asset(gov, asset, accountant, accountant_mint)
 
         # Deposit assets to vault and get strategy ready
         user_deposit(user, vault, asset, debt_amount)
@@ -494,7 +494,7 @@ def initial_set_up_lossy(
         management_fee=0,
         performance_fee=0,
         refund_ratio=0,
-        accountant_deposit=fish_amount // 10,
+        accountant_mint=0,
     ):
         """ """
         vault = create_vault(asset)
@@ -512,9 +512,8 @@ def initial_set_up_lossy(
                 performance_fee,
                 refund_ratio,
             )
-            airdrop_asset(gov, asset, accountant, fish_amount)
-            if accountant_deposit:
-                user_deposit(accountant, vault, asset, accountant_deposit)
+            if accountant_mint:
+                airdrop_asset(gov, asset, accountant, accountant_mint)
 
         # Deposit assets to vault and get strategy ready
         user_deposit(user, vault, asset, debt_amount)
