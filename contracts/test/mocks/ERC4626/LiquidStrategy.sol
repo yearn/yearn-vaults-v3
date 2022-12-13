@@ -7,7 +7,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract ERC4626LiquidStrategy is ERC4626BaseStrategyMock {
     using SafeERC20 for IERC20;
-    
+
     constructor(address _vault, address _asset)
         ERC4626BaseStrategyMock(_vault, _asset)
     {}
@@ -31,6 +31,9 @@ contract ERC4626LiquidStrategy is ERC4626BaseStrategyMock {
     }
 
     function migrate(address newStrategy) external override {
-        IERC20(asset()).safeTransfer(newStrategy, IERC20(asset()).balanceOf(address(this)));
+        IERC20(asset()).safeTransfer(
+            newStrategy,
+            IERC20(asset()).balanceOf(address(this))
+        );
     }
 }
