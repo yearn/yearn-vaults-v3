@@ -58,9 +58,9 @@ contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
         return IERC20(asset()).balanceOf(address(this));
     }
 
-    function migrate(address newStrategy) external override {
+    function migrate(address _newStrategy) external override {
         IERC20(asset()).safeTransfer(
-            newStrategy,
+            _newStrategy,
             IERC20(asset()).balanceOf(address(this))
         );
     }
