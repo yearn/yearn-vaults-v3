@@ -57,4 +57,8 @@ contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
     function maxWithdraw(address) public view override returns (uint256) {
         return IERC20(asset()).balanceOf(address(this));
     }
+
+    function migrate(address newStrategy) external override {
+        IERC20(asset()).safeTransfer(newStrategy, IERC20(asset()).balanceOf(address(this)));
+    }
 }
