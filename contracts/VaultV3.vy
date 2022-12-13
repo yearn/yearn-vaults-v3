@@ -720,7 +720,6 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         # if insufficient funds to deposit, transfer only what is free
         if assets_to_deposit > available_idle:
             assets_to_deposit = available_idle
-            new_debt = current_debt + assets_to_deposit
 
         if assets_to_deposit > 0:
             self.erc20_safe_approve(ASSET.address, strategy, assets_to_deposit)
