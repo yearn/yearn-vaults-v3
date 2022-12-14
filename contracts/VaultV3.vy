@@ -948,13 +948,14 @@ def process_report(strategy: address) -> (uint256, uint256):
 @external
 def sweep(token: address) -> (uint256):
     self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
+    assert token != self, "can't sweep self"
     amount: uint256 = 0
     if token == ASSET.address:
         amount = ASSET.balanceOf(self) - self.total_idle
     else:
         amount = ERC20(token).balanceOf(self)
     assert amount != 0, "no dust"
-    self.erc20_safe_transfer(ASSET.address, msg.sender, amount)
+    self.erc20_safe_transfer(token, msg.sender, amount)
     log Sweep(token, amount)
     return amount
 
