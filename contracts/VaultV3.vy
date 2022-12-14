@@ -627,8 +627,8 @@ def _migrate_strategy(new_strategy: address, old_strategy: address, call_migrate
 
     # NOTE: we add strategy with same params than the strategy being migrated
     self.strategies[new_strategy] = StrategyParams({
-       activation: block.timestamp,
-       last_report: block.timestamp,
+       activation: migrated_strategy.activation,
+       last_report: migrated_strategy.last_report,
        current_debt: migrated_strategy.current_debt,
        max_debt: migrated_strategy.max_debt
        })
