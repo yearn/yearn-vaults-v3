@@ -77,7 +77,7 @@ def test_sweep__with_mock_token__withdraws_token(
 
     # give gov the amount of mock_token to airdrop
     mock_token.mint(gov, mock_token_airdrop, sender=gov)
-    # airdrop random token to vault
+    # airdrop mock token to vault
     airdrop_asset(gov, mock_token, vault, mock_token_airdrop)
 
     gov_balance = mock_token.balanceOf(gov)
