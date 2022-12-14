@@ -16,9 +16,11 @@ def test_sweep__with_asset_token_and_no_dust__reverts(gov, asset, vault):
     with ape.reverts("no dust"):
         vault.sweep(asset.address, sender=gov)
 
+
 def test_sweep__with_vault_token__reverts(gov, asset, vault):
     with ape.reverts("can't sweep self"):
         vault.sweep(vault.address, sender=gov)
+
 
 def test_sweep__with_asset_token__withdraws_airdrop_only(
     gov,
@@ -73,7 +75,7 @@ def test_sweep__with_mock_token__withdraws_token(
     mint_and_deposit_into_vault(vault, gov, vault_balance)
     add_debt_to_strategy(gov, strategy, vault, debt)
 
-    # give gov the amount of mock_token to airdrop 
+    # give gov the amount of mock_token to airdrop
     mock_token.mint(gov, mock_token_airdrop, sender=gov)
     # airdrop random token to vault
     airdrop_asset(gov, mock_token, vault, mock_token_airdrop)
