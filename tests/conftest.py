@@ -222,13 +222,22 @@ def create_locked_strategy(project, strategist):
     yield create_locked_strategy
 
 
-# create locked strategy with 0 fee
+# create lossy strategy with 0 fee
 @pytest.fixture(scope="session")
 def create_lossy_strategy(project, strategist):
     def create_lossy_strategy(vault):
         return strategist.deploy(project.ERC4626LossyStrategy, vault, vault.asset())
 
     yield create_lossy_strategy
+
+
+# create faulty strategy with 0 fee
+@pytest.fixture(scope="session")
+def create_faulty_strategy(project, strategist):
+    def create_faulty_strategy(vault):
+        return strategist.deploy(project.ERC4626FaultyStrategy, vault, vault.asset())
+
+    yield create_faulty_strategy
 
 
 @pytest.fixture(scope="session")
@@ -257,6 +266,14 @@ def locked_strategy(gov, vault, create_locked_strategy):
 @pytest.fixture(scope="session")
 def lossy_strategy(gov, vault, create_lossy_strategy):
     strategy = create_lossy_strategy(vault)
+    vault.add_strategy(strategy.address, sender=gov)
+    strategy.setMaxDebt(MAX_INT, sender=gov)
+    yield strategy
+
+
+@pytest.fixture(scope="session")
+def faulty_strategy(gov, vault, create_faulty_strategy):
+    strategy = create_faulty_strategy(vault)
     vault.add_strategy(strategy.address, sender=gov)
     strategy.setMaxDebt(MAX_INT, sender=gov)
     yield strategy
