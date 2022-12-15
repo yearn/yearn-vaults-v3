@@ -94,7 +94,7 @@ def test_migrate_strategy__with_no_debt(chain, gov, vault, strategy, create_stra
     old_strategy_params = vault.strategies(old_strategy)
     old_current_debt = old_strategy_params.current_debt
     old_max_debt = old_strategy_params.max_debt
-    old_activateion = old_strategy_params.activation
+    old_activation = old_strategy_params.activation
     old_last_report = old_strategy_params.last_report
 
     snapshot = chain.pending_timestamp
@@ -106,7 +106,7 @@ def test_migrate_strategy__with_no_debt(chain, gov, vault, strategy, create_stra
     assert event[0].new_strategy == new_strategy.address
 
     new_strategy_params = vault.strategies(new_strategy)
-    assert new_strategy_params.activation == old_activateion
+    assert new_strategy_params.activation == old_activation
     assert new_strategy_params.current_debt == old_current_debt
     assert new_strategy_params.max_debt == old_max_debt
     assert new_strategy_params.last_report == old_last_report
@@ -158,7 +158,7 @@ def test_migrate_strategy__with_existing_debt__migrates(
     old_strategy_params = vault.strategies(old_strategy)
     old_current_debt = old_strategy_params.current_debt
     old_max_debt = old_strategy_params.max_debt
-    old_activateion = old_strategy_params.activation
+    old_activation = old_strategy_params.activation
     old_last_report = old_strategy_params.last_report
 
     snapshot = chain.pending_timestamp
@@ -171,7 +171,7 @@ def test_migrate_strategy__with_existing_debt__migrates(
     assert event[0].new_strategy == new_strategy.address
 
     new_strategy_params = vault.strategies(new_strategy)
-    assert new_strategy_params.activation == old_activateion
+    assert new_strategy_params.activation == old_activation
     assert new_strategy_params.current_debt == old_current_debt
     assert new_strategy_params.max_debt == old_max_debt
     assert new_strategy_params.last_report == old_last_report
@@ -224,7 +224,7 @@ def test_migrate_locked_strategy__with_existing_debt__reverts(
     old_strategy_params = vault.strategies(old_strategy)
     old_current_debt = old_strategy_params.current_debt
     old_max_debt = old_strategy_params.max_debt
-    old_activateion = old_strategy_params.activation
+    old_activation = old_strategy_params.activation
     old_last_report = old_strategy_params.last_report
 
     snapshot = chain.pending_timestamp
@@ -237,7 +237,7 @@ def test_migrate_locked_strategy__with_existing_debt__reverts(
     assert event[0].new_strategy == new_strategy.address
 
     new_strategy_params = vault.strategies(new_strategy)
-    assert new_strategy_params.activation == old_activateion
+    assert new_strategy_params.activation == old_activation
     assert new_strategy_params.current_debt == old_current_debt
     assert new_strategy_params.max_debt == old_max_debt
     assert new_strategy_params.last_report == old_last_report
@@ -281,7 +281,7 @@ def test_migrate_lossy_strategy__with_existing_debt__migrates(
     old_strategy_params = vault.strategies(old_strategy)
     old_current_debt = old_strategy_params.current_debt
     old_max_debt = old_strategy_params.max_debt
-    old_activateion = old_strategy_params.activation
+    old_activation = old_strategy_params.activation
     old_last_report = old_strategy_params.last_report
 
     snapshot = chain.pending_timestamp
@@ -295,7 +295,7 @@ def test_migrate_lossy_strategy__with_existing_debt__migrates(
 
     # Funds should still migrate and current debt should stay the same since the loss hasn't been reported
     new_strategy_params = vault.strategies(new_strategy)
-    assert new_strategy_params.activation == old_activateion
+    assert new_strategy_params.activation == old_activation
     assert new_strategy_params.current_debt == old_current_debt
     assert new_strategy_params.max_debt == old_max_debt
     assert new_strategy_params.last_report == old_last_report
