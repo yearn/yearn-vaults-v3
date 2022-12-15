@@ -17,6 +17,11 @@ def test_sweep__with_asset_token_and_no_dust__reverts(gov, asset, vault):
         vault.sweep(asset.address, sender=gov)
 
 
+def test_sweep__with_vault_token__reverts(gov, asset, vault):
+    with ape.reverts("can't sweep self"):
+        vault.sweep(vault.address, sender=gov)
+
+
 def test_sweep__with_asset_token__withdraws_airdrop_only(
     gov,
     asset,
@@ -54,9 +59,9 @@ def test_sweep__with_asset_token__withdraws_airdrop_only(
     assert vault.totalAssets() == vault_balance
 
 
-def test_sweep__with_token__withdraws_token(
+def test_sweep__with_mock_token__withdraws_token(
     gov,
-    asset,
+    mock_token,
     vault,
     strategy,
     mint_and_deposit_into_vault,
@@ -70,17 +75,19 @@ def test_sweep__with_token__withdraws_token(
     mint_and_deposit_into_vault(vault, gov, vault_balance)
     add_debt_to_strategy(gov, strategy, vault, debt)
 
-    # airdrop random token to vault
-    airdrop_asset(gov, asset, vault, mock_token_airdrop)
+    # give gov the amount of mock_token to airdrop
+    mock_token.mint(gov, mock_token_airdrop, sender=gov)
+    # airdrop mock token to vault
+    airdrop_asset(gov, mock_token, vault, mock_token_airdrop)
 
-    gov_balance = asset.balanceOf(gov)
-    tx = vault.sweep(asset.address, sender=gov)
+    gov_balance = mock_token.balanceOf(gov)
+    tx = vault.sweep(mock_token.address, sender=gov)
     event = list(tx.decode_logs(vault.Sweep))
 
     assert len(event) == 1
-    assert event[0].token == asset.address
+    assert event[0].token == mock_token.address
     assert event[0].amount == mock_token_airdrop
 
-    assert asset.balanceOf(gov) == mock_token_airdrop + gov_balance
-    assert asset.balanceOf(vault) == vault_balance - debt
+    assert mock_token.balanceOf(gov) == mock_token_airdrop + gov_balance
+    assert mock_token.balanceOf(vault) == 0
     assert vault.totalAssets() == vault_balance

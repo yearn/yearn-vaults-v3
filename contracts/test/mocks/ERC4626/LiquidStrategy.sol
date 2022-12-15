@@ -2,10 +2,12 @@
 pragma solidity 0.8.14;
 
 import {ERC4626BaseStrategyMock, IERC20} from "./BaseStrategyMock.sol";
-
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract ERC4626LiquidStrategy is ERC4626BaseStrategyMock {
+    using SafeERC20 for IERC20;
+
     constructor(address _vault, address _asset)
         ERC4626BaseStrategyMock(_vault, _asset)
     {}
@@ -26,5 +28,12 @@ contract ERC4626LiquidStrategy is ERC4626BaseStrategyMock {
         returns (uint256)
     {
         return _convertToAssets(balanceOf(_owner), Math.Rounding.Down);
+    }
+
+    function migrate(address _newStrategy) external override {
+        IERC20(asset()).safeTransfer(
+            _newStrategy,
+            IERC20(asset()).balanceOf(address(this))
+        );
     }
 }
