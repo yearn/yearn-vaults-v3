@@ -612,7 +612,7 @@ def _revoke_strategy(old_strategy: address):
 @internal
 def _migrate_strategy(new_strategy: address, old_strategy: address, call_migrate_strategy: bool):
     assert self.strategies[old_strategy].activation != 0, "old strategy not active"
-    assert self.strategies[old_strategy].current_debt == 0, "old strategy has debt"
+    assert self.strategies[old_strategy].current_debt == 0 or call_migrate_strategy, "old strategy has debt"
     assert new_strategy != empty(address), "strategy cannot be zero address"
     assert IStrategy(new_strategy).asset() == ASSET.address, "invalid asset"
     assert IStrategy(new_strategy).vault() == self, "invalid vault"
@@ -622,16 +622,17 @@ def _migrate_strategy(new_strategy: address, old_strategy: address, call_migrate
 
     if call_migrate_strategy:
       IStrategy(old_strategy).migrate(new_strategy)
-
+      # update old strategies debt so it can be revoked if the debt was migrated
+      self.strategies[old_strategy].current_debt = 0
 
     # NOTE: we add strategy with same params than the strategy being migrated
     self.strategies[new_strategy] = StrategyParams({
-       activation: block.timestamp,
-       last_report: block.timestamp,
+       activation: migrated_strategy.activation,
+       last_report: migrated_strategy.last_report,
        current_debt: migrated_strategy.current_debt,
        max_debt: migrated_strategy.max_debt
        })
-
+    
     self._revoke_strategy(old_strategy)
 
     log StrategyMigrated(old_strategy, new_strategy)
