@@ -772,7 +772,12 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     total_fees: uint256 = 0
     total_refunds: uint256 = 0
-   
+    
+    accountant: address = self.accountant
+    # if accountant is not set, fees and refunds remain unchanged
+    if accountant != empty(address):
+        total_fees, total_refunds = IAccountant(accountant).report(strategy, gain, loss)
+
     # Protocol fee assessment
     protocol_fees: uint256 = 0
     protocol_fee_recipient: address = empty(address)
@@ -790,11 +795,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
         protocol_fees = convert(protocol_fee_bps, uint256) * self._total_assets() * seconds_since_last_report / 24 / 365 / 3600 / MAX_BPS
         total_fees += protocol_fees
         self.last_report = block.timestamp
-
-    accountant: address = self.accountant
-    # if accountant is not set, fees and refunds remain unchanged
-    if accountant != empty(address):
-        total_fees, total_refunds = IAccountant(accountant).report(strategy, gain, loss)
    
     # We calculate the amount of shares that could be insta unlocked to avoid pps changes
     # NOTE: this needs to be done before any pps changes
