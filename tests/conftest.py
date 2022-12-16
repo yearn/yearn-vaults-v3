@@ -231,6 +231,15 @@ def create_lossy_strategy(project, strategist):
     yield create_lossy_strategy
 
 
+# create locked strategy with 0 fee
+@pytest.fixture(scope="session")
+def create_generic_strategy(project, strategist):
+    def create_generic_strategy(asset):
+        return strategist.deploy(project.Generic4626, asset)
+
+    yield create_generic_strategy
+
+
 @pytest.fixture(scope="session")
 def vault(gov, asset, create_vault):
     vault = create_vault(asset)
@@ -259,6 +268,13 @@ def lossy_strategy(gov, vault, create_lossy_strategy):
     strategy = create_lossy_strategy(vault)
     vault.add_strategy(strategy.address, sender=gov)
     strategy.setMaxDebt(MAX_INT, sender=gov)
+    yield strategy
+
+
+@pytest.fixture(scope="session")
+def generic_strategy(gov, vault, create_generic_strategy):
+    strategy = create_generic_strategy(vault.asset())
+    vault.add_strategy(strategy.address, sender=gov)
     yield strategy
 
 
