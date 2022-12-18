@@ -248,7 +248,6 @@ def create_generic_strategy(project, strategist):
     yield create_generic_strategy
 
 
-
 @pytest.fixture(scope="session")
 def vault(gov, asset, create_vault):
     vault = create_vault(asset)
@@ -286,6 +285,7 @@ def faulty_strategy(gov, vault, create_faulty_strategy):
     vault.add_strategy(strategy.address, sender=gov)
     strategy.setMaxDebt(MAX_INT, sender=gov)
     yield strategy
+
 
 @pytest.fixture(scope="session")
 def generic_strategy(gov, vault, create_generic_strategy):
