@@ -7,7 +7,6 @@ from vyper.interfaces import ERC20Detailed
 # INTERFACES #
 interface IStrategy:
     def asset() -> address: view
-    def vault() -> address: view
     def balanceOf(owner: address) -> uint256: view
     def maxDeposit(receiver: address) -> uint256: view
     def maxWithdraw(owner: address) -> uint256: view
@@ -582,7 +581,6 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
 def _add_strategy(new_strategy: address):
    assert new_strategy != empty(address), "strategy cannot be zero address"
    assert IStrategy(new_strategy).asset() == ASSET.address, "invalid asset"
-   assert IStrategy(new_strategy).vault() == self, "invalid vault"
    assert self.strategies[new_strategy].activation == 0, "strategy already active"
 
    self.strategies[new_strategy] = StrategyParams({
@@ -615,7 +613,6 @@ def _migrate_strategy(new_strategy: address, old_strategy: address, call_migrate
     assert self.strategies[old_strategy].current_debt == 0 or call_migrate_strategy, "old strategy has debt"
     assert new_strategy != empty(address), "strategy cannot be zero address"
     assert IStrategy(new_strategy).asset() == ASSET.address, "invalid asset"
-    assert IStrategy(new_strategy).vault() == self, "invalid vault"
     assert self.strategies[new_strategy].activation == 0, "strategy already active"
 
     migrated_strategy: StrategyParams = self.strategies[old_strategy]
@@ -777,7 +774,12 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     total_fees: uint256 = 0
     total_refunds: uint256 = 0
-   
+    
+    accountant: address = self.accountant
+    # if accountant is not set, fees and refunds remain unchanged
+    if accountant != empty(address):
+        total_fees, total_refunds = IAccountant(accountant).report(strategy, gain, loss)
+
     # Protocol fee assessment
     protocol_fees: uint256 = 0
     protocol_fee_recipient: address = empty(address)
@@ -795,11 +797,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
         protocol_fees = convert(protocol_fee_bps, uint256) * self._total_assets() * seconds_since_last_report / 24 / 365 / 3600 / MAX_BPS
         total_fees += protocol_fees
         self.last_report = block.timestamp
-
-    accountant: address = self.accountant
-    # if accountant is not set, fees and refunds remain unchanged
-    if accountant != empty(address):
-        total_fees, total_refunds = IAccountant(accountant).report(strategy, gain, loss)
    
     # We calculate the amount of shares that could be insta unlocked to avoid pps changes
     # NOTE: this needs to be done before any pps changes
