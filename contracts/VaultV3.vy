@@ -718,12 +718,17 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         # if insufficient funds to deposit, transfer only what is free
         if assets_to_deposit > available_idle:
             assets_to_deposit = available_idle
-            new_debt = current_debt + assets_to_deposit
 
         if assets_to_deposit > 0:
             self.erc20_safe_approve(ASSET.address, strategy, assets_to_deposit)
+            pre_balance: uint256 = ASSET.balanceOf(self)
             IStrategy(strategy).deposit(assets_to_deposit, self)
+            post_balance: uint256 = ASSET.balanceOf(self)
             self.erc20_safe_approve(ASSET.address, strategy, 0)
+
+            # making sure we are changing according to the real result no matter what. This will spend more gas but makes it more robust
+            assets_to_deposit = pre_balance - post_balance
+
             self.total_idle -= assets_to_deposit
             self.total_debt += assets_to_deposit
 

@@ -438,3 +438,119 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_total_idle_les
     assert asset.balanceOf(vault) == vault_balance + expected_new_difference
     assert vault.total_idle() == initial_idle + expected_new_difference
     assert vault.total_debt() == initial_debt - expected_new_difference
+
+
+def test_update_debt__with_faulty_strategy_that_deposits_less_than_requested(
+    gov, asset, vault, faulty_strategy, add_debt_to_strategy
+):
+    vault_balance = asset.balanceOf(vault)
+    current_debt = vault_balance
+    expected_debt = current_debt // 2
+    difference = current_debt - expected_debt  # maximum we can withdraw
+
+    add_debt_to_strategy(gov, faulty_strategy, vault, current_debt)
+
+    initial_idle = vault.total_idle()
+    initial_debt = vault.total_debt()
+
+    # check the strategy only took half and vault recorded it correctly
+    assert initial_idle == expected_debt
+    assert initial_debt == expected_debt
+    assert vault.strategies(faulty_strategy.address).current_debt == expected_debt
+    assert asset.balanceOf(faulty_strategy) == expected_debt
+
+
+def test_update_debt__with_faulty_strategy_that_withdraws_less_than_requested(
+    gov, asset, vault, faulty_strategy, add_debt_to_strategy
+):
+    vault_balance = asset.balanceOf(vault)
+
+    add_debt_to_strategy(gov, faulty_strategy, vault, vault_balance)
+
+    initial_idle = vault.total_idle()
+    initial_debt = vault.total_debt()
+    current_debt = vault.strategies(faulty_strategy.address).current_debt
+    new_debt = current_debt // 2
+    difference = current_debt - new_debt
+
+    tx = vault.update_debt(faulty_strategy.address, 0, sender=gov)
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 1
+    assert event[0].strategy == faulty_strategy.address
+    assert event[0].current_debt == current_debt
+    assert event[0].new_debt == new_debt
+
+    # assert we only got back half of what was requested and the vault recorded it correctly
+    assert vault.strategies(faulty_strategy.address).current_debt == new_debt
+    assert asset.balanceOf(faulty_strategy) == new_debt
+    assert asset.balanceOf(vault) == (vault_balance - new_debt)
+    assert vault.total_idle() == initial_idle + difference
+    assert vault.total_debt() == initial_debt - difference
+
+
+def test_update_debt__with_faulty_strategy_that_deposits_less_than_requested_with_airdrop(
+    gov,
+    asset,
+    vault,
+    faulty_strategy,
+    add_debt_to_strategy,
+    airdrop_asset,
+    fish_amount,
+):
+    vault_balance = asset.balanceOf(vault)
+    current_debt = vault_balance
+    expected_debt = current_debt // 2
+    difference = current_debt - expected_debt  # maximum we can withdraw
+
+    # airdrop some asset to the vault
+    airdrop_asset(gov, asset, vault, fish_amount)
+
+    add_debt_to_strategy(gov, faulty_strategy, vault, current_debt)
+
+    initial_idle = vault.total_idle()
+    initial_debt = vault.total_debt()
+
+    # check the strategy only took half and vault recorded it correctly
+    assert initial_idle == expected_debt
+    assert initial_debt == expected_debt
+    assert vault.strategies(faulty_strategy.address).current_debt == expected_debt
+    assert asset.balanceOf(faulty_strategy) == expected_debt
+
+
+def test_update_debt__with_faulty_strategy_that_withdraws_less_than_requested_with_airdrop(
+    gov,
+    asset,
+    vault,
+    faulty_strategy,
+    add_debt_to_strategy,
+    airdrop_asset,
+    fish_amount,
+):
+    vault_balance = asset.balanceOf(vault)
+
+    add_debt_to_strategy(gov, faulty_strategy, vault, vault_balance)
+
+    initial_idle = vault.total_idle()
+    initial_debt = vault.total_debt()
+    current_debt = vault.strategies(faulty_strategy.address).current_debt
+    new_debt = current_debt // 2
+    difference = current_debt - new_debt
+
+    # airdrop some asset to the vault
+    airdrop_asset(gov, asset, vault, fish_amount)
+
+    tx = vault.update_debt(faulty_strategy.address, 0, sender=gov)
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 1
+    assert event[0].strategy == faulty_strategy.address
+    assert event[0].current_debt == current_debt
+    assert event[0].new_debt == new_debt
+
+    # assert we only got back half of what was requested and the vault recorded it correctly
+    assert vault.strategies(faulty_strategy.address).current_debt == new_debt
+    assert asset.balanceOf(faulty_strategy) == new_debt
+    assert asset.balanceOf(vault) == (vault_balance - new_debt + fish_amount)
+    assert vault.total_idle() == initial_idle + difference
+    assert vault.total_debt() == initial_debt - difference
