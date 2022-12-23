@@ -2479,7 +2479,7 @@ def test_accountant_and_protcol_fees_doesnt_change_pps(
 
     # set fees
     set_factory_fee_config(management_fee, protocol_recipient)
-    
+
     # Deposit assets to vault and get strategy ready. Management fee == 0 initially
     vault, strategy, accountant = initial_set_up(
         asset, gov, amount, fish, management_fee, performance_fee, refund_ratio
@@ -2492,14 +2492,7 @@ def test_accountant_and_protcol_fees_doesnt_change_pps(
 
     # process report with first profit
     total_fees = create_and_check_profit(
-        asset,
-        strategy,
-        gov,
-        vault,
-        first_profit,
-        0,
-        0,
-        True
+        asset, strategy, gov, vault, first_profit, 0, 0, True
     )
 
     # assure both accounts got payed fees and the PPS stayed exactly the same
@@ -2520,19 +2513,9 @@ def test_accountant_and_protcol_fees_doesnt_change_pps(
     starting_pps = vault.price_per_share()
 
     total_fees = create_and_check_profit(
-        asset,
-        strategy,
-        gov,
-        vault,
-        first_profit,
-        0,
-        0,
-        True
+        asset, strategy, gov, vault, first_profit, 0, 0, True
     )
 
     assert vault.balanceOf(accountant.address) != 0
     assert vault.balanceOf(protocol_recipient) != 0
     assert vault.price_per_share() == starting_pps
-    
-
-    
