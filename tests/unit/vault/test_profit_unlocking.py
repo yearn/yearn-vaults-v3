@@ -2449,3 +2449,90 @@ def test_loss_fees_refunds_with_buffer(
         total_assets=0,
         total_supply=0,
     )
+
+
+def test_accountant_and_protcol_fees_doesnt_change_pps(
+    create_vault,
+    asset,
+    fish_amount,
+    create_strategy,
+    user_deposit,
+    fish,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    gov,
+    airdrop_asset,
+    deploy_flexible_accountant,
+    set_fees_for_strategy,
+    initial_set_up,
+    vault_factory,
+    set_factory_fee_config,
+    bunny,
+):
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
+    # Using only management_fee as its easier to measure comparision
+    management_fee = 25
+    performance_fee = 0
+    refund_ratio = 0
+    protocol_recipient = bunny
+
+    # set fees
+    set_factory_fee_config(management_fee, protocol_recipient)
+    
+    # Deposit assets to vault and get strategy ready. Management fee == 0 initially
+    vault, strategy, accountant = initial_set_up(
+        asset, gov, amount, fish, management_fee, performance_fee, refund_ratio
+    )
+
+    # skip the time needed for the protocol to assess fees
+    increase_time_and_check_profit_buffer(chain, vault)
+
+    starting_pps = vault.price_per_share()
+
+    # process report with first profit
+    total_fees = create_and_check_profit(
+        asset,
+        strategy,
+        gov,
+        vault,
+        first_profit,
+        0,
+        0,
+        True
+    )
+
+    # assure both accounts got payed fees and the PPS stayed exactly the same
+    assert vault.balanceOf(accountant.address) != 0
+    assert vault.balanceOf(protocol_recipient) != 0
+    assert vault.price_per_share() == starting_pps
+
+    # send all fees collected out
+    vault.transfer(gov, vault.balanceOf(protocol_recipient), sender=protocol_recipient)
+    vault.transfer(gov, vault.balanceOf(accountant.address), sender=accountant)
+
+    assert vault.balanceOf(protocol_recipient) == 0
+    assert vault.balanceOf(accountant.address) == 0
+
+    # skip the time needed for the protocol to assess fees
+    increase_time_and_check_profit_buffer(chain, vault)
+
+    starting_pps = vault.price_per_share()
+
+    total_fees = create_and_check_profit(
+        asset,
+        strategy,
+        gov,
+        vault,
+        first_profit,
+        0,
+        0,
+        True
+    )
+
+    assert vault.balanceOf(accountant.address) != 0
+    assert vault.balanceOf(protocol_recipient) != 0
+    assert vault.price_per_share() == starting_pps
+    
+
+    

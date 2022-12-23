@@ -797,13 +797,12 @@ def _process_report(strategy: address) -> (uint256, uint256):
         protocol_fees = convert(protocol_fee_bps, uint256) * self._total_assets() * seconds_since_last_report / 24 / 365 / 3600 / MAX_BPS
         total_fees += protocol_fees
         self.last_report = block.timestamp
-   
-    # We calculate the amount of shares that could be insta unlocked to avoid pps changes
-    # NOTE: this needs to be done before any pps changes
-    shares_to_burn: uint256 = 0 
-    if loss + total_fees > 0:
-      shares_to_burn = self._convert_to_shares(loss + total_fees)
-
+    
+    shares_for_fees: uint256 = self._convert_to_shares(total_fees)
+    # we need to record this before any debt updates in case we have losses
+    shares_to_burn: uint256 = self._convert_to_shares(loss + total_fees)
+    
+    previously_locked_shares: uint256 = self.balance_of[self] 
     newly_locked_shares: uint256 = 0
     if total_refunds > 0:
         # if refunds are non-zero, transfer shares worth of assets
@@ -825,39 +824,48 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self.strategies[strategy].current_debt -= loss
         self.total_debt -= loss
 
+    if loss + total_fees >= gain + total_refunds:
+        # we have a net loss and need to try and burn shares to offset
+        # Vault insta unlocks losses and fees to avoid pps decrease
+        # NOTE: it can only unlock shares that are previously locked. Any loss / fees over the amount of total locked shares will have an effect on pps
+        shares_to_burn = min(shares_to_burn, previously_locked_shares + newly_locked_shares)
+        if shares_to_burn > 0:
+            self._burn_shares(shares_to_burn, self)
+            # we burn first the newly locked shares, then the previously locked shares
+            shares_to_unlock: uint256 = min(shares_to_burn, newly_locked_shares)
+            newly_locked_shares -= shares_to_unlock
+            previously_locked_shares -= (shares_to_burn - shares_to_unlock)
+        
+        # issue all fees at once to self
+        if total_fees > 0:
+            # we need to update the shares we are getting at a lower PPS
+            shares_for_fees = self._issue_shares_for_amount(total_fees, self)
+    else:
+        # we arent locking the shares that are sent as fees
+        newly_locked_shares -= shares_for_fees
+
+    # if fees are non-zero, transfer shares
+    protocol_reward: uint256 = 0
+    if protocol_fees > 0:
+        protocol_reward = shares_for_fees * protocol_fees / total_fees
+        self._transfer(self, protocol_fee_recipient, protocol_reward)
+
+    if shares_for_fees - protocol_reward > 0:
+        # we transfer whats left
+        self._transfer(self, accountant, shares_for_fees - protocol_reward)
+
     # Calculate how long until the full amount of shares is unlocked
     remaining_time: uint256 = 0
-    # NOTE: should be precise (no new unlocked shares due to above's burn of shares)
-    # newly_locked_shares have already been minted / transfered to the vault, so they need to be substracted
-    # no risk of underflow because they have just been minted
-    previously_locked_shares: uint256 = self.balance_of[self] - newly_locked_shares
     _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
     if _full_profit_unlock_date > block.timestamp: 
       remaining_time = _full_profit_unlock_date - block.timestamp
-
-    # Vault insta unlocks losses and fees to avoid pps decrease
-    # NOTE: it can only unlock shares that are previously locked. Any loss / fees over the amount of total locked shares will have an effect on pps
-    shares_to_burn = min(shares_to_burn, previously_locked_shares + newly_locked_shares)
-    if shares_to_burn > 0:
-      self._burn_shares(shares_to_burn, self)
-      # we burn first the newly locked shares, then the previously locked shares
-      shares_to_unlock: uint256 = min(shares_to_burn, newly_locked_shares)
-      newly_locked_shares -= shares_to_unlock
-      previously_locked_shares -= (shares_to_burn - shares_to_unlock)
-
-    # if fees are non-zero, issue shares
-    if protocol_fees > 0:
-      self._issue_shares_for_amount(protocol_fees, protocol_fee_recipient)
-
-    if total_fees - protocol_fees > 0:
-      self._issue_shares_for_amount(total_fees - protocol_fees, accountant)
 
     # Update unlocking rate and time to fully unlocked
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
     if total_locked_shares > 0:
       # new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the PROFIT_MAX_UNLOCK_TIME
       new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * PROFIT_MAX_UNLOCK_TIME) / total_locked_shares
-      self.profit_unlocking_rate = (previously_locked_shares + newly_locked_shares) * MAX_BPS_EXTENDED / new_profit_locking_period
+      self.profit_unlocking_rate = total_locked_shares * MAX_BPS_EXTENDED / new_profit_locking_period
       self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
       self.last_profit_update = block.timestamp
     else:
@@ -876,7 +884,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
         total_refunds
     )
     return (gain, loss)
-
 
 # SETTERS #
 @external
