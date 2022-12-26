@@ -29,7 +29,6 @@ def test_profitable_strategy_flow(
     deposit_amount = fish_amount
     first_profit = deposit_amount // 4
     second_profit = deposit_amount // 2
-
     first_loss = deposit_amount // 4
 
     initial_timestamp = chain.pending_timestamp

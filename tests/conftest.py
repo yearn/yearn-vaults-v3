@@ -162,6 +162,15 @@ def vault_factory(project, gov, vault_blueprint):
 
 
 @pytest.fixture(scope="session")
+def set_factory_fee_config(project, gov, vault_factory):
+    def set_factory_fee_config(fee_bps, fee_recipient):
+        vault_factory.set_protocol_fee_bps(fee_bps, sender=gov)
+        vault_factory.set_protocol_fee_recipient(fee_recipient, sender=gov)
+
+    yield set_factory_fee_config
+
+
+@pytest.fixture(scope="session")
 def create_vault(project, gov, vault_factory):
     def create_vault(
         asset,
