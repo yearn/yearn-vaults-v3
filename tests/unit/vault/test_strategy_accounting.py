@@ -518,7 +518,6 @@ def test_process_report__with_loss_management_fees_and_refunds(
     )
 
 
-
 def test_proccess_report__no_max_unlock_time(
     chain,
     gov,

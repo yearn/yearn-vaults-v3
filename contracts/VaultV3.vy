@@ -851,9 +851,9 @@ def _process_report(strategy: address) -> (uint256, uint256):
       shares_to_burn = min(shares_to_burn, previously_locked_shares + newly_locked_shares)
       self._burn_shares(shares_to_burn, self)
       # we burn first the newly locked shares, then the previously locked shares
-      shares_to_unlock: uint256 = min(shares_to_burn, newly_locked_shares)
-      newly_locked_shares -= shares_to_unlock
-      previously_locked_shares -= (shares_to_burn - shares_to_unlock)
+      shares_not_to_lock: uint256 = min(shares_to_burn, newly_locked_shares)
+      newly_locked_shares -= shares_not_to_lock
+      previously_locked_shares -= (shares_to_burn - shares_not_to_lock)
 
     # issue shares
     if accountant_fees_shares > 0:
