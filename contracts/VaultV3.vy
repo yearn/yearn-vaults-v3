@@ -809,17 +809,16 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # We calculate the amount of shares that could be insta unlocked to avoid pps changes
     # NOTE: this needs to be done before any pps changes
     shares_to_burn: uint256 = 0
-    fees_shares: uint256 = 0
+    accountant_fees_shares: uint256 = 0
     protocol_fees_shares: uint256 = 0
     if loss + total_fees > 0:
         shares_to_burn += self._convert_to_shares(loss + total_fees)
         # Vault calculates the amount of shares to mint as fees before changing totalAssets / totalSupply
-        if total_fees > 0:
-            fees_shares = self._convert_to_shares(total_fees)
-            if protocol_fees > 0:
+        if protocol_fees > 0:
               protocol_fees_shares = self._convert_to_shares(protocol_fees)
-              fees_shares = fees_shares - protocol_fees_shares
-
+        if total_fees - protocol_fees > 0:
+            accountant_fees_shares = self._convert_to_shares(total_fees - protocol_fees)
+            
     newly_locked_shares: uint256 = 0
     if total_refunds > 0:
         # if refunds are non-zero, transfer shares worth of assets
@@ -857,11 +856,14 @@ def _process_report(strategy: address) -> (uint256, uint256):
       previously_locked_shares -= (shares_to_burn - shares_to_unlock)
 
     # issue shares
-    if fees_shares + protocol_fees_shares > 0:
-        self.balance_of[accountant] += fees_shares
+    if accountant_fees_shares > 0:
+        self.balance_of[accountant] += accountant_fees_shares
+        self.total_supply += accountant_fees_shares
+        log Transfer(empty(address), accountant, accountant_fees_shares)
+
+    if protocol_fees_shares > 0:
         self.balance_of[protocol_fee_recipient] += protocol_fees_shares
-        self.total_supply += fees_shares + protocol_fees_shares
-        log Transfer(empty(address), accountant, fees_shares)
+        self.total_supply += protocol_fees_shares
         log Transfer(empty(address), protocol_fee_recipient, protocol_fees_shares)
 
     # Calculate how long until the full amount of shares is unlocked
@@ -875,7 +877,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if total_locked_shares > 0:
       # new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the PROFIT_MAX_UNLOCK_TIME
       new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * PROFIT_MAX_UNLOCK_TIME) / total_locked_shares
-      self.profit_unlocking_rate = (previously_locked_shares + newly_locked_shares) * MAX_BPS_EXTENDED / new_profit_locking_period
+      self.profit_unlocking_rate = total_locked_shares * MAX_BPS_EXTENDED / new_profit_locking_period
       self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
       self.last_profit_update = block.timestamp
     else:
@@ -889,8 +891,8 @@ def _process_report(strategy: address) -> (uint256, uint256):
         gain,
         loss,
         self.strategies[strategy].current_debt,
-        protocol_fees,
-        total_fees,
+        self._convert_to_assets(protocol_fees_shares),
+        self._convert_to_assets(protocol_fees_shares + accountant_fees_shares),
         total_refunds
     )
     return (gain, loss)

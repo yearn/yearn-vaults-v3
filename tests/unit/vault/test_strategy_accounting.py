@@ -351,6 +351,14 @@ def test_process_report__with_loss_and_management_fees(
     initial_total_assets = vault.totalAssets()
 
     expected_management_fees = vault_balance // 10
+
+    # with a loss we will not get the full expected fee
+    expected_management_fees = (
+        (initial_total_assets - loss)
+        / (initial_total_assets + expected_management_fees)
+        * expected_management_fees
+    )
+
     snapshot = chain.pending_timestamp
 
     tx = vault.process_report(lossy_strategy.address, sender=gov)
@@ -484,6 +492,11 @@ def test_process_report__with_loss_management_fees_and_refunds(
         * management_fee
         / MAX_BPS_ACCOUNTANT
         / YEAR
+    )
+
+    # with a loss we will not get the full expected fee
+    expected_management_fees = (
+        new_debt / (new_debt + expected_management_fees) * expected_management_fees
     )
 
     tx = vault.process_report(lossy_strategy.address, sender=gov)
