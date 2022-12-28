@@ -874,9 +874,10 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     # Update unlocking rate and time to fully unlocked
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
-    if total_locked_shares > 0:
+    _profit_max_unlock_time: uint256 = PROFIT_MAX_UNLOCK_TIME
+    if total_locked_shares > 0 and _profit_max_unlock_time > 0:
       # new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the PROFIT_MAX_UNLOCK_TIME
-      new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * PROFIT_MAX_UNLOCK_TIME) / total_locked_shares
+      new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * _profit_max_unlock_time) / total_locked_shares
       self.profit_unlocking_rate = total_locked_shares * MAX_BPS_EXTENDED / new_profit_locking_period
       self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
       self.last_profit_update = block.timestamp
