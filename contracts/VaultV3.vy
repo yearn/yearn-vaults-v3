@@ -392,6 +392,13 @@ def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
         assert convert(response, bool), "Transfer failed!"
 
 @internal
+def _issue_shares(shares: uint256, recipient: address):
+    self.balance_of[recipient] += shares
+    self.total_supply += shares
+
+    log Transfer(empty(address), recipient, shares)
+
+@internal
 def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
     """
     Issues shares that are worth 'amount' in the underlying token (asset)
@@ -408,15 +415,13 @@ def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
     else:
       # after first deposit, getting here would mean that the rest of the shares would be diluted to ~0
       assert total_assets > amount, "amount too high"
-
+  
     # We don't make the function revert
     if new_shares == 0:
        return 0
 
-    self.balance_of[recipient] += new_shares
-    self.total_supply += new_shares
+    self._issue_shares(new_shares, recipient)
 
-    log Transfer(empty(address), recipient, new_shares)
     return new_shares
 
 ## ERC4626 ##
@@ -814,11 +819,11 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if loss + total_fees > 0:
         shares_to_burn += self._convert_to_shares(loss + total_fees)
         # Vault calculates the amount of shares to mint as fees before changing totalAssets / totalSupply
-        if protocol_fees > 0:
-              protocol_fees_shares = self._convert_to_shares(protocol_fees)
-        if total_fees - protocol_fees > 0:
+        if total_fees > 0:
             accountant_fees_shares = self._convert_to_shares(total_fees - protocol_fees)
-            
+            if protocol_fees > 0:
+              protocol_fees_shares = self._convert_to_shares(protocol_fees)
+
     newly_locked_shares: uint256 = 0
     if total_refunds > 0:
         # if refunds are non-zero, transfer shares worth of assets
@@ -855,16 +860,12 @@ def _process_report(strategy: address) -> (uint256, uint256):
       newly_locked_shares -= shares_not_to_lock
       previously_locked_shares -= (shares_to_burn - shares_not_to_lock)
 
-    # issue shares
+    # issue shares that were calculated above
     if accountant_fees_shares > 0:
-        self.balance_of[accountant] += accountant_fees_shares
-        self.total_supply += accountant_fees_shares
-        log Transfer(empty(address), accountant, accountant_fees_shares)
+        self._issue_shares(accountant_fees_shares, accountant)
 
     if protocol_fees_shares > 0:
-        self.balance_of[protocol_fee_recipient] += protocol_fees_shares
-        self.total_supply += protocol_fees_shares
-        log Transfer(empty(address), protocol_fee_recipient, protocol_fees_shares)
+        self._issue_shares(protocol_fees_shares, protocol_fee_recipient)
 
     # Calculate how long until the full amount of shares is unlocked
     remaining_time: uint256 = 0
