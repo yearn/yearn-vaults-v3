@@ -133,9 +133,9 @@ def test__report_no_gain_with_protocol_fees__set_pre_vault_deploy(
         )
         == amount * 0.0025 * days_passed / 365
     )
-    assert vault.price_per_share() / 10 ** vault.decimals() == amount / (
-        amount + amount * 0.0025
-    )
+    assert pytest.approx(
+        vault.price_per_share(), rel=1e-8
+    ) == amount * 10 ** vault.decimals() // (amount + amount * 0.0025)
 
 
 def test__report_gain_with_protocol_fees__set_post_vault_deploy(
@@ -243,9 +243,9 @@ def test__report_no_gain_with_protocol_fees__set_post_vault_deploy(
         == amount * 0.0025 * days_passed / 365
     )
 
-    assert vault.price_per_share() / 10 ** vault.decimals() == amount / (
-        amount + amount * 0.0025
-    )
+    assert pytest.approx(
+        vault.price_per_share(), rel=1e-8
+    ) == amount * 10 ** vault.decimals() // (amount + amount * 0.0025)
 
 
 def test__report_gain_several_times_in_a_day(
@@ -357,9 +357,9 @@ def test__report_no_gain_several_times_in_a_day(
         )
         == amount * 0.0025 * days_passed / 365
     )
-    assert vault.price_per_share() / 10 ** vault.decimals() == amount / (
-        amount + amount * 0.0025
-    )
+    assert pytest.approx(
+        vault.price_per_share(), rel=1e-8
+    ) == amount * 10 ** vault.decimals() // (amount + amount * 0.0025)
 
     # When a day has not passed, no new protocol fees are charged
     chain.pending_timestamp = vault.last_report() + int(days_to_secs(0.75))
