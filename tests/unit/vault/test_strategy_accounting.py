@@ -351,6 +351,14 @@ def test_process_report__with_loss_and_management_fees(
     initial_total_assets = vault.totalAssets()
 
     expected_management_fees = vault_balance // 10
+
+    # with a loss we will not get the full expected fee
+    expected_management_fees = (
+        (initial_total_assets - loss)
+        / (initial_total_assets + expected_management_fees)
+        * expected_management_fees
+    )
+
     snapshot = chain.pending_timestamp
 
     tx = vault.process_report(lossy_strategy.address, sender=gov)
@@ -486,6 +494,11 @@ def test_process_report__with_loss_management_fees_and_refunds(
         / YEAR
     )
 
+    # with a loss we will not get the full expected fee
+    expected_management_fees = (
+        new_debt / (new_debt + expected_management_fees) * expected_management_fees
+    )
+
     tx = vault.process_report(lossy_strategy.address, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
 
@@ -503,6 +516,73 @@ def test_process_report__with_loss_management_fees_and_refunds(
     assert vault.convertToAssets(vault.balanceOf(accountant)) == pytest.approx(
         expected_management_fees, 1e-4
     )
+
+
+def test_proccess_report__no_max_unlock_time(
+    chain,
+    gov,
+    asset,
+    create_vault,
+    strategy,
+    mint_and_deposit_into_vault,
+    airdrop_asset,
+    add_debt_to_strategy,
+):
+    vault = create_vault(asset, gov, MAX_INT, max_profit_locking_time=0)
+
+    mint_and_deposit_into_vault(vault)
+    vault_balance = asset.balanceOf(vault)
+    new_debt = vault_balance
+    gain = new_debt // 2
+
+    # add debt to strategy
+    vault.add_strategy(strategy.address, sender=gov)
+    add_debt_to_strategy(gov, strategy, vault, new_debt)
+
+    # process report with no gain
+    strategy_params = vault.strategies(strategy.address)
+    initial_debt = strategy_params.current_debt
+
+    snapshot = chain.pending_timestamp
+    tx = vault.process_report(strategy.address, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyReported))
+
+    assert len(event) == 1
+    assert event[0].strategy == strategy.address
+    assert event[0].gain == 0
+    assert event[0].loss == 0
+    assert event[0].current_debt == initial_debt
+    assert event[0].total_fees == 0
+
+    strategy_params = vault.strategies(strategy.address)
+    assert strategy_params.current_debt == initial_debt
+    assert vault.strategies(strategy.address).last_report == pytest.approx(
+        snapshot, abs=1
+    )
+
+    # simulate gain and process report
+    airdrop_asset(gov, asset, strategy, gain)
+
+    strategy_params = vault.strategies(strategy.address)
+    initial_debt = strategy_params.current_debt
+
+    snapshot = chain.pending_timestamp
+    tx = vault.process_report(strategy.address, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyReported))
+
+    assert len(event) == 1
+    assert event[0].strategy == strategy.address
+    assert event[0].gain == gain
+    assert event[0].loss == 0
+    assert event[0].current_debt == initial_debt + gain
+    assert event[0].total_fees == 0
+
+    strategy_params = vault.strategies(strategy.address)
+    assert strategy_params.current_debt == initial_debt + gain
+    assert vault.strategies(strategy.address).last_report == pytest.approx(
+        snapshot, abs=1
+    )
+    assert vault.totalSupply() == vault.total_supply()
 
 
 def test_set_accountant__with_accountant(gov, vault, deploy_accountant):
