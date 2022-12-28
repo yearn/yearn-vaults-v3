@@ -1393,8 +1393,8 @@ def test_loss_fees_no_refunds_no_existing_buffer(
     check_vault_totals(
         vault,
         total_debt=0,
-        total_idle=total_fees,  # - ((first_loss * total_fees) // (amount + total_fees)),
-        total_assets=total_fees,  # - ((first_loss * total_fees) // (amount + total_fees)),
+        total_idle=total_fees,
+        total_assets=total_fees,
         total_supply=vault.convertToShares(total_fees),
     )
 
