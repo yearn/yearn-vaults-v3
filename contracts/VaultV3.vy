@@ -392,6 +392,13 @@ def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
         assert convert(response, bool), "Transfer failed!"
 
 @internal
+def _issue_shares(shares: uint256, recipient: address):
+    self.balance_of[recipient] += shares
+    self.total_supply += shares
+
+    log Transfer(empty(address), recipient, shares)
+
+@internal
 def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
     """
     Issues shares that are worth 'amount' in the underlying token (asset)
@@ -408,15 +415,13 @@ def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
     else:
       # after first deposit, getting here would mean that the rest of the shares would be diluted to ~0
       assert total_assets > amount, "amount too high"
-
+  
     # We don't make the function revert
     if new_shares == 0:
        return 0
 
-    self.balance_of[recipient] += new_shares
-    self.total_supply += new_shares
+    self._issue_shares(new_shares, recipient)
 
-    log Transfer(empty(address), recipient, new_shares)
     return new_shares
 
 ## ERC4626 ##
@@ -740,6 +745,26 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
     log DebtUpdated(strategy, current_debt, new_debt)
     return new_debt
 
+@internal
+def _assess_protocol_fees() -> (uint256, address):
+    protocol_fees: uint256 = 0
+    protocol_fee_recipient: address = empty(address)
+    seconds_since_last_report: uint256 = block.timestamp - self.last_report
+    # to avoid wasting gas for minimal fees vault will only assess once every PROTOCOL_FEE_ASSESSMENT_PERIOD seconds
+    if(seconds_since_last_report >= PROTOCOL_FEE_ASSESSMENT_PERIOD):
+      protocol_fee_bps: uint16 = 0
+      protocol_fee_last_change: uint32 = 0
+
+      protocol_fee_bps, protocol_fee_last_change, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
+
+      if(protocol_fee_bps > 0):
+        # NOTE: charge fees since last report OR last fee change (this will mean less fees are charged after a change in protocol_fees, but fees should not change frequently)
+        seconds_since_last_report = min(seconds_since_last_report, block.timestamp - convert(protocol_fee_last_change, uint256))
+        protocol_fees = convert(protocol_fee_bps, uint256) * self._total_assets() * seconds_since_last_report / 24 / 365 / 3600 / MAX_BPS
+        self.last_report = block.timestamp
+    return (protocol_fees, protocol_fee_recipient)
+
+
 ## ACCOUNTING MANAGEMENT ##
 @internal
 def _process_report(strategy: address) -> (uint256, uint256):
@@ -774,7 +799,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     total_fees: uint256 = 0
     total_refunds: uint256 = 0
-    
+
     accountant: address = self.accountant
     # if accountant is not set, fees and refunds remain unchanged
     if accountant != empty(address):
@@ -783,26 +808,21 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Protocol fee assessment
     protocol_fees: uint256 = 0
     protocol_fee_recipient: address = empty(address)
-    seconds_since_last_report: uint256 = block.timestamp - self.last_report
-    # to avoid wasting gas for minimal fees vault will only assess once every PROTOCOL_FEE_ASSESSMENT_PERIOD seconds
-    if(seconds_since_last_report >= PROTOCOL_FEE_ASSESSMENT_PERIOD):
-      protocol_fee_bps: uint16 = 0
-      protocol_fee_last_change: uint32 = 0
+    protocol_fees, protocol_fee_recipient = self._assess_protocol_fees()
+    total_fees += protocol_fees
 
-      protocol_fee_bps, protocol_fee_last_change, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
-
-      if(protocol_fee_bps > 0):
-        # NOTE: charge fees since last report OR last fee change (this will mean less fees are charged after a change in protocol_fees, but fees should not change frequently)
-        seconds_since_last_report = min(seconds_since_last_report, block.timestamp - convert(protocol_fee_last_change, uint256))
-        protocol_fees = convert(protocol_fee_bps, uint256) * self._total_assets() * seconds_since_last_report / 24 / 365 / 3600 / MAX_BPS
-        total_fees += protocol_fees
-        self.last_report = block.timestamp
-   
     # We calculate the amount of shares that could be insta unlocked to avoid pps changes
     # NOTE: this needs to be done before any pps changes
-    shares_to_burn: uint256 = 0 
+    shares_to_burn: uint256 = 0
+    accountant_fees_shares: uint256 = 0
+    protocol_fees_shares: uint256 = 0
     if loss + total_fees > 0:
-      shares_to_burn = self._convert_to_shares(loss + total_fees)
+        shares_to_burn += self._convert_to_shares(loss + total_fees)
+        # Vault calculates the amount of shares to mint as fees before changing totalAssets / totalSupply
+        if total_fees > 0:
+            accountant_fees_shares = self._convert_to_shares(total_fees - protocol_fees)
+            if protocol_fees > 0:
+              protocol_fees_shares = self._convert_to_shares(protocol_fees)
 
     newly_locked_shares: uint256 = 0
     if total_refunds > 0:
@@ -825,39 +845,41 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self.strategies[strategy].current_debt -= loss
         self.total_debt -= loss
 
-    # Calculate how long until the full amount of shares is unlocked
-    remaining_time: uint256 = 0
     # NOTE: should be precise (no new unlocked shares due to above's burn of shares)
     # newly_locked_shares have already been minted / transfered to the vault, so they need to be substracted
     # no risk of underflow because they have just been minted
     previously_locked_shares: uint256 = self.balance_of[self] - newly_locked_shares
-    _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
-    if _full_profit_unlock_date > block.timestamp: 
-      remaining_time = _full_profit_unlock_date - block.timestamp
 
     # Vault insta unlocks losses and fees to avoid pps decrease
     # NOTE: it can only unlock shares that are previously locked. Any loss / fees over the amount of total locked shares will have an effect on pps
-    shares_to_burn = min(shares_to_burn, previously_locked_shares + newly_locked_shares)
     if shares_to_burn > 0:
+      shares_to_burn = min(shares_to_burn, previously_locked_shares + newly_locked_shares)
       self._burn_shares(shares_to_burn, self)
       # we burn first the newly locked shares, then the previously locked shares
-      shares_to_unlock: uint256 = min(shares_to_burn, newly_locked_shares)
-      newly_locked_shares -= shares_to_unlock
-      previously_locked_shares -= (shares_to_burn - shares_to_unlock)
+      shares_not_to_lock: uint256 = min(shares_to_burn, newly_locked_shares)
+      newly_locked_shares -= shares_not_to_lock
+      previously_locked_shares -= (shares_to_burn - shares_not_to_lock)
 
-    # if fees are non-zero, issue shares
-    if protocol_fees > 0:
-      self._issue_shares_for_amount(protocol_fees, protocol_fee_recipient)
+    # issue shares that were calculated above
+    if accountant_fees_shares > 0:
+        self._issue_shares(accountant_fees_shares, accountant)
 
-    if total_fees - protocol_fees > 0:
-      self._issue_shares_for_amount(total_fees - protocol_fees, accountant)
+    if protocol_fees_shares > 0:
+        self._issue_shares(protocol_fees_shares, protocol_fee_recipient)
+
+    # Calculate how long until the full amount of shares is unlocked
+    remaining_time: uint256 = 0
+    _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
+    if _full_profit_unlock_date > block.timestamp: 
+        remaining_time = _full_profit_unlock_date - block.timestamp
 
     # Update unlocking rate and time to fully unlocked
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
-    if total_locked_shares > 0:
+    _profit_max_unlock_time: uint256 = PROFIT_MAX_UNLOCK_TIME
+    if total_locked_shares > 0 and _profit_max_unlock_time > 0:
       # new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the PROFIT_MAX_UNLOCK_TIME
-      new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * PROFIT_MAX_UNLOCK_TIME) / total_locked_shares
-      self.profit_unlocking_rate = (previously_locked_shares + newly_locked_shares) * MAX_BPS_EXTENDED / new_profit_locking_period
+      new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * _profit_max_unlock_time) / total_locked_shares
+      self.profit_unlocking_rate = total_locked_shares * MAX_BPS_EXTENDED / new_profit_locking_period
       self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
       self.last_profit_update = block.timestamp
     else:
@@ -871,8 +893,8 @@ def _process_report(strategy: address) -> (uint256, uint256):
         gain,
         loss,
         self.strategies[strategy].current_debt,
-        protocol_fees,
-        total_fees,
+        self._convert_to_assets(protocol_fees_shares),
+        self._convert_to_assets(protocol_fees_shares + accountant_fees_shares),
         total_refunds
     )
     return (gain, loss)
