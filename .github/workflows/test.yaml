@@ -23,7 +23,7 @@ jobs:
     - uses: ApeWorX/github-action@v1.1
       with:
         python-version: '3.9'
-        ape-version-pin: '==0.5.2'
+        ape-version-pin: '==0.5.9'
 
     - name: install vyper
       run: pip install git+https://github.com/vyperlang/vyper
