@@ -16,17 +16,6 @@ python3 -m pip install -r requirements-dev.txt
 yarn
 ```
 
-
-Fetch the ape plugins:
-
-```
-ape plugins install .
-```
-
-Install plugins with:
-
-`ape plugins install .`
-
 Compile smart contracts with:
 
 ```
