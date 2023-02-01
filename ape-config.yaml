@@ -2,8 +2,11 @@ name: yearn-v3
 
 plugins:
   - name: solidity
+    version: 0.5.4
   - name: vyper
+    version: 0.5.2
   - name: hardhat
+    version: 0.5.5
 
 default_ecosystem: ethereum
 dependencies:
