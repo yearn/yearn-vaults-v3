@@ -8,6 +8,13 @@ def test_set_open_role__by_random_account__reverts(vault, bunny):
         vault.set_open_role(ROLES.STRATEGY_MANAGER, sender=bunny)
 
 
+def test_close_open_role__by_random_account__reverts(vault, gov, bunny):
+    vault.set_open_role(ROLES.STRATEGY_MANAGER, sender=gov)
+    assert vault.open_roles(ROLES.STRATEGY_MANAGER) == True
+    with ape.reverts():
+        vault.close_open_role(ROLES.STRATEGY_MANAGER, sender=bunny)
+
+
 # STRATEGY_MANAGER
 
 
@@ -67,6 +74,57 @@ def test_migrate_strategy__set_strategy_role_open(vault, create_strategy, bunny,
         event[0].old_strategy == new_strategy.address
         and event[0].new_strategy == other_new_strategy.address
     )
+
+
+def test_add_strategy__set_strategy_role_open_then_close__reverts(
+    vault, create_strategy, bunny, gov
+):
+    new_strategy = create_strategy(vault)
+    vault.set_open_role(ROLES.STRATEGY_MANAGER, sender=gov)
+    tx = vault.add_strategy(new_strategy, sender=bunny)
+    event = list(tx.decode_logs(vault.StrategyAdded))
+    assert len(event) == 1
+    assert event[0].strategy == new_strategy.address
+    # close the role
+    vault.close_open_role(ROLES.STRATEGY_MANAGER, sender=gov)
+    with ape.reverts():
+        vault.add_strategy(new_strategy, sender=bunny)
+
+
+def test_revoke_strategy__set_strategy_role_open_then_close__reverts(
+    vault, create_strategy, bunny, gov
+):
+    new_strategy = create_strategy(vault)
+    vault.add_strategy(new_strategy, sender=gov)
+    vault.set_open_role(ROLES.STRATEGY_MANAGER, sender=gov)
+    tx = vault.revoke_strategy(new_strategy, sender=bunny)
+    event = list(tx.decode_logs(vault.StrategyRevoked))
+    assert len(event) == 1
+    assert event[0].strategy == new_strategy.address
+    # close the role
+    vault.close_open_role(ROLES.STRATEGY_MANAGER, sender=gov)
+    with ape.reverts():
+        vault.revoke_strategy(new_strategy, sender=bunny)
+
+
+def test_migrate_strategy__set_strategy_role_open_then_close__reverts(
+    vault, create_strategy, bunny, gov
+):
+    new_strategy = create_strategy(vault)
+    other_new_strategy = create_strategy(vault)
+    vault.add_strategy(new_strategy, sender=gov)
+    vault.set_open_role(ROLES.STRATEGY_MANAGER, sender=gov)
+    tx = vault.migrate_strategy(other_new_strategy, new_strategy, sender=bunny)
+    event = list(tx.decode_logs(vault.StrategyMigrated))
+    assert len(event) == 1
+    assert (
+        event[0].old_strategy == new_strategy.address
+        and event[0].new_strategy == other_new_strategy.address
+    )
+    # close the role
+    vault.close_open_role(ROLES.STRATEGY_MANAGER, sender=gov)
+    with ape.reverts():
+        vault.migrate_strategy(other_new_strategy, new_strategy, sender=bunny)
 
 
 # ACCOUNTING_MANAGER
@@ -193,6 +251,57 @@ def test_update_max_debt_for_strategy__set_debt_role_open(
         event[0].sender == bunny.address and event[0].strategy == new_strategy.address
     )
     assert event[0].new_debt == 420
+
+
+def test_set_minimum_total_idle__set_debt_role_open_then_close__reverts(
+    vault, bunny, gov
+):
+    vault.set_open_role(ROLES.DEBT_MANAGER, sender=gov)
+    tx = vault.set_minimum_total_idle(0, sender=bunny)
+    event = list(tx.decode_logs(vault.UpdateMinimumTotalIdle))
+    assert len(event) == 1
+    assert event[0].minimum_total_idle == 0
+    # close role
+    vault.close_open_role(ROLES.DEBT_MANAGER, sender=gov)
+    with ape.reverts():
+        vault.set_minimum_total_idle(0, sender=bunny)
+
+
+def test_update_debt__set_debt_role_open_then_close__reverts(
+    vault, create_strategy, bunny, gov, mint_and_deposit_into_vault
+):
+    new_strategy = create_strategy(vault)
+    vault.add_strategy(new_strategy, sender=gov)
+    vault.update_max_debt_for_strategy(new_strategy, 1338, sender=gov)
+    mint_and_deposit_into_vault(vault)
+    vault.set_open_role(ROLES.DEBT_MANAGER, sender=gov)
+    tx = vault.update_debt(new_strategy, 1337, sender=bunny)
+    event = list(tx.decode_logs(vault.DebtUpdated))
+    assert len(event) == 1
+    assert event[0].strategy == new_strategy.address and event[0].new_debt == 1337
+    # close role
+    vault.close_open_role(ROLES.DEBT_MANAGER, sender=gov)
+    with ape.reverts():
+        vault.update_debt(new_strategy, 1337, sender=bunny)
+
+
+def test_update_max_debt_for_strategy__set_debt_role_open_then_close__reverts(
+    vault, create_strategy, bunny, gov
+):
+    vault.set_open_role(ROLES.DEBT_MANAGER, sender=gov)
+    new_strategy = create_strategy(vault)
+    vault.add_strategy(new_strategy, sender=gov)
+    tx = vault.update_max_debt_for_strategy(new_strategy, 420, sender=bunny)
+    event = list(tx.decode_logs(vault.UpdatedMaxDebtForStrategy))
+    assert len(event) == 1
+    assert (
+        event[0].sender == bunny.address and event[0].strategy == new_strategy.address
+    )
+    assert event[0].new_debt == 420
+    # close role
+    vault.close_open_role(ROLES.DEBT_MANAGER, sender=gov)
+    with ape.reverts():
+        vault.update_max_debt_for_strategy(new_strategy, 420, sender=bunny)
 
 
 # EMERGENCY_MANAGER
