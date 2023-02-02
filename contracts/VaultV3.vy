@@ -934,6 +934,11 @@ def set_open_role(role: Roles):
     self.open_roles[role] = True
 
 @external
+def close_open_role(role: Roles):
+    assert msg.sender == self.role_manager
+    self.open_roles[role] = False
+    
+@external
 def transfer_role_manager(role_manager: address):
     assert msg.sender == self.role_manager
     self.future_role_manager = role_manager
