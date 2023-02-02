@@ -18,13 +18,13 @@ def test_close_open_role__by_random_account__reverts(vault, gov, bunny):
 # STRATEGY_MANAGER
 
 
-def test_add_strategy__set_strategy_role_open__reverts(vault, create_strategy, bunny):
+def test_add_strategy__strategy_role_closed__reverts(vault, create_strategy, bunny):
     new_strategy = create_strategy(vault)
     with ape.reverts():
         vault.add_strategy(new_strategy, sender=bunny)
 
 
-def test_revoke_strategy__set_strategy_role_open__reverts(
+def test_revoke_strategy__strategy_role_closed__reverts(
     vault, create_strategy, bunny, gov
 ):
     new_strategy = create_strategy(vault)
@@ -33,7 +33,7 @@ def test_revoke_strategy__set_strategy_role_open__reverts(
         vault.revoke_strategy(new_strategy, sender=bunny)
 
 
-def test_migrate_strategy__set_strategy_role_open__reverts(
+def test_migrate_strategy__strategy_role_closed__reverts(
     vault, create_strategy, bunny, gov
 ):
     new_strategy = create_strategy(vault)
@@ -130,7 +130,7 @@ def test_migrate_strategy__set_strategy_role_open_then_close__reverts(
 # ACCOUNTING_MANAGER
 
 
-def test_process_report__set_accounting_role_open__reverts(
+def test_process_report__accounting_role_closed__reverts(
     vault, create_strategy, bunny, gov
 ):
     new_strategy = create_strategy(vault)
@@ -139,7 +139,7 @@ def test_process_report__set_accounting_role_open__reverts(
         vault.process_report(new_strategy, sender=bunny)
 
 
-def test_sweep__set_accounting_role_open__reverts(vault, mock_token, bunny):
+def test_sweep__accounting_role_closed__reverts(vault, mock_token, bunny):
     with ape.reverts():
         vault.sweep(mock_token, sender=bunny)
 
@@ -195,7 +195,7 @@ def test_update_profit_unlock__set_accounting_role_open(vault, bunny, gov):
 # DEBT_MANAGER
 
 
-def test_update_max_debt_for_strategy__set_debt_role_open__reverts(
+def test_update_max_debt_for_strategy__debt_role_closed__reverts(
     vault, create_strategy, bunny, gov
 ):
     new_strategy = create_strategy(vault)
@@ -204,14 +204,14 @@ def test_update_max_debt_for_strategy__set_debt_role_open__reverts(
         vault.update_max_debt_for_strategy(new_strategy, 0, sender=bunny)
 
 
-def test_update_debt__set_debt_role_open__reverts(vault, create_strategy, bunny, gov):
+def test_update_debt__debt_role_closed__reverts(vault, create_strategy, bunny, gov):
     new_strategy = create_strategy(vault)
     vault.add_strategy(new_strategy, sender=gov)
     with ape.reverts():
         vault.update_debt(new_strategy, 0, sender=bunny)
 
 
-def test_set_minimum_total_idle__set_debt_role_open__reverts(vault, bunny):
+def test_set_minimum_total_idle__debt_role_closed__reverts(vault, bunny):
     with ape.reverts():
         vault.set_minimum_total_idle(0, sender=bunny)
 
@@ -307,12 +307,12 @@ def test_update_max_debt_for_strategy__set_debt_role_open_then_close__reverts(
 # EMERGENCY_MANAGER
 
 
-def test_shutdown_vault__set__emergency_role_open__reverts(vault, bunny):
+def test_shutdown_vault__emergency_role_closed__reverts(vault, bunny):
     with ape.reverts():
         vault.shutdown_vault(sender=bunny)
 
 
-def test_shutdown_vault__set__emergency_role_open(vault, bunny, gov):
+def test_shutdown_vault__set_emergency_role_open(vault, bunny, gov):
     with ape.reverts():
         vault.shutdown_vault(sender=bunny)
     vault.set_open_role(ROLES.EMERGENCY_MANAGER, sender=gov)
