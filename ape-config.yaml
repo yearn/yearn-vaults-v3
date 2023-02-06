@@ -13,7 +13,3 @@ solidity:
 ethereum:
   local:
     default_provider: hardhat
-
-plugins:
-  - name: solidity
-  - name: vyper
