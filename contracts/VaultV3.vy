@@ -15,11 +15,12 @@ interface IStrategy:
     def totalAssets() -> (uint256): view
     def convertToAssets(shares: uint256) -> (uint256): view
     def convertToShares(assets: uint256) -> (uint256): view
-    def migrate(strategy: address): nonpayable
-    def tend(): nonpayable
 
 interface IAccountant:
     def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
+
+interface IQueueManager:
+    def withdraw_queue() -> (DynArray[address, 10]): nonpayable
 
 interface IFactory:
     def protocol_fee_config() -> (uint16, uint32, address): view
@@ -56,6 +57,7 @@ event StrategyAdded:
 
 event StrategyRevoked:
     strategy: indexed(address)
+    loss: uint256
 
 event StrategyMigrated:
     old_strategy: indexed(address)
@@ -79,6 +81,9 @@ event DebtUpdated:
 # STORAGE MANAGEMENT EVENTS
 event UpdateAccountant:
     accountant: address
+
+event UpdateQueueManager:
+    queue_manager: address
 
 event UpdatedMaxDebtForStrategy:
     sender: address
@@ -147,6 +152,7 @@ minimum_total_idle: public(uint256)
 # Maximum amount of tokens that the vault can accept. If totalAssets > deposit_limit, deposits will revert
 deposit_limit: public(uint256)
 accountant: public(address)
+queue_manager: public(address)
 # HashMap mapping addresses to their roles
 roles: public(HashMap[address, Roles])
 # HashMap mapping roles to their permissioned state. If false, the role is not open to the public
@@ -487,9 +493,15 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
 
 
 @internal
-def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: uint256, strategies: DynArray[address, 10] = []) -> uint256:
+def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: uint256, _strategies: DynArray[address, 10] = []) -> uint256:
     if sender != owner:
         self._spend_allowance(owner, sender, shares_to_burn)
+
+    strategies: DynArray[address, 10] = _strategies
+
+    queue_manager: address = self.queue_manager
+    if queue_manager != empty(address):
+        strategies = IQueueManager(queue_manager).withdraw_queue()
 
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
@@ -598,9 +610,14 @@ def _add_strategy(new_strategy: address):
    log StrategyAdded(new_strategy)
 
 @internal
-def _revoke_strategy(old_strategy: address):
+def _revoke_strategy(old_strategy: address, force: bool):
    assert self.strategies[old_strategy].activation != 0, "strategy not active"
-   assert self.strategies[old_strategy].current_debt == 0, "strategy has debt"
+   loss: uint256 = 0
+
+   if self.strategies[old_strategy].current_debt != 0:
+    assert force, "strategy has debt"
+    loss = self.strategies[old_strategy].current_debt
+   
 
    # NOTE: strategy params are set to 0 (WARNING: it can be readded)
    self.strategies[old_strategy] = StrategyParams({
@@ -610,40 +627,7 @@ def _revoke_strategy(old_strategy: address):
       max_debt: 0
       })
 
-   log StrategyRevoked(old_strategy)
-
-@internal
-def _migrate_strategy(new_strategy: address, old_strategy: address, call_migrate_strategy: bool):
-    assert self.strategies[old_strategy].activation != 0, "old strategy not active"
-    assert self.strategies[old_strategy].current_debt == 0 or call_migrate_strategy, "old strategy has debt"
-    assert new_strategy != empty(address), "strategy cannot be zero address"
-    assert IStrategy(new_strategy).asset() == ASSET.address, "invalid asset"
-    assert self.strategies[new_strategy].activation == 0, "strategy already active"
-
-    migrated_strategy: StrategyParams = self.strategies[old_strategy]
-
-    if call_migrate_strategy:
-      IStrategy(old_strategy).migrate(new_strategy)
-      # update old strategies debt so it can be revoked if the debt was migrated
-      self.strategies[old_strategy].current_debt = 0
-
-    # NOTE: we add strategy with same params than the strategy being migrated
-    self.strategies[new_strategy] = StrategyParams({
-       activation: migrated_strategy.activation,
-       last_report: migrated_strategy.last_report,
-       current_debt: migrated_strategy.current_debt,
-       max_debt: migrated_strategy.max_debt
-       })
-    
-    self._revoke_strategy(old_strategy)
-
-    log StrategyMigrated(old_strategy, new_strategy)
-
-@internal
-def _tend_strategy(strategy: address):
-  assert self.strategies[strategy].activation != 0, "strategy not active"
-
-  IStrategy(strategy).tend()
+   log StrategyRevoked(old_strategy, loss)
 
 # DEBT MANAGEMENT #
 @internal
@@ -780,6 +764,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     Losses will be taken immediately, first from the profit buffer (avoiding an impact in pps), then will reduce pps
     """
     assert self.strategies[strategy].activation != 0, "inactive strategy"
+
     # Vault needs to assess 
     # Using strategy shares because some may be a ERC4626 vault
     strategy_shares: uint256 = IStrategy(strategy).balanceOf(self)
@@ -908,6 +893,12 @@ def set_accountant(new_accountant: address):
     log UpdateAccountant(new_accountant)
 
 @external
+def set_queue_manager(new_queue_manager: address):
+    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
+    self.queue_manager = new_queue_manager
+    log UpdateQueueManager(new_queue_manager)
+
+@external
 def set_deposit_limit(deposit_limit: uint256):
     self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
     self.deposit_limit = deposit_limit
@@ -966,8 +957,9 @@ def available_deposit_limit() -> uint256:
 
 ## ACCOUNTING MANAGEMENT ##
 @external
+@nonreentrant("lock")
 def process_report(strategy: address) -> (uint256, uint256):
-    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
+    self._enforce_role(msg.sender, Roles.KEEPER)
     return self._process_report(strategy)
 
 @external
@@ -993,17 +985,18 @@ def add_strategy(new_strategy: address):
 @external
 def revoke_strategy(old_strategy: address):
     self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
-    self._revoke_strategy(old_strategy)
+    self._revoke_strategy(old_strategy, False)
 
 @external
-def migrate_strategy(new_strategy: address, old_strategy: address, call_migrate_strategy: bool=True):
+def force_revoke_strategy(old_strategy: address):
+    """
+    The vault will remove the inputed strategy and write off any debt left in it as loss. 
+    This function is a dangerous function as it can force a strategy to take a loss. 
+    All possible assets should be removed from the strategy first via update_debt
+    Note that if a strategy is removed erroneously it can be readded and the loss will be credited as profit. Fees will apply
+    """
     self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
-    self._migrate_strategy(new_strategy, old_strategy, call_migrate_strategy)
-
-@external
-def tend_strategy(strategy: address):
-    self._enforce_role(msg.sender, Roles.KEEPER)
-    self._tend_strategy(strategy)
+    self._revoke_strategy(old_strategy, True)
 
 ## DEBT MANAGEMENT ##
 @external
@@ -1015,6 +1008,7 @@ def update_max_debt_for_strategy(strategy: address, new_max_debt: uint256):
     log UpdatedMaxDebtForStrategy(msg.sender, strategy, new_max_debt)
 
 @external
+@nonreentrant("lock")
 def update_debt(strategy: address, target_debt: uint256) -> uint256:
     self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
     return self._update_debt(strategy, target_debt)
@@ -1032,22 +1026,26 @@ def shutdown_vault():
 ## SHARE MANAGEMENT ##
 ## ERC20 + ERC4626 ##
 @external
+@nonreentrant("lock")
 def deposit(assets: uint256, receiver: address) -> uint256:
     return self._deposit(msg.sender, receiver, assets)
 
 @external
+@nonreentrant("lock")
 def mint(shares: uint256, receiver: address) -> uint256:
     assets: uint256 = self._convert_to_assets(shares)
     self._deposit(msg.sender, receiver, assets)
     return assets
 
 @external
+@nonreentrant("lock")
 def withdraw(assets: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
     shares: uint256 = self._convert_to_shares(assets)
     self._redeem(msg.sender, receiver, owner, shares, strategies)
     return shares
 
 @external
+@nonreentrant("lock")
 def redeem(shares: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
     assets: uint256 = self._redeem(msg.sender, receiver, owner, shares, strategies)
     return assets
