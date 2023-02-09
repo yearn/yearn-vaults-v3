@@ -19,7 +19,7 @@ interface IAccountant:
     def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
 
 interface IQueueManager:
-    def withdraw_queue() -> (DynArray[address, 10]): nonpayable
+    def withdraw_queue(vault: address) -> (DynArray[address, 10]): nonpayable
 
 interface IFactory:
     def protocol_fee_config() -> (uint16, uint32, address): view
@@ -82,7 +82,7 @@ event UpdateAccountant:
     accountant: address
 
 event UpdateQueueManager:
-    queue_manager: address
+    queue_manager: indexed(address)
 
 event UpdatedMaxDebtForStrategy:
     sender: address
@@ -497,7 +497,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
 
     queue_manager: address = self.queue_manager
     if queue_manager != empty(address):
-        strategies = IQueueManager(queue_manager).withdraw_queue()
+        strategies = IQueueManager(queue_manager).withdraw_queue(self)
 
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
@@ -613,6 +613,7 @@ def _revoke_strategy(old_strategy: address, force: bool):
    if self.strategies[old_strategy].current_debt != 0:
     assert force, "strategy has debt"
     loss = self.strategies[old_strategy].current_debt
+    self.total_debt -= loss
    
 
    # NOTE: strategy params are set to 0 (WARNING: it can be readded)
