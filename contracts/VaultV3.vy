@@ -483,7 +483,7 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
 
 
 @internal
-def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: uint256, strategies: DynArray[address, 10] = []) -> uint256:
+def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: uint256, strategies: DynArray[address, 10]) -> uint256:
     if sender != owner:
         self._spend_allowance(owner, sender, shares_to_burn)
 
