@@ -90,6 +90,9 @@ event UpdateDepositLimit:
 event UpdateMinimumTotalIdle:
     minimum_total_idle: uint256
 
+event UpdateProfitMaxUnlockTime:
+    profit_max_unlock_time: uint256
+
 event Shutdown:
     pass
 
@@ -121,7 +124,6 @@ enum Roles:
 # IMMUTABLE #
 ASSET: immutable(ERC20)
 DECIMALS: immutable(uint256)
-PROFIT_MAX_UNLOCK_TIME: immutable(uint256)
 FACTORY: public(immutable(address))
 
 # STORAGE #
@@ -160,6 +162,7 @@ name: public(String[64])
 # ERC20 - symbol of the token
 symbol: public(String[32])
 
+profit_max_unlock_time: public(uint256)
 full_profit_unlock_date: public(uint256)
 profit_unlocking_rate: public(uint256)
 last_profit_update: uint256
@@ -180,8 +183,7 @@ def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: a
 
     FACTORY = msg.sender
 
-    PROFIT_MAX_UNLOCK_TIME = profit_max_unlock_time
-
+    self.profit_max_unlock_time = profit_max_unlock_time
     self.name = name
     self.symbol = symbol
     self.last_report = block.timestamp
@@ -266,7 +268,7 @@ def _burn_shares(shares: uint256, owner: address):
 @internal
 def _unlocked_shares() -> uint256:
   # To avoid sudden price_per_share, shares are minted and insta-locked.
-  # Shares that have been locked are gradually unlocked over PROFIT_MAX_UNLOCK_TIME seconds
+  # Shares that have been locked are gradually unlocked over profit_max_unlock_time seconds
   _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
   unlocked_shares: uint256 = 0
   if _full_profit_unlock_date > block.timestamp:
@@ -771,7 +773,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     Different strategies might choose different reporting strategies: pessimistic, only realised P&L, ...
     The best way to report depends on the strategy
 
-    The profit will be distributed following a smooth curve over the next PROFIT_MAX_UNLOCK_TIME seconds. 
+    The profit will be distributed following a smooth curve over the next profit_max_unlock_time seconds. 
     Losses will be taken immediately, first from the profit buffer (avoiding an impact in pps), then will reduce pps
     """
     assert self.strategies[strategy].activation != 0, "inactive strategy"
@@ -870,9 +872,9 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     # Update unlocking rate and time to fully unlocked
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
-    _profit_max_unlock_time: uint256 = PROFIT_MAX_UNLOCK_TIME
+    _profit_max_unlock_time: uint256 = self.profit_max_unlock_time
     if total_locked_shares > 0 and _profit_max_unlock_time > 0:
-      # new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the PROFIT_MAX_UNLOCK_TIME
+      # new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the profit_max_unlock_time
       new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * _profit_max_unlock_time) / total_locked_shares
       self.profit_unlocking_rate = total_locked_shares * MAX_BPS_EXTENDED / new_profit_locking_period
       self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
@@ -913,6 +915,14 @@ def set_minimum_total_idle(minimum_total_idle: uint256):
     self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
     self.minimum_total_idle = minimum_total_idle
     log UpdateMinimumTotalIdle(minimum_total_idle)
+
+@external
+def set_profit_max_unlock_time(new_profit_max_unlock_time: uint256):
+    # no need to update locking period as the current period will use the old rate
+    # and on the next report it will be reset with the new unlocking time
+    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
+    self.profit_max_unlock_time = new_profit_max_unlock_time
+    log UpdateProfitMaxUnlockTime(new_profit_max_unlock_time)
 
 # ROLE MANAGEMENT #
 @internal
