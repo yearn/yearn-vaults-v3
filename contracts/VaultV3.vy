@@ -108,6 +108,7 @@ struct StrategyParams:
 MAX_BPS: constant(uint256) = 10_000
 MAX_BPS_EXTENDED: constant(uint256) = 1_000_000_000_000
 PROTOCOL_FEE_ASSESSMENT_PERIOD: constant(uint256) = 24 * 3600 # assess once a day
+API_VERSION: constant(String[28]) = "0.1.0"
 
 # ENUMS #
 enum Roles:
@@ -122,9 +123,6 @@ ASSET: immutable(ERC20)
 DECIMALS: immutable(uint256)
 PROFIT_MAX_UNLOCK_TIME: immutable(uint256)
 FACTORY: public(immutable(address))
-
-# CONSTANTS #
-API_VERSION: constant(String[28]) = "0.1.0"
 
 # STORAGE #
 # HashMap that records all the strategies that are allowed to receive assets from the vault
