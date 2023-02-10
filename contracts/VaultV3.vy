@@ -691,7 +691,8 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         post_balance: uint256 = ASSET.balanceOf(self)
         
         # making sure we are changing according to the real result no matter what. This will spend more gas but makes it more robust
-        assets_to_withdraw = post_balance - pre_balance
+        # also prevents issues from faulty strategy that either under or over delievers 'assets_to_withdraw'
+        assets_to_withdraw = min(post_balance - pre_balance, current_debt)
 
         self.total_idle += assets_to_withdraw
         self.total_debt -= assets_to_withdraw
