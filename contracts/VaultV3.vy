@@ -289,13 +289,11 @@ def _burn_unlocked_shares():
   """
   unlocked_shares: uint256 = self._unlocked_shares()
   if unlocked_shares == 0:
-    return 0
+    return
   
   # update variables (done here to keep _unlocked_shares() as a view function)
   if self.full_profit_unlock_date > block.timestamp:
     self.last_profit_update = block.timestamp
-  else:
-    self.profit_unlocking_rate = 0
 
   self._burn_shares(unlocked_shares, self)
 
