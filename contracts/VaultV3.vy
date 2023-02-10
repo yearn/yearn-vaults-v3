@@ -283,7 +283,7 @@ def _total_supply() -> uint256:
   return self.total_supply - self._unlocked_shares()
 
 @internal
-def _burn_unlocked_shares() -> uint256:
+def _burn_unlocked_shares():
   """
   Burns shares that have been unlocked since last update. In case the full unlocking period has passed, it stops the unlocking
   """
@@ -298,7 +298,6 @@ def _burn_unlocked_shares() -> uint256:
     self.profit_unlocking_rate = 0
 
   self._burn_shares(unlocked_shares, self)
-  return unlocked_shares
 
 @view
 @internal
