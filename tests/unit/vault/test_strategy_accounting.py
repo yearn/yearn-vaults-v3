@@ -16,7 +16,9 @@ def set_role(vault, gov):
         ROLES.EMERGENCY_MANAGER
         | ROLES.STRATEGY_MANAGER
         | ROLES.DEBT_MANAGER
-        | ROLES.ACCOUNTING_MANAGER,
+        | ROLES.ACCOUNTING_MANAGER
+        | ROLES.REPORTING_MANAGER
+        | ROLES.SET_ACCOUNTANT_MANAGER,
         sender=gov,
     )
 

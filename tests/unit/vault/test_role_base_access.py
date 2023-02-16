@@ -66,18 +66,18 @@ def test_migrate_strategy__strategy_manager(
     assert event[0].new_strategy == new_strategy.address
 
 
-# DEBT_MANAGER
+# ACCOUNTING_MANAGER
 
 
-def test_set_minimum_total_idle__no_debt_manager__reverts(bunny, vault):
+def test_set_minimum_total_idle__no_accounting_manager__reverts(bunny, vault):
     minimum_total_idle = 1
     with ape.reverts():
         vault.set_minimum_total_idle(minimum_total_idle, sender=bunny)
 
 
-def test_set_minimum_total_idle__debt_manager(gov, vault, bunny):
+def test_set_minimum_total_idle__accounting_manager(gov, vault, bunny):
     # We temporarily give bunny the role of DEBT_MANAGER
-    vault.set_role(bunny.address, ROLES.DEBT_MANAGER, sender=gov)
+    vault.set_role(bunny.address, ROLES.ACCOUNTING_MANAGER, sender=gov)
 
     assert vault.minimum_total_idle() == 0
     minimum_total_idle = 1
@@ -85,7 +85,7 @@ def test_set_minimum_total_idle__debt_manager(gov, vault, bunny):
     assert vault.minimum_total_idle() == 1
 
 
-def test_update_max_debt__no_debt_manager__reverts(vault, strategy, bunny):
+def test_update_max_debt__no_accounting_manager__reverts(vault, strategy, bunny):
     assert vault.strategies(strategy).max_debt == 0
     max_debt_for_strategy = 1
     with ape.reverts():
@@ -94,9 +94,9 @@ def test_update_max_debt__no_debt_manager__reverts(vault, strategy, bunny):
         )
 
 
-def test_update_max_debt__debt_manager(gov, vault, strategy, bunny):
+def test_update_max_debt__accounting_manager(gov, vault, strategy, bunny):
     # We temporarily give bunny the role of DEBT_MANAGER
-    vault.set_role(bunny.address, ROLES.DEBT_MANAGER, sender=gov)
+    vault.set_role(bunny.address, ROLES.ACCOUNTING_MANAGER, sender=gov)
 
     assert vault.strategies(strategy).max_debt == 0
     max_debt_for_strategy = 1
@@ -104,7 +104,59 @@ def test_update_max_debt__debt_manager(gov, vault, strategy, bunny):
     assert vault.strategies(strategy).max_debt == 1
 
 
-def test_update_debt__no_debt_manager__reverts(vault, strategy, bunny):
+def test_set_deposit_limit__no_accounting_manager__reverts(bunny, vault):
+    deposit_limit = 1
+    with ape.reverts():
+        vault.set_deposit_limit(deposit_limit, sender=bunny)
+
+
+def test_set_deposit_limit__accounting_manager(gov, vault, bunny):
+    # We temporarily give bunny the role of DEBT_MANAGER
+    vault.set_role(bunny.address, ROLES.ACCOUNTING_MANAGER, sender=gov)
+
+    deposit_limit = 1
+    assert vault.deposit_limit() != deposit_limit
+    vault.set_deposit_limit(deposit_limit, sender=bunny)
+    assert vault.deposit_limit() == deposit_limit
+
+
+# SWEEPER
+
+
+def test_sweep__no_sweeper__reverts(vault, strategy, bunny):
+    with ape.reverts():
+        vault.process_report(strategy, sender=bunny)
+
+
+def test_sweep__sweeper(
+    gov,
+    asset,
+    vault,
+    bunny,
+    airdrop_asset,
+    mint_and_deposit_into_vault,
+):
+    # We temporarily give bunny the role of ACCOUNTING_MANAGER
+    vault.set_role(bunny.address, ROLES.SWEEPER, sender=gov)
+
+    vault_balance = 10**22
+    asset_airdrop = vault_balance // 10
+    mint_and_deposit_into_vault(vault, gov, vault_balance)
+
+    airdrop_asset(gov, asset, vault, asset_airdrop)
+
+    tx = vault.sweep(asset.address, sender=bunny)
+    event = list(tx.decode_logs(vault.Sweep))
+
+    assert len(event) == 1
+    assert event[0].token == asset.address
+    assert event[0].amount == asset_airdrop
+
+
+# DEBT_MANAGER
+
+
+def test_update_debt__no_debt_manager__reverts(vault, gov, strategy, bunny):
     with ape.reverts():
         vault.update_debt(strategy, 10**18, sender=bunny)
 
@@ -119,7 +171,7 @@ def test_update_debt__debt_manager(
     mint_and_deposit_into_vault(vault, gov, 10**18, 10**18 // 2)
 
     max_debt_for_strategy = 1
-    vault.update_max_debt_for_strategy(strategy, max_debt_for_strategy, sender=bunny)
+    vault.update_max_debt_for_strategy(strategy, max_debt_for_strategy, sender=gov)
 
     tx = vault.update_debt(strategy, max_debt_for_strategy, sender=bunny)
 
@@ -149,19 +201,19 @@ def test_shutdown_vault__emergency_manager(gov, vault, bunny):
     event = list(tx.decode_logs(vault.Shutdown))
     assert len(event) == 1
     # lets ensure that we give the EMERGENCY_MANAGER DEBT_MANAGER permissions after shutdown
-    # EMERGENCY_MANAGER=4 DEBT_MANGER=2 -> binary or operation should give us 6 (110)
-    assert vault.roles(bunny) == 6
+    # EMERGENCY_MANAGER=64 DEBT_MANGER=2 -> binary or operation should give us 66 (1000010)
+    assert vault.roles(bunny) == 66
 
 
-# ACCOUNTING_MANAGER
+# REPORTING_MANAGER
 
 
-def test_process_report__no_accounting_manager__reverts(vault, strategy, bunny):
+def test_process_report__no_reporting_manager__reverts(vault, strategy, bunny):
     with ape.reverts():
         vault.process_report(strategy, sender=bunny)
 
 
-def test_process_report__accounting_manager(
+def test_process_report__reporting_manager(
     gov,
     vault,
     asset,
@@ -172,7 +224,7 @@ def test_process_report__accounting_manager(
     mint_and_deposit_into_vault,
 ):
     # We temporarily give bunny the role of ACCOUNTING_MANAGER
-    vault.set_role(bunny.address, ROLES.ACCOUNTING_MANAGER, sender=gov)
+    vault.set_role(bunny.address, ROLES.REPORTING_MANAGER, sender=gov)
 
     # Provide liquidity into vault
     mint_and_deposit_into_vault(vault, gov, 10**18, 10**18 // 2)
@@ -190,31 +242,18 @@ def test_process_report__accounting_manager(
     assert event[0].loss == 0
 
 
-def test_sweep__no_accounting_manager__reverts(vault, strategy, bunny):
+# SET_ACCOUNTANT_MANAGER
+
+
+def test_set_accountant__no_set_accountant_manager__reverts(bunny, vault):
     with ape.reverts():
-        vault.process_report(strategy, sender=bunny)
+        vault.set_accountant(bunny, sender=bunny)
 
 
-def test_sweep__accounting_manager(
-    gov,
-    asset,
-    vault,
-    bunny,
-    airdrop_asset,
-    mint_and_deposit_into_vault,
-):
-    # We temporarily give bunny the role of ACCOUNTING_MANAGER
-    vault.set_role(bunny.address, ROLES.ACCOUNTING_MANAGER, sender=gov)
+def test_set_accountant__set_accountant_manager(gov, vault, bunny):
+    # We temporarily give bunny the role of DEBT_MANAGER
+    vault.set_role(bunny.address, ROLES.SET_ACCOUNTANT_MANAGER, sender=gov)
 
-    vault_balance = 10**22
-    asset_airdrop = vault_balance // 10
-    mint_and_deposit_into_vault(vault, gov, vault_balance)
-
-    airdrop_asset(gov, asset, vault, asset_airdrop)
-
-    tx = vault.sweep(asset.address, sender=bunny)
-    event = list(tx.decode_logs(vault.Sweep))
-
-    assert len(event) == 1
-    assert event[0].token == asset.address
-    assert event[0].amount == asset_airdrop
+    assert vault.accountant() != bunny
+    vault.set_accountant(bunny, sender=bunny)
+    assert vault.accountant() == bunny

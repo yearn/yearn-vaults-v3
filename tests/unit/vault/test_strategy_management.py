@@ -206,7 +206,11 @@ def test_migrate_locked_strategy__with_existing_debt__reverts(
     amount = fish_amount
     shares = amount
 
-    vault.set_role(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
+    vault.set_role(
+        gov.address,
+        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        sender=gov,
+    )
     user_deposit(fish, vault, asset, amount)
     add_strategy_to_vault(gov, locked_strategy, vault)
     add_debt_to_strategy(gov, locked_strategy, vault, amount)
@@ -272,7 +276,11 @@ def test_migrate_lossy_strategy__with_existing_debt__migrates(
     amount = fish_amount
     shares = amount
 
-    vault.set_role(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
+    vault.set_role(
+        gov.address,
+        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        sender=gov,
+    )
     user_deposit(fish, vault, asset, amount)
     add_strategy_to_vault(gov, lossy_strategy, vault)
     add_debt_to_strategy(gov, lossy_strategy, vault, amount)

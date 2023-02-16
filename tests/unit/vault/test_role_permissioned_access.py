@@ -127,10 +127,10 @@ def test_migrate_strategy__set_strategy_role_open_then_close__reverts(
         vault.migrate_strategy(other_new_strategy, new_strategy, sender=bunny)
 
 
-# ACCOUNTING_MANAGER
+# REPORTING_MANAGER
 
 
-def test_process_report__accounting_role_closed__reverts(
+def test_process_report__reporting_role_closed__reverts(
     vault, create_strategy, bunny, gov
 ):
     new_strategy = create_strategy(vault)
@@ -149,7 +149,7 @@ def test_update_profit_unlock__accounting_role_closed__reverts(vault, bunny):
         vault.set_profit_max_unlock_time(WEEK * 2, sender=bunny)
 
 
-def test_process_report__set_accounting_role_open(
+def test_process_report__set_reporting_role_open(
     vault,
     create_strategy,
     asset,
@@ -165,22 +165,12 @@ def test_process_report__set_accounting_role_open(
     new_strategy = create_strategy(vault)
     add_strategy_to_vault(gov, new_strategy, vault)
     add_debt_to_strategy(gov, new_strategy, vault, fish_amount)
-    vault.set_open_role(ROLES.ACCOUNTING_MANAGER, sender=gov)
+    vault.set_open_role(ROLES.REPORTING_MANAGER, sender=gov)
     asset.mint(new_strategy, fish_amount, sender=gov)
     tx = vault.process_report(new_strategy, sender=bunny)
     event = list(tx.decode_logs(vault.StrategyReported))
     assert len(event) == 1
     assert event[0].strategy == new_strategy.address and event[0].gain == fish_amount
-
-
-def test_sweep__set_accounting_role_open(vault, fish_amount, asset, bunny, gov):
-    asset.mint(vault, fish_amount, sender=gov)
-    vault.set_open_role(ROLES.ACCOUNTING_MANAGER, sender=gov)
-    tx = vault.sweep(asset, sender=bunny)
-    event = list(tx.decode_logs(vault.Sweep))
-    assert len(event) == 1
-    assert event[0].token == asset.address
-    assert asset.balanceOf(bunny) == fish_amount
 
 
 def test_update_profit_unlock__set_accounting_role_open(vault, bunny, gov):
@@ -191,11 +181,49 @@ def test_update_profit_unlock__set_accounting_role_open(vault, bunny, gov):
     assert event[0].profit_max_unlock_time == WEEK * 2
     vault.profit_max_unlock_time() == WEEK * 2
 
+    
+def test_process_report__set_reporting_role_open_then_close__reverts(
+    vault,
+    create_strategy,
+    asset,
+    fish_amount,
+    user_deposit,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    bunny,
+    gov,
+):
+    asset.mint(bunny, fish_amount, sender=gov)
+    user_deposit(bunny, vault, asset, fish_amount)
+    new_strategy = create_strategy(vault)
+    add_strategy_to_vault(gov, new_strategy, vault)
+    add_debt_to_strategy(gov, new_strategy, vault, fish_amount)
+    vault.set_open_role(ROLES.REPORTING_MANAGER, sender=gov)
+    asset.mint(new_strategy, fish_amount, sender=gov)
+    tx = vault.process_report(new_strategy, sender=bunny)
+    event = list(tx.decode_logs(vault.StrategyReported))
+    assert len(event) == 1
+    assert event[0].strategy == new_strategy.address and event[0].gain == fish_amount
+    # close role
+    vault.close_open_role(ROLES.REPORTING_MANAGER, sender=gov)
+    with ape.reverts():
+        vault.process_report(new_strategy, sender=bunny)
 
-# DEBT_MANAGER
+
+# ACCOUNTING_MANAGER
 
 
-def test_update_max_debt_for_strategy__debt_role_closed__reverts(
+def test_set_minimum_total_idle__accounting_role_closed__reverts(vault, bunny):
+    with ape.reverts():
+        vault.set_minimum_total_idle(0, sender=bunny)
+
+
+def test_set_deposit_limit__accounting_role_closed__reverts(vault, bunny):
+    with ape.reverts():
+        vault.set_deposit_limit(0, sender=bunny)
+
+
+def test_update_max_debt_for_strategy__accounting_role_closed__reverts(
     vault, create_strategy, bunny, gov
 ):
     new_strategy = create_strategy(vault)
@@ -204,24 +232,124 @@ def test_update_max_debt_for_strategy__debt_role_closed__reverts(
         vault.update_max_debt_for_strategy(new_strategy, 0, sender=bunny)
 
 
+def test_set_minimum_total_idle__set_accounting_role_open(vault, bunny, gov):
+    vault.set_open_role(ROLES.ACCOUNTING_MANAGER, sender=gov)
+    tx = vault.set_minimum_total_idle(0, sender=bunny)
+    event = list(tx.decode_logs(vault.UpdateMinimumTotalIdle))
+    assert len(event) == 1
+    assert event[0].minimum_total_idle == 0
+
+
+def test_set_deposit_limit__set_accounting_role_open(vault, bunny, gov):
+    vault.set_open_role(ROLES.ACCOUNTING_MANAGER, sender=gov)
+    tx = vault.set_deposit_limit(0, sender=bunny)
+    event = list(tx.decode_logs(vault.UpdateDepositLimit))
+    assert len(event) == 1
+    assert event[0].deposit_limit == 0
+
+
+def test_update_max_debt_for_strategy__accounting_limit_role_open(
+    vault, create_strategy, bunny, gov
+):
+    vault.set_open_role(ROLES.ACCOUNTING_MANAGER, sender=gov)
+    new_strategy = create_strategy(vault)
+    vault.add_strategy(new_strategy, sender=gov)
+    tx = vault.update_max_debt_for_strategy(new_strategy, 420, sender=bunny)
+    event = list(tx.decode_logs(vault.UpdatedMaxDebtForStrategy))
+    assert len(event) == 1
+    assert (
+        event[0].sender == bunny.address and event[0].strategy == new_strategy.address
+    )
+    assert event[0].new_debt == 420
+
+
+def test_set_minimum_total_idle__set_accounting_role_open_then_close__reverts(
+    vault, bunny, gov
+):
+    vault.set_open_role(ROLES.ACCOUNTING_MANAGER, sender=gov)
+    tx = vault.set_minimum_total_idle(0, sender=bunny)
+    event = list(tx.decode_logs(vault.UpdateMinimumTotalIdle))
+    assert len(event) == 1
+    assert event[0].minimum_total_idle == 0
+    # close role
+    vault.close_open_role(ROLES.ACCOUNTING_MANAGER, sender=gov)
+    with ape.reverts():
+        vault.set_minimum_total_idle(0, sender=bunny)
+
+
+def test_set_deposit_limit__set_accounting_role_open(vault, bunny, gov):
+    vault.set_open_role(ROLES.ACCOUNTING_MANAGER, sender=gov)
+    tx = vault.set_deposit_limit(0, sender=bunny)
+    event = list(tx.decode_logs(vault.UpdateDepositLimit))
+    assert len(event) == 1
+    assert event[0].deposit_limit == 0
+    # close role
+    vault.close_open_role(ROLES.ACCOUNTING_MANAGER, sender=gov)
+    with ape.reverts():
+        vault.set_deposit_limit(0, sender=bunny)
+
+
+def test_update_max_debt_for_strategy__set_accounting_role_open_then_close__reverts(
+    vault, create_strategy, bunny, gov
+):
+    vault.set_open_role(ROLES.ACCOUNTING_MANAGER, sender=gov)
+    new_strategy = create_strategy(vault)
+    vault.add_strategy(new_strategy, sender=gov)
+    tx = vault.update_max_debt_for_strategy(new_strategy, 420, sender=bunny)
+    event = list(tx.decode_logs(vault.UpdatedMaxDebtForStrategy))
+    assert len(event) == 1
+    assert (
+        event[0].sender == bunny.address and event[0].strategy == new_strategy.address
+    )
+    assert event[0].new_debt == 420
+    # close role
+    vault.close_open_role(ROLES.ACCOUNTING_MANAGER, sender=gov)
+    with ape.reverts():
+        vault.update_max_debt_for_strategy(new_strategy, 420, sender=bunny)
+
+
+# SWEEPER
+
+
+def test_sweep__sweeper_role_closed__reverts(vault, mock_token, bunny):
+    with ape.reverts():
+        vault.sweep(mock_token, sender=bunny)
+
+
+def test_sweep__set_sweeper_role_open(vault, fish_amount, asset, bunny, gov):
+    asset.mint(vault, fish_amount, sender=gov)
+    vault.set_open_role(ROLES.SWEEPER, sender=gov)
+    tx = vault.sweep(asset, sender=bunny)
+    event = list(tx.decode_logs(vault.Sweep))
+    assert len(event) == 1
+    assert event[0].token == asset.address
+    assert asset.balanceOf(bunny) == fish_amount
+
+
+def test_sweep__set_sweeper_role_open_then_close__reverts(
+    vault, fish_amount, asset, bunny, gov
+):
+    asset.mint(vault, fish_amount, sender=gov)
+    vault.set_open_role(ROLES.SWEEPER, sender=gov)
+    tx = vault.sweep(asset, sender=bunny)
+    event = list(tx.decode_logs(vault.Sweep))
+    assert len(event) == 1
+    assert event[0].token == asset.address
+    assert asset.balanceOf(bunny) == fish_amount
+    # close role
+    vault.close_open_role(ROLES.SWEEPER, sender=gov)
+    with ape.reverts():
+        vault.sweep(asset, sender=bunny)
+
+
+# DEBT_MANAGER
+
+
 def test_update_debt__debt_role_closed__reverts(vault, create_strategy, bunny, gov):
     new_strategy = create_strategy(vault)
     vault.add_strategy(new_strategy, sender=gov)
     with ape.reverts():
         vault.update_debt(new_strategy, 0, sender=bunny)
-
-
-def test_set_minimum_total_idle__debt_role_closed__reverts(vault, bunny):
-    with ape.reverts():
-        vault.set_minimum_total_idle(0, sender=bunny)
-
-
-def test_set_minimum_total_idle__set_debt_role_open(vault, bunny, gov):
-    vault.set_open_role(ROLES.DEBT_MANAGER, sender=gov)
-    tx = vault.set_minimum_total_idle(0, sender=bunny)
-    event = list(tx.decode_logs(vault.UpdateMinimumTotalIdle))
-    assert len(event) == 1
-    assert event[0].minimum_total_idle == 0
 
 
 def test_update_debt__set_debt_role_open(
@@ -236,35 +364,6 @@ def test_update_debt__set_debt_role_open(
     event = list(tx.decode_logs(vault.DebtUpdated))
     assert len(event) == 1
     assert event[0].strategy == new_strategy.address and event[0].new_debt == 1337
-
-
-def test_update_max_debt_for_strategy__set_debt_role_open(
-    vault, create_strategy, bunny, gov
-):
-    vault.set_open_role(ROLES.DEBT_MANAGER, sender=gov)
-    new_strategy = create_strategy(vault)
-    vault.add_strategy(new_strategy, sender=gov)
-    tx = vault.update_max_debt_for_strategy(new_strategy, 420, sender=bunny)
-    event = list(tx.decode_logs(vault.UpdatedMaxDebtForStrategy))
-    assert len(event) == 1
-    assert (
-        event[0].sender == bunny.address and event[0].strategy == new_strategy.address
-    )
-    assert event[0].new_debt == 420
-
-
-def test_set_minimum_total_idle__set_debt_role_open_then_close__reverts(
-    vault, bunny, gov
-):
-    vault.set_open_role(ROLES.DEBT_MANAGER, sender=gov)
-    tx = vault.set_minimum_total_idle(0, sender=bunny)
-    event = list(tx.decode_logs(vault.UpdateMinimumTotalIdle))
-    assert len(event) == 1
-    assert event[0].minimum_total_idle == 0
-    # close role
-    vault.close_open_role(ROLES.DEBT_MANAGER, sender=gov)
-    with ape.reverts():
-        vault.set_minimum_total_idle(0, sender=bunny)
 
 
 def test_update_debt__set_debt_role_open_then_close__reverts(
@@ -285,23 +384,37 @@ def test_update_debt__set_debt_role_open_then_close__reverts(
         vault.update_debt(new_strategy, 1337, sender=bunny)
 
 
-def test_update_max_debt_for_strategy__set_debt_role_open_then_close__reverts(
-    vault, create_strategy, bunny, gov
-):
-    vault.set_open_role(ROLES.DEBT_MANAGER, sender=gov)
-    new_strategy = create_strategy(vault)
-    vault.add_strategy(new_strategy, sender=gov)
-    tx = vault.update_max_debt_for_strategy(new_strategy, 420, sender=bunny)
-    event = list(tx.decode_logs(vault.UpdatedMaxDebtForStrategy))
-    assert len(event) == 1
-    assert (
-        event[0].sender == bunny.address and event[0].strategy == new_strategy.address
-    )
-    assert event[0].new_debt == 420
-    # close role
-    vault.close_open_role(ROLES.DEBT_MANAGER, sender=gov)
+# SET_ACCOUNTANT_MANAGER
+
+
+def test_set_accountant__set_accountant_manager_closed__reverts(bunny, vault):
     with ape.reverts():
-        vault.update_max_debt_for_strategy(new_strategy, 420, sender=bunny)
+        vault.set_accountant(bunny, sender=bunny)
+
+
+def test_set_accountant__set_accountant_manager_open(gov, vault, bunny):
+    # We temporarily give bunny the role of DEBT_MANAGER
+    vault.set_open_role(ROLES.SET_ACCOUNTANT_MANAGER, sender=gov)
+
+    assert vault.accountant() != bunny
+    vault.set_accountant(bunny, sender=bunny)
+    assert vault.accountant() == bunny
+
+
+def test_set_accountant__set_accountant_manager_open_then_close__reverts(
+    gov, vault, bunny, fish
+):
+    # We temporarily give bunny the role of DEBT_MANAGER
+    vault.set_open_role(ROLES.SET_ACCOUNTANT_MANAGER, sender=gov)
+
+    assert vault.accountant() != bunny
+    vault.set_accountant(bunny, sender=bunny)
+    assert vault.accountant() == bunny
+
+    vault.close_open_role(ROLES.SET_ACCOUNTANT_MANAGER, sender=gov)
+
+    with ape.reverts():
+        vault.set_accountant(fish, sender=fish)
 
 
 # EMERGENCY_MANAGER
