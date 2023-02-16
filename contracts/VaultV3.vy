@@ -979,6 +979,7 @@ def process_report(strategy: address) -> (uint256, uint256):
 def sweep(token: address) -> (uint256):
     self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
     assert token != self, "can't sweep self"
+    assert self.strategies[token].activation == 0, "can't sweep strategy"
     amount: uint256 = 0
     if token == ASSET.address:
         amount = ASSET.balanceOf(self) - self.total_idle
