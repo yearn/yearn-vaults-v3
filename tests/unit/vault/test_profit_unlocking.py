@@ -2527,7 +2527,6 @@ def test_increase_profit_max_period__no_change(
 
     vault, strategy, _ = initial_set_up(asset, gov, amount, fish)
 
-    
     create_and_check_profit(asset, strategy, gov, vault, first_profit)
     timestamp = chain.pending_timestamp
 
@@ -2554,9 +2553,7 @@ def test_increase_profit_max_period__no_change(
         total_debt=amount + first_profit,
         total_idle=0,
         total_assets=amount + first_profit,
-        total_supply=amount
-        + first_profit
-        - first_profit // (WEEK / time_passed)
+        total_supply=amount + first_profit - first_profit // (WEEK / time_passed),
     )
 
     increase_time_and_check_profit_buffer(chain, vault, secs=WEEK // 2)
@@ -2599,7 +2596,6 @@ def test_decrease_profit_max_period__no_change(
 
     vault, strategy, _ = initial_set_up(asset, gov, amount, fish)
 
-    
     create_and_check_profit(asset, strategy, gov, vault, first_profit)
     timestamp = chain.pending_timestamp
 
@@ -2626,9 +2622,7 @@ def test_decrease_profit_max_period__no_change(
         total_debt=amount + first_profit,
         total_idle=0,
         total_assets=amount + first_profit,
-        total_supply=amount
-        + first_profit
-        - first_profit // (WEEK / time_passed)
+        total_supply=amount + first_profit - first_profit // (WEEK / time_passed),
     )
 
     increase_time_and_check_profit_buffer(chain, vault, secs=WEEK // 2)
@@ -2671,7 +2665,7 @@ def test_increase_profit_max_period__next_report_works(
     second_profit = fish_amount // 10
 
     vault, strategy, _ = initial_set_up(asset, gov, amount, fish)
-    
+
     create_and_check_profit(asset, strategy, gov, vault, first_profit)
     timestamp = chain.pending_timestamp
 
@@ -2698,9 +2692,7 @@ def test_increase_profit_max_period__next_report_works(
         total_debt=amount + first_profit,
         total_idle=0,
         total_assets=amount + first_profit,
-        total_supply=amount
-        + first_profit
-        - first_profit // (WEEK / time_passed)
+        total_supply=amount + first_profit - first_profit // (WEEK / time_passed),
     )
 
     increase_time_and_check_profit_buffer(chain, vault, secs=WEEK // 2)
@@ -2718,7 +2710,7 @@ def test_increase_profit_max_period__next_report_works(
         total_debt=amount + first_profit + second_profit,
         total_idle=0,
         total_assets=amount + first_profit + second_profit,
-        total_supply=amount + expected_new_shares, 
+        total_supply=amount + expected_new_shares,
     )
 
     # increase by a full week which is now only half the profit unlock time
@@ -2727,7 +2719,7 @@ def test_increase_profit_max_period__next_report_works(
     )
 
     time_passed = chain.pending_timestamp - timestamp
-    
+
     check_vault_totals(
         vault,
         total_debt=amount + first_profit + second_profit,
@@ -2735,7 +2727,7 @@ def test_increase_profit_max_period__next_report_works(
         total_assets=amount + first_profit + second_profit,
         total_supply=amount
         + expected_new_shares
-        - expected_new_shares // (WEEK * 2 / time_passed)
+        - expected_new_shares // (WEEK * 2 / time_passed),
     )
 
     increase_time_and_check_profit_buffer(chain, vault, secs=WEEK)
@@ -2778,7 +2770,7 @@ def test_decrease_profit_max_period__next_report_works(
     second_profit = fish_amount // 10
 
     vault, strategy, _ = initial_set_up(asset, gov, amount, fish)
-    
+
     create_and_check_profit(asset, strategy, gov, vault, first_profit)
     timestamp = chain.pending_timestamp
 
@@ -2805,9 +2797,7 @@ def test_decrease_profit_max_period__next_report_works(
         total_debt=amount + first_profit,
         total_idle=0,
         total_assets=amount + first_profit,
-        total_supply=amount
-        + first_profit
-        - first_profit // (WEEK / time_passed)
+        total_supply=amount + first_profit - first_profit // (WEEK / time_passed),
     )
 
     increase_time_and_check_profit_buffer(chain, vault, secs=WEEK // 2)
@@ -2825,7 +2815,7 @@ def test_decrease_profit_max_period__next_report_works(
         total_debt=amount + first_profit + second_profit,
         total_idle=0,
         total_assets=amount + first_profit + second_profit,
-        total_supply=amount + expected_new_shares, 
+        total_supply=amount + expected_new_shares,
     )
 
     # increase by a quarter week which is now half the profit unlock time
@@ -2834,7 +2824,7 @@ def test_decrease_profit_max_period__next_report_works(
     )
 
     time_passed = chain.pending_timestamp - timestamp
-    
+
     check_vault_totals(
         vault,
         total_debt=amount + first_profit + second_profit,
@@ -2842,7 +2832,7 @@ def test_decrease_profit_max_period__next_report_works(
         total_assets=amount + first_profit + second_profit,
         total_supply=amount
         + expected_new_shares
-        - expected_new_shares // (WEEK // 2 / time_passed)
+        - expected_new_shares // (WEEK // 2 / time_passed),
     )
 
     increase_time_and_check_profit_buffer(chain, vault, secs=WEEK // 4)

@@ -22,7 +22,15 @@ def test_sweep__with_vault_token__reverts(gov, asset, vault):
         vault.sweep(vault.address, sender=gov)
 
 
-def test_sweep__with_strategies_token__reverts(chain, gov, asset, vault, create_strategy, mint_and_deposit_into_vault, add_debt_to_strategy):
+def test_sweep__with_strategies_token__reverts(
+    chain,
+    gov,
+    asset,
+    vault,
+    create_strategy,
+    mint_and_deposit_into_vault,
+    add_debt_to_strategy,
+):
     new_strategy = create_strategy(vault)
     vault.add_strategy(new_strategy.address, sender=gov)
 
@@ -34,7 +42,16 @@ def test_sweep__with_strategies_token__reverts(chain, gov, asset, vault, create_
         vault.sweep(new_strategy, sender=gov)
 
 
-def test_sweep__with_strategies_token__been_revoked__sweeps(chain, gov, asset, vault, create_strategy, mint_and_deposit_into_vault, add_debt_to_strategy, mint_and_deposit_into_strategy):
+def test_sweep__with_strategies_token__been_revoked__sweeps(
+    chain,
+    gov,
+    asset,
+    vault,
+    create_strategy,
+    mint_and_deposit_into_vault,
+    add_debt_to_strategy,
+    mint_and_deposit_into_strategy,
+):
     new_strategy = create_strategy(vault)
     vault.add_strategy(new_strategy.address, sender=gov)
 
@@ -44,7 +61,7 @@ def test_sweep__with_strategies_token__been_revoked__sweeps(chain, gov, asset, v
 
     with ape.reverts("can't sweep strategy"):
         vault.sweep(new_strategy, sender=gov)
-        
+
     # remove debt and revoke strategy
     vault.update_debt(new_strategy, 0, sender=gov)
     vault.revoke_strategy(new_strategy, sender=gov)
