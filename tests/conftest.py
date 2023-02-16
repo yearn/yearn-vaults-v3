@@ -201,7 +201,12 @@ def create_vault(project, gov, vault_factory):
 
         vault.set_role(
             gov.address,
-            ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+            ROLES.STRATEGY_MANAGER
+            | ROLES.DEBT_MANAGER
+            | ROLES.REPORTING_MANAGER
+            | ROLES.ACCOUNTING_MANAGER
+            | ROLES.SET_ACCOUNTANT_MANAGER
+            | ROLES.SWEEPER,
             sender=gov,
         )
 

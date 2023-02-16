@@ -112,10 +112,13 @@ PROTOCOL_FEE_ASSESSMENT_PERIOD: constant(uint256) = 24 * 3600 # assess once a da
 
 # ENUMS #
 enum Roles:
-    STRATEGY_MANAGER
-    DEBT_MANAGER
-    EMERGENCY_MANAGER
-    ACCOUNTING_MANAGER
+    STRATEGY_MANAGER # adds and removes strategies
+    DEBT_MANAGER # adds and remove debt from strategies
+    REPORTING_MANAGER # calls report for a strategy
+    ACCOUNTING_MANAGER # sets deposit, debt and idle limits
+    SET_ACCOUNTANT_MANAGER # can set the accountant that assesss fees
+    SWEEPER # can sweep tokens from the vault
+    EMERGENCY_MANAGER # can shutdown vault in an emergency
     KEEPER
 
 # IMMUTABLE #
@@ -903,7 +906,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
 # SETTERS #
 @external
 def set_accountant(new_accountant: address):
-    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
+    self._enforce_role(msg.sender, Roles.SET_ACCOUNTANT_MANAGER)
     self.accountant = new_accountant
     log UpdateAccountant(new_accountant)
 
@@ -915,7 +918,7 @@ def set_deposit_limit(deposit_limit: uint256):
 
 @external
 def set_minimum_total_idle(minimum_total_idle: uint256):
-    self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
+    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
     self.minimum_total_idle = minimum_total_idle
     log UpdateMinimumTotalIdle(minimum_total_idle)
 
@@ -972,12 +975,12 @@ def available_deposit_limit() -> uint256:
 ## ACCOUNTING MANAGEMENT ##
 @external
 def process_report(strategy: address) -> (uint256, uint256):
-    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
+    self._enforce_role(msg.sender, Roles.REPORTING_MANAGER)
     return self._process_report(strategy)
 
 @external
 def sweep(token: address) -> (uint256):
-    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
+    self._enforce_role(msg.sender, Roles.SWEEPER)
     assert token != self, "can't sweep self"
     amount: uint256 = 0
     if token == ASSET.address:
@@ -1013,7 +1016,7 @@ def tend_strategy(strategy: address):
 ## DEBT MANAGEMENT ##
 @external
 def update_max_debt_for_strategy(strategy: address, new_max_debt: uint256):
-    self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
+    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
     assert self.strategies[strategy].activation != 0, "inactive strategy"
     self.strategies[strategy].max_debt = new_max_debt
 
