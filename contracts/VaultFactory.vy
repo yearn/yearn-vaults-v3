@@ -14,7 +14,7 @@ event UpdateProtocolFeeRecipient:
     new_fee_recipient: address
 
 event UpdateGovernance:
-    governance: address
+    governance: indexed(address)
 
 event NewPendingGovernance:
     pending_governance: indexed(address)
