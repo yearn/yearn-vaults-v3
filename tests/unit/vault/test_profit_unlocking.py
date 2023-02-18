@@ -2517,3 +2517,351 @@ def test_accountant_and_protcol_fees_doesnt_change_pps(
     assert vault.balanceOf(accountant.address) != 0
     assert vault.balanceOf(protocol_recipient) != 0
     assert vault.price_per_share() == starting_pps
+
+
+def test_increase_profit_max_period__no_change(
+    asset, fish_amount, fish, initial_set_up, gov, add_debt_to_strategy
+):
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
+
+    vault, strategy, _ = initial_set_up(asset, gov, amount, fish)
+
+    create_and_check_profit(asset, strategy, gov, vault, first_profit)
+    timestamp = chain.pending_timestamp
+
+    assert_price_per_share(vault, 1.0)
+    check_vault_totals(
+        vault,
+        total_debt=amount + first_profit,
+        total_idle=0,
+        total_assets=amount + first_profit,
+        total_supply=amount + first_profit,
+    )
+
+    increase_time_and_check_profit_buffer(
+        chain, vault, secs=WEEK // 2, expected_buffer=first_profit // 2
+    )
+
+    # update profit max unlock time
+    vault.set_profit_max_unlock_time(WEEK * 2, sender=gov)
+
+    time_passed = chain.pending_timestamp - timestamp
+    # assure the all the amounts is what is originally would have been
+    check_vault_totals(
+        vault,
+        total_debt=amount + first_profit,
+        total_idle=0,
+        total_assets=amount + first_profit,
+        total_supply=amount + first_profit - first_profit // (WEEK / time_passed),
+    )
+
+    increase_time_and_check_profit_buffer(chain, vault, secs=WEEK // 2)
+
+    assert_price_per_share(vault, 2.0)
+
+    add_debt_to_strategy(gov, strategy, vault, 0)
+
+    assert vault.strategies(strategy).current_debt == 0
+    assert_price_per_share(vault, 2.0)
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=amount + first_profit,
+        total_assets=amount + first_profit,
+        total_supply=amount,
+    )
+
+    # User redeems shares
+    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+
+    assert_price_per_share(vault, 1.0)
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=0,
+        total_assets=0,
+        total_supply=0,
+    )
+
+    assert asset.balanceOf(vault) == 0
+    assert asset.balanceOf(fish) == fish_amount + first_profit
+
+
+def test_decrease_profit_max_period__no_change(
+    asset, fish_amount, fish, initial_set_up, gov, add_debt_to_strategy
+):
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
+
+    vault, strategy, _ = initial_set_up(asset, gov, amount, fish)
+
+    create_and_check_profit(asset, strategy, gov, vault, first_profit)
+    timestamp = chain.pending_timestamp
+
+    assert_price_per_share(vault, 1.0)
+    check_vault_totals(
+        vault,
+        total_debt=amount + first_profit,
+        total_idle=0,
+        total_assets=amount + first_profit,
+        total_supply=amount + first_profit,
+    )
+
+    increase_time_and_check_profit_buffer(
+        chain, vault, secs=WEEK // 2, expected_buffer=first_profit // 2
+    )
+
+    # update profit max unlock time
+    vault.set_profit_max_unlock_time(WEEK // 2, sender=gov)
+
+    time_passed = chain.pending_timestamp - timestamp
+    # assure the all the amounts is what is originally would have been
+    check_vault_totals(
+        vault,
+        total_debt=amount + first_profit,
+        total_idle=0,
+        total_assets=amount + first_profit,
+        total_supply=amount + first_profit - first_profit // (WEEK / time_passed),
+    )
+
+    increase_time_and_check_profit_buffer(chain, vault, secs=WEEK // 2)
+
+    assert_price_per_share(vault, 2.0)
+
+    add_debt_to_strategy(gov, strategy, vault, 0)
+
+    assert vault.strategies(strategy).current_debt == 0
+    assert_price_per_share(vault, 2.0)
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=amount + first_profit,
+        total_assets=amount + first_profit,
+        total_supply=amount,
+    )
+
+    # User redeems shares
+    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+
+    assert_price_per_share(vault, 1.0)
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=0,
+        total_assets=0,
+        total_supply=0,
+    )
+
+    assert asset.balanceOf(vault) == 0
+    assert asset.balanceOf(fish) == fish_amount + first_profit
+
+
+def test_increase_profit_max_period__next_report_works(
+    asset, fish_amount, fish, initial_set_up, gov, add_debt_to_strategy
+):
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
+    second_profit = fish_amount // 10
+
+    vault, strategy, _ = initial_set_up(asset, gov, amount, fish)
+
+    create_and_check_profit(asset, strategy, gov, vault, first_profit)
+    timestamp = chain.pending_timestamp
+
+    assert_price_per_share(vault, 1.0)
+    check_vault_totals(
+        vault,
+        total_debt=amount + first_profit,
+        total_idle=0,
+        total_assets=amount + first_profit,
+        total_supply=amount + first_profit,
+    )
+
+    increase_time_and_check_profit_buffer(
+        chain, vault, secs=WEEK // 2, expected_buffer=first_profit // 2
+    )
+
+    # update profit max unlock time
+    vault.set_profit_max_unlock_time(WEEK * 2, sender=gov)
+
+    time_passed = chain.pending_timestamp - timestamp
+    # assure the all the amounts is what is originally would have been
+    check_vault_totals(
+        vault,
+        total_debt=amount + first_profit,
+        total_idle=0,
+        total_assets=amount + first_profit,
+        total_supply=amount + first_profit - first_profit // (WEEK / time_passed),
+    )
+
+    increase_time_and_check_profit_buffer(chain, vault, secs=WEEK // 2)
+
+    assert_price_per_share(vault, 2.0)
+
+    create_and_check_profit(asset, strategy, gov, vault, second_profit)
+    timestamp = chain.pending_timestamp
+
+    assert_price_per_share(vault, 2.0)
+    # only have the amount of shares are issued due to pps = 2.0
+    expected_new_shares = second_profit // 2
+    check_vault_totals(
+        vault,
+        total_debt=amount + first_profit + second_profit,
+        total_idle=0,
+        total_assets=amount + first_profit + second_profit,
+        total_supply=amount + expected_new_shares,
+    )
+
+    # increase by a full week which is now only half the profit unlock time
+    increase_time_and_check_profit_buffer(
+        chain, vault, secs=WEEK, expected_buffer=expected_new_shares // 2
+    )
+
+    time_passed = chain.pending_timestamp - timestamp
+
+    check_vault_totals(
+        vault,
+        total_debt=amount + first_profit + second_profit,
+        total_idle=0,
+        total_assets=amount + first_profit + second_profit,
+        total_supply=amount
+        + expected_new_shares
+        - expected_new_shares // (WEEK * 2 / time_passed),
+    )
+
+    increase_time_and_check_profit_buffer(chain, vault, secs=WEEK)
+
+    assert_price_per_share(vault, 3.0)
+
+    add_debt_to_strategy(gov, strategy, vault, 0)
+
+    assert vault.strategies(strategy).current_debt == 0
+    assert_price_per_share(vault, 3.0)
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=amount + first_profit + second_profit,
+        total_assets=amount + first_profit + second_profit,
+        total_supply=amount,
+    )
+
+    # User redeems shares
+    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+
+    assert_price_per_share(vault, 1.0)
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=0,
+        total_assets=0,
+        total_supply=0,
+    )
+
+    assert asset.balanceOf(vault) == 0
+    assert asset.balanceOf(fish) == fish_amount + first_profit + second_profit
+
+
+def test_decrease_profit_max_period__next_report_works(
+    asset, fish_amount, fish, initial_set_up, gov, add_debt_to_strategy
+):
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
+    second_profit = fish_amount // 10
+
+    vault, strategy, _ = initial_set_up(asset, gov, amount, fish)
+
+    create_and_check_profit(asset, strategy, gov, vault, first_profit)
+    timestamp = chain.pending_timestamp
+
+    assert_price_per_share(vault, 1.0)
+    check_vault_totals(
+        vault,
+        total_debt=amount + first_profit,
+        total_idle=0,
+        total_assets=amount + first_profit,
+        total_supply=amount + first_profit,
+    )
+
+    increase_time_and_check_profit_buffer(
+        chain, vault, secs=WEEK // 2, expected_buffer=first_profit // 2
+    )
+
+    # update profit max unlock time
+    vault.set_profit_max_unlock_time(WEEK // 2, sender=gov)
+
+    time_passed = chain.pending_timestamp - timestamp
+    # assure the all the amounts is what is originally would have been
+    check_vault_totals(
+        vault,
+        total_debt=amount + first_profit,
+        total_idle=0,
+        total_assets=amount + first_profit,
+        total_supply=amount + first_profit - first_profit // (WEEK / time_passed),
+    )
+
+    increase_time_and_check_profit_buffer(chain, vault, secs=WEEK // 2)
+
+    assert_price_per_share(vault, 2.0)
+
+    create_and_check_profit(asset, strategy, gov, vault, second_profit)
+    timestamp = chain.pending_timestamp
+
+    assert_price_per_share(vault, 2.0)
+    # only have the amount of shares are issued due to pps = 2.0
+    expected_new_shares = second_profit // 2
+    check_vault_totals(
+        vault,
+        total_debt=amount + first_profit + second_profit,
+        total_idle=0,
+        total_assets=amount + first_profit + second_profit,
+        total_supply=amount + expected_new_shares,
+    )
+
+    # increase by a quarter week which is now half the profit unlock time
+    increase_time_and_check_profit_buffer(
+        chain, vault, secs=WEEK // 4, expected_buffer=expected_new_shares // 2
+    )
+
+    time_passed = chain.pending_timestamp - timestamp
+
+    check_vault_totals(
+        vault,
+        total_debt=amount + first_profit + second_profit,
+        total_idle=0,
+        total_assets=amount + first_profit + second_profit,
+        total_supply=amount
+        + expected_new_shares
+        - expected_new_shares // (WEEK // 2 / time_passed),
+    )
+
+    increase_time_and_check_profit_buffer(chain, vault, secs=WEEK // 4)
+
+    assert_price_per_share(vault, 3.0)
+
+    add_debt_to_strategy(gov, strategy, vault, 0)
+
+    assert vault.strategies(strategy).current_debt == 0
+    assert_price_per_share(vault, 3.0)
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=amount + first_profit + second_profit,
+        total_assets=amount + first_profit + second_profit,
+        total_supply=amount,
+    )
+
+    # User redeems shares
+    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+
+    assert_price_per_share(vault, 1.0)
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=0,
+        total_assets=0,
+        total_supply=0,
+    )
+
+    assert asset.balanceOf(vault) == 0
+    assert asset.balanceOf(fish) == fish_amount + first_profit + second_profit

@@ -1,5 +1,5 @@
 import ape
-from utils.constants import ROLES
+from utils.constants import ROLES, WEEK
 from utils.utils import from_units
 
 
@@ -86,6 +86,11 @@ def test_sweep__set_accounting_role_open__reverts(vault, mock_token, bunny):
         vault.sweep(mock_token, sender=bunny)
 
 
+def test_update_profit_unlock__accounting_role_closed__reverts(vault, bunny):
+    with ape.reverts():
+        vault.set_profit_max_unlock_time(WEEK * 2, sender=bunny)
+
+
 def test_process_report__set_accounting_role_open(
     vault,
     create_strategy,
@@ -118,6 +123,15 @@ def test_sweep__set_accounting_role_open(vault, fish_amount, asset, bunny, gov):
     assert len(event) == 1
     assert event[0].token == asset.address
     assert asset.balanceOf(bunny) == fish_amount
+
+
+def test_update_profit_unlock__set_accounting_role_open(vault, bunny, gov):
+    vault.set_open_role(ROLES.ACCOUNTING_MANAGER, sender=gov)
+    tx = vault.set_profit_max_unlock_time(WEEK * 2, sender=bunny)
+    event = list(tx.decode_logs(vault.UpdateProfitMaxUnlockTime))
+    assert len(event) == 1
+    assert event[0].profit_max_unlock_time == WEEK * 2
+    vault.profit_max_unlock_time() == WEEK * 2
 
 
 # DEBT_MANAGER

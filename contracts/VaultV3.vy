@@ -1,7 +1,6 @@
 # @version 0.3.7
 
 from vyper.interfaces import ERC20
-from vyper.interfaces import ERC4626
 from vyper.interfaces import ERC20Detailed
 
 # INTERFACES #
@@ -91,6 +90,9 @@ event UpdateDepositLimit:
 event UpdateMinimumTotalIdle:
     minimum_total_idle: uint256
 
+event UpdateProfitMaxUnlockTime:
+    profit_max_unlock_time: uint256
+
 event Shutdown:
     pass
 
@@ -109,6 +111,7 @@ struct StrategyParams:
 MAX_BPS: constant(uint256) = 10_000
 MAX_BPS_EXTENDED: constant(uint256) = 1_000_000_000_000
 PROTOCOL_FEE_ASSESSMENT_PERIOD: constant(uint256) = 24 * 3600 # assess once a day
+API_VERSION: constant(String[28]) = "0.1.0"
 
 # ENUMS #
 enum Roles:
@@ -121,11 +124,7 @@ enum Roles:
 # IMMUTABLE #
 ASSET: immutable(ERC20)
 DECIMALS: immutable(uint256)
-PROFIT_MAX_UNLOCK_TIME: immutable(uint256)
 FACTORY: public(immutable(address))
-
-# CONSTANTS #
-API_VERSION: constant(String[28]) = "0.1.0"
 
 # STORAGE #
 # HashMap that records all the strategies that are allowed to receive assets from the vault
@@ -163,6 +162,7 @@ name: public(String[64])
 # ERC20 - symbol of the token
 symbol: public(String[32])
 
+profit_max_unlock_time: public(uint256)
 full_profit_unlock_date: public(uint256)
 profit_unlocking_rate: public(uint256)
 last_profit_update: uint256
@@ -183,8 +183,7 @@ def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: a
 
     FACTORY = msg.sender
 
-    PROFIT_MAX_UNLOCK_TIME = profit_max_unlock_time
-
+    self.profit_max_unlock_time = profit_max_unlock_time
     self.name = name
     self.symbol = symbol
     self.last_report = block.timestamp
@@ -269,7 +268,7 @@ def _burn_shares(shares: uint256, owner: address):
 @internal
 def _unlocked_shares() -> uint256:
   # To avoid sudden price_per_share, shares are minted and insta-locked.
-  # Shares that have been locked are gradually unlocked over PROFIT_MAX_UNLOCK_TIME seconds
+  # Shares that have been locked are gradually unlocked over profit_max_unlock_time seconds
   _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
   unlocked_shares: uint256 = 0
   if _full_profit_unlock_date > block.timestamp:
@@ -286,22 +285,19 @@ def _total_supply() -> uint256:
   return self.total_supply - self._unlocked_shares()
 
 @internal
-def _burn_unlocked_shares() -> uint256:
+def _burn_unlocked_shares():
   """
   Burns shares that have been unlocked since last update. In case the full unlocking period has passed, it stops the unlocking
   """
   unlocked_shares: uint256 = self._unlocked_shares()
   if unlocked_shares == 0:
-    return 0
+    return
   
   # update variables (done here to keep _unlocked_shares() as a view function)
   if self.full_profit_unlock_date > block.timestamp:
     self.last_profit_update = block.timestamp
-  else:
-    self.profit_unlocking_rate = 0
 
   self._burn_shares(unlocked_shares, self)
-  return unlocked_shares
 
 @view
 @internal
@@ -487,7 +483,7 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
 
 
 @internal
-def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: uint256, strategies: DynArray[address, 10] = []) -> uint256:
+def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: uint256, strategies: DynArray[address, 10]) -> uint256:
     if sender != owner:
         self._spend_allowance(owner, sender, shares_to_burn)
 
@@ -697,7 +693,8 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         post_balance: uint256 = ASSET.balanceOf(self)
         
         # making sure we are changing according to the real result no matter what. This will spend more gas but makes it more robust
-        assets_to_withdraw = post_balance - pre_balance
+        # also prevents issues from faulty strategy that either under or over delievers 'assets_to_withdraw'
+        assets_to_withdraw = min(post_balance - pre_balance, current_debt)
 
         self.total_idle += assets_to_withdraw
         self.total_debt -= assets_to_withdraw
@@ -776,7 +773,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     Different strategies might choose different reporting strategies: pessimistic, only realised P&L, ...
     The best way to report depends on the strategy
 
-    The profit will be distributed following a smooth curve over the next PROFIT_MAX_UNLOCK_TIME seconds. 
+    The profit will be distributed following a smooth curve over the next profit_max_unlock_time seconds. 
     Losses will be taken immediately, first from the profit buffer (avoiding an impact in pps), then will reduce pps
     """
     assert self.strategies[strategy].activation != 0, "inactive strategy"
@@ -875,9 +872,9 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     # Update unlocking rate and time to fully unlocked
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
-    _profit_max_unlock_time: uint256 = PROFIT_MAX_UNLOCK_TIME
+    _profit_max_unlock_time: uint256 = self.profit_max_unlock_time
     if total_locked_shares > 0 and _profit_max_unlock_time > 0:
-      # new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the PROFIT_MAX_UNLOCK_TIME
+      # new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the profit_max_unlock_time
       new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * _profit_max_unlock_time) / total_locked_shares
       self.profit_unlocking_rate = total_locked_shares * MAX_BPS_EXTENDED / new_profit_locking_period
       self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
@@ -918,6 +915,14 @@ def set_minimum_total_idle(minimum_total_idle: uint256):
     self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
     self.minimum_total_idle = minimum_total_idle
     log UpdateMinimumTotalIdle(minimum_total_idle)
+
+@external
+def set_profit_max_unlock_time(new_profit_max_unlock_time: uint256):
+    # no need to update locking period as the current period will use the old rate
+    # and on the next report it will be reset with the new unlocking time
+    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
+    self.profit_max_unlock_time = new_profit_max_unlock_time
+    log UpdateProfitMaxUnlockTime(new_profit_max_unlock_time)
 
 # ROLE MANAGEMENT #
 @internal
@@ -974,6 +979,7 @@ def process_report(strategy: address) -> (uint256, uint256):
 def sweep(token: address) -> (uint256):
     self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
     assert token != self, "can't sweep self"
+    assert self.strategies[token].activation == 0, "can't sweep strategy"
     amount: uint256 = 0
     if token == ASSET.address:
         amount = ASSET.balanceOf(self) - self.total_idle
