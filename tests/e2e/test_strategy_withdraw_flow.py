@@ -35,7 +35,7 @@ def test_multiple_strategy_withdraw_flow(
     # set up strategies
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
         sender=gov,
     )
     for strategy in strategies:

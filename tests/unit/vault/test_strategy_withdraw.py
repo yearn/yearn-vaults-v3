@@ -24,7 +24,7 @@ def test_withdraw__with_inactive_strategy__reverts(
 
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
         sender=gov,
     )
     user_deposit(fish, vault, asset, amount)
@@ -60,7 +60,7 @@ def test_withdraw__with_insufficient_funds_in_strategies__reverts(
 
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
         sender=gov,
     )
     user_deposit(fish, vault, asset, amount)
@@ -96,7 +96,7 @@ def test_withdraw__with_liquid_strategy__withdraws(
 
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
         sender=gov,
     )
     user_deposit(fish, vault, asset, amount)
@@ -147,7 +147,7 @@ def test_withdraw__with_multiple_liquid_strategies__withdraws(
     # set up strategies
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
         sender=gov,
     )
     for strategy in strategies:
@@ -201,7 +201,7 @@ def test_withdraw__locked_funds_with_locked_and_liquid_strategy__withdraws(
     # set up strategies
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
         sender=gov,
     )
     for strategy in strategies:
@@ -249,7 +249,7 @@ def test_withdraw__with_locked_and_liquid_strategy__withdraws(
     # set up strategies
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
         sender=gov,
     )
     for strategy in strategies:
@@ -307,7 +307,7 @@ def test_withdraw__with_lossy_strategy__withdraws_less_than_deposited(
     # set up strategies
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
         sender=gov,
     )
     add_strategy_to_vault(gov, lossy_strategy, vault)
@@ -370,7 +370,7 @@ def test_withdraw__with_lossy_and_liquid_strategy__withdraws_less_than_deposited
     # set up strategies
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
         sender=gov,
     )
     for strategy in strategies:
@@ -435,7 +435,7 @@ def test_withdraw__with_liquid_and_lossy_strategy__withdraws_less_than_deposited
     # set up strategies
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
         sender=gov,
     )
     for strategy in strategies:
@@ -500,7 +500,7 @@ def test_withdraw__with_liquid_and_lossy_strategy_that_losses_while_withdrawing_
     # set up strategies
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
         sender=gov,
     )
     for strategy in strategies:
@@ -565,7 +565,7 @@ def test_withdraw__half_of_assets_from_lossy_strategy_that_losses_while_withdraw
     # set up strategies
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
         sender=gov,
     )
     for strategy in strategies:
@@ -634,7 +634,7 @@ def test_withdraw__half_of_strategy_assets_from_lossy_strategy_with_unrealised_l
     # set up strategies
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
         sender=gov,
     )
     for strategy in strategies:
@@ -705,7 +705,7 @@ def test_withdraw__with_multiple_liquid_strategies_more_assets_than_debt__withdr
     # set up strategies
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
         sender=gov,
     )
     for strategy in strategies:
