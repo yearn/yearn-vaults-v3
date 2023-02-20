@@ -135,7 +135,7 @@ def test_max_withdraw__with_balance_greater_than_total_idle__returns_total_idle(
 
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
         sender=gov,
     )
     user_deposit(fish, vault, asset, assets)
@@ -186,7 +186,7 @@ def test_max_redeem__with_balance_greater_than_total_idle__returns_total_idle(
 
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
         sender=gov,
     )
     user_deposit(fish, vault, asset, assets)

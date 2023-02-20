@@ -111,15 +111,24 @@ MAX_BPS_EXTENDED: constant(uint256) = 1_000_000_000_000
 PROTOCOL_FEE_ASSESSMENT_PERIOD: constant(uint256) = 24 * 3600 # assess once a day
 
 # ENUMS #
+# Each permissioned function has its own Role.
+# Roles can be combined in any combination or all kept seperate
+# Follows python Enum patterns so the first role == 1 and doubles each time
 enum Roles:
-    STRATEGY_MANAGER # adds and removes strategies
-    DEBT_MANAGER # adds and remove debt from strategies
+    ADD_STRATEGY_MANAGER # can add strategies to the vault
+    REVOKE_STRATEGY_MANAGER # can remove strategies from the vault
+    ACCOUNTANT_MANAGER # can set the accountant that assesss fees
+    QUEUE_MANAGER # can set the queue manager
     REPORTING_MANAGER # calls report for a strategy
-    ACCOUNTING_MANAGER # sets deposit, debt and idle limits
-    SET_ACCOUNTANT_MANAGER # can set the accountant that assesss fees
+    DEBT_MANAGER # adds and remove debt from strategies
+    MAX_DEBT_MANAGER # can set the max debt for a strategy
+    DEPOSIT_LIMIT_MANAGER # sets deposit limit for the vault
+    MINIMUM_IDLE_MANAGER # sets the minimun total idle the vault should keep
+    PROFIT_UNLOCK_MANAGER # sets the profit_max_unlock_time
     SWEEPER # can sweep tokens from the vault
     EMERGENCY_MANAGER # can shutdown vault in an emergency
     KEEPER
+    STRATEGY_MANAGER
 
 # IMMUTABLE #
 ASSET: immutable(ERC20)
@@ -906,19 +915,19 @@ def _process_report(strategy: address) -> (uint256, uint256):
 # SETTERS #
 @external
 def set_accountant(new_accountant: address):
-    self._enforce_role(msg.sender, Roles.SET_ACCOUNTANT_MANAGER)
+    self._enforce_role(msg.sender, Roles.ACCOUNTANT_MANAGER)
     self.accountant = new_accountant
     log UpdateAccountant(new_accountant)
 
 @external
 def set_deposit_limit(deposit_limit: uint256):
-    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
+    self._enforce_role(msg.sender, Roles.DEPOSIT_LIMIT_MANAGER)
     self.deposit_limit = deposit_limit
     log UpdateDepositLimit(deposit_limit)
 
 @external
 def set_minimum_total_idle(minimum_total_idle: uint256):
-    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
+    self._enforce_role(msg.sender, Roles.MINIMUM_IDLE_MANAGER)
     self.minimum_total_idle = minimum_total_idle
     log UpdateMinimumTotalIdle(minimum_total_idle)
 
@@ -995,12 +1004,12 @@ def sweep(token: address) -> (uint256):
 ## STRATEGY MANAGEMENT ##
 @external
 def add_strategy(new_strategy: address):
-    self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
+    self._enforce_role(msg.sender, Roles.ADD_STRATEGY_MANAGER)
     self._add_strategy(new_strategy)
 
 @external
 def revoke_strategy(old_strategy: address):
-    self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
+    self._enforce_role(msg.sender, Roles.REVOKE_STRATEGY_MANAGER)
     self._revoke_strategy(old_strategy)
 
 @external
@@ -1016,7 +1025,7 @@ def tend_strategy(strategy: address):
 ## DEBT MANAGEMENT ##
 @external
 def update_max_debt_for_strategy(strategy: address, new_max_debt: uint256):
-    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
+    self._enforce_role(msg.sender, Roles.MAX_DEBT_MANAGER)
     assert self.strategies[strategy].activation != 0, "inactive strategy"
     self.strategies[strategy].max_debt = new_max_debt
 

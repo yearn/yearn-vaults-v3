@@ -14,11 +14,13 @@ def set_role(vault, gov):
     vault.set_role(
         gov.address,
         ROLES.EMERGENCY_MANAGER
-        | ROLES.STRATEGY_MANAGER
+        | ROLES.ADD_STRATEGY_MANAGER
+        | ROLES.REVOKE_STRATEGY_MANAGER
         | ROLES.DEBT_MANAGER
-        | ROLES.ACCOUNTING_MANAGER
-        | ROLES.REPORTING_MANAGER
-        | ROLES.SET_ACCOUNTANT_MANAGER,
+        | ROLES.DEPOSIT_LIMIT_MANAGER
+        | ROLES.MAX_DEBT_MANAGER
+        | ROLES.ACCOUNTANT_MANAGER
+        | ROLES.REPORTING_MANAGER,
         sender=gov,
     )
 
