@@ -121,8 +121,8 @@ API_VERSION: constant(String[28]) = "0.1.0"
 
 # ENUMS #
 # Each permissioned function has its own Role.
-# Roles can be combined in any combination or all kept seperate
-# Follows python Enum patterns so the first role == 1 and doubles each time
+# Roles can be combined in any combination or all kept seperate.
+# Follows python Enum patterns so the first role == 1 and doubles each time.
 enum Roles:
     ADD_STRATEGY_MANAGER # can add strategies to the vault
     REVOKE_STRATEGY_MANAGER # can remove strategies from the vault
@@ -933,7 +933,7 @@ def set_profit_max_unlock_time(new_profit_max_unlock_time: uint256):
 # ROLE MANAGEMENT #
 @internal
 def _enforce_role(account: address, role: Roles):
-    assert role in self.roles[account] or self.open_roles[role] # dev: not allowed
+    assert role in self.roles[account] or self.open_roles[role], "not allowed"
 
 @external
 def set_role(account: address, role: Roles):
@@ -980,7 +980,7 @@ def available_deposit_limit() -> uint256:
         return self.deposit_limit - self._total_assets()
     return 0
 
-## ACCOUNTING MANAGEMENT ##
+## REPORTING MANAGEMENT ##
 @external
 @nonreentrant("lock")
 def process_report(strategy: address) -> (uint256, uint256):
