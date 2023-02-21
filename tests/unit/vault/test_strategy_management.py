@@ -126,6 +126,7 @@ def test_force_revoke_strategy__with_non_zero_debt(
     assert event[0].strategy == strategy.address
     assert event[0].loss == new_debt
     assert vault.total_debt() == 0
+    assert vault.price_per_share() == 0
 
     strategy_params = vault.strategies(strategy)
     checks.check_revoked_strategy(strategy_params)
