@@ -138,5 +138,3 @@ def test_force_revoke_strategy__with_inactive_strategy__fails_with_error(
 
     with ape.reverts("strategy not active"):
         vault.force_revoke_strategy(strategy.address, sender=gov)
-
-

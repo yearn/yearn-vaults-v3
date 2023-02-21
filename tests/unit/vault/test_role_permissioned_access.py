@@ -64,7 +64,9 @@ def test_revoke_strategy__set_revoke_strategy_role_open(
     assert event[0].strategy == new_strategy.address
 
 
-def test_force_revoke_strategy__set_revoke_strategy_role_open(vault, create_strategy, bunny, gov):
+def test_force_revoke_strategy__set_revoke_strategy_role_open(
+    vault, create_strategy, bunny, gov
+):
     new_strategy = create_strategy(vault)
 
     vault.add_strategy(new_strategy, sender=gov)
@@ -72,10 +74,7 @@ def test_force_revoke_strategy__set_revoke_strategy_role_open(vault, create_stra
     tx = vault.force_revoke_strategy(new_strategy, sender=bunny)
     event = list(tx.decode_logs(vault.StrategyRevoked))
     assert len(event) == 1
-    assert (
-        event[0].strategy == new_strategy.address
-        and event[0].loss == 0
-    )
+    assert event[0].strategy == new_strategy.address and event[0].loss == 0
 
 
 def test_add_strategy__set_add_strategy_role_open_then_close__reverts(
@@ -109,7 +108,9 @@ def test_revoke_strategy__set_revoke_strategy_role_open_then_close__reverts(
         vault.revoke_strategy(new_strategy, sender=bunny)
 
 
-def test_force_revoke_strategy__set_revoke_strategy_role_open(vault, create_strategy, bunny, gov):
+def test_force_revoke_strategy__set_revoke_strategy_role_open(
+    vault, create_strategy, bunny, gov
+):
     new_strategy = create_strategy(vault)
 
     vault.add_strategy(new_strategy, sender=gov)
@@ -117,10 +118,7 @@ def test_force_revoke_strategy__set_revoke_strategy_role_open(vault, create_stra
     tx = vault.force_revoke_strategy(new_strategy, sender=bunny)
     event = list(tx.decode_logs(vault.StrategyRevoked))
     assert len(event) == 1
-    assert (
-        event[0].strategy == new_strategy.address
-        and event[0].loss == 0
-    )
+    assert event[0].strategy == new_strategy.address and event[0].loss == 0
     other_strategy = create_strategy(vault)
     vault.add_strategy(other_strategy, sender=gov)
     vault.close_open_role(ROLES.FORCE_REVOKE_MANAGER, sender=gov)
@@ -209,7 +207,9 @@ def test_update_profit_unlock__set_profit_unlock_role_role_open(vault, bunny, go
     vault.profit_max_unlock_time() == WEEK * 2
 
 
-def test_update_profit_unlock__set_profit_unlock_role_role_open_then_close__reverts(vault, bunny, gov):
+def test_update_profit_unlock__set_profit_unlock_role_role_open_then_close__reverts(
+    vault, bunny, gov
+):
     vault.set_open_role(ROLES.PROFIT_UNLOCK_MANAGER, sender=gov)
     tx = vault.set_profit_max_unlock_time(WEEK * 2, sender=bunny)
     event = list(tx.decode_logs(vault.UpdateProfitMaxUnlockTime))

@@ -217,7 +217,6 @@ def create_vault(project, gov, vault_factory):
             sender=gov,
         )
 
-
         # set vault deposit
         vault.set_deposit_limit(deposit_limit, sender=gov)
 

@@ -60,7 +60,6 @@ def test_force_revoke_strategy__revoke_strategy_manager(
     assert event[0].loss == 0
 
 
-
 # ACCOUNTING MANAGEMENT
 
 
@@ -287,4 +286,3 @@ def test_set_profit_unlcok__profit_unlcok_manager(gov, vault, bunny):
     assert vault.profit_max_unlock_time() != time
     vault.set_profit_max_unlock_time(time, sender=bunny)
     assert vault.profit_max_unlock_time() == time
-
