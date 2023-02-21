@@ -75,20 +75,20 @@ event StrategyReported:
 
 # DEBT MANAGEMENT EVENTS
 event DebtUpdated:
-    strategy: address
+    strategy: indexed(address)
     current_debt: uint256
     new_debt: uint256
 
 # STORAGE MANAGEMENT EVENTS
 event UpdateAccountant:
-    accountant: address
+    accountant: indexed(address)
 
 event UpdateQueueManager:
     queue_manager: indexed(address)
 
 event UpdatedMaxDebtForStrategy:
-    sender: address
-    strategy: address
+    sender: indexed(address)
+    strategy: indexed(address)
     new_debt: uint256
 
 event UpdateDepositLimit:
