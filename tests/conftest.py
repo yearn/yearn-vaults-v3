@@ -203,6 +203,7 @@ def create_vault(project, gov, vault_factory):
             gov.address,
             ROLES.ADD_STRATEGY_MANAGER
             | ROLES.REVOKE_STRATEGY_MANAGER
+            | ROLES.FORCE_REVOKE_MANAGER
             | ROLES.ACCOUNTANT_MANAGER
             | ROLES.QUEUE_MANAGER
             | ROLES.REPORTING_MANAGER
@@ -211,12 +212,11 @@ def create_vault(project, gov, vault_factory):
             | ROLES.DEPOSIT_LIMIT_MANAGER
             | ROLES.MINIMUM_IDLE_MANAGER
             | ROLES.PROFIT_UNLOCK_MANAGER
-            | ROLES.EMERGENCY_MANAGER
             | ROLES.SWEEPER
-            | ROLES.KEEPER
-            | ROLES.STRATEGY_MANAGER,
+            | ROLES.EMERGENCY_MANAGER,
             sender=gov,
         )
+
 
         # set vault deposit
         vault.set_deposit_limit(deposit_limit, sender=gov)

@@ -8,6 +8,7 @@ def set_role(vault, gov):
     vault.set_role(
         gov.address,
         ROLES.ADD_STRATEGY_MANAGER
+        | ROLES.REVOKE_STRATEGY_MANAGER
         | ROLES.DEBT_MANAGER
         | ROLES.MAX_DEBT_MANAGER
         | ROLES.SWEEPER,

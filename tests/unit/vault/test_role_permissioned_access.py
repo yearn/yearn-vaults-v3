@@ -33,14 +33,14 @@ def test_revoke_strategy__revoke_strategy_role_closed__reverts(
         vault.revoke_strategy(new_strategy, sender=bunny)
 
 
-def test_migrate_strategy__strategy_role_closed__reverts(
+def test_force_revoke_strategy__revoke_strategy_role_closed__reverts(
     vault, create_strategy, bunny, gov
 ):
     new_strategy = create_strategy(vault)
-    other_new_strategy = create_strategy(vault)
+
     vault.add_strategy(new_strategy, sender=gov)
     with ape.reverts("not allowed"):
-        vault.migrate_strategy(other_new_strategy, new_strategy, sender=bunny)
+        vault.force_revoke_strategy(new_strategy, sender=bunny)
 
 
 def test_add_strategy__set_add_strategy_role_open(vault, create_strategy, bunny, gov):
@@ -64,17 +64,17 @@ def test_revoke_strategy__set_revoke_strategy_role_open(
     assert event[0].strategy == new_strategy.address
 
 
-def test_migrate_strategy__set_strategy_role_open(vault, create_strategy, bunny, gov):
+def test_force_revoke_strategy__set_revoke_strategy_role_open(vault, create_strategy, bunny, gov):
     new_strategy = create_strategy(vault)
-    other_new_strategy = create_strategy(vault)
+
     vault.add_strategy(new_strategy, sender=gov)
-    vault.set_open_role(ROLES.STRATEGY_MANAGER, sender=gov)
-    tx = vault.migrate_strategy(other_new_strategy, new_strategy, sender=bunny)
-    event = list(tx.decode_logs(vault.StrategyMigrated))
+    vault.set_open_role(ROLES.FORCE_REVOKE_MANAGER, sender=gov)
+    tx = vault.force_revoke_strategy(new_strategy, sender=bunny)
+    event = list(tx.decode_logs(vault.StrategyRevoked))
     assert len(event) == 1
     assert (
-        event[0].old_strategy == new_strategy.address
-        and event[0].new_strategy == other_new_strategy.address
+        event[0].strategy == new_strategy.address
+        and event[0].loss == 0
     )
 
 
@@ -109,24 +109,23 @@ def test_revoke_strategy__set_revoke_strategy_role_open_then_close__reverts(
         vault.revoke_strategy(new_strategy, sender=bunny)
 
 
-def test_migrate_strategy__set_strategy_role_open_then_close__reverts(
-    vault, create_strategy, bunny, gov
-):
+def test_force_revoke_strategy__set_revoke_strategy_role_open(vault, create_strategy, bunny, gov):
     new_strategy = create_strategy(vault)
-    other_new_strategy = create_strategy(vault)
+
     vault.add_strategy(new_strategy, sender=gov)
-    vault.set_open_role(ROLES.STRATEGY_MANAGER, sender=gov)
-    tx = vault.migrate_strategy(other_new_strategy, new_strategy, sender=bunny)
-    event = list(tx.decode_logs(vault.StrategyMigrated))
+    vault.set_open_role(ROLES.FORCE_REVOKE_MANAGER, sender=gov)
+    tx = vault.force_revoke_strategy(new_strategy, sender=bunny)
+    event = list(tx.decode_logs(vault.StrategyRevoked))
     assert len(event) == 1
     assert (
-        event[0].old_strategy == new_strategy.address
-        and event[0].new_strategy == other_new_strategy.address
+        event[0].strategy == new_strategy.address
+        and event[0].loss == 0
     )
-    # close the role
-    vault.close_open_role(ROLES.STRATEGY_MANAGER, sender=gov)
+    other_strategy = create_strategy(vault)
+    vault.add_strategy(other_strategy, sender=gov)
+    vault.close_open_role(ROLES.FORCE_REVOKE_MANAGER, sender=gov)
     with ape.reverts("not allowed"):
-        vault.migrate_strategy(other_new_strategy, new_strategy, sender=bunny)
+        vault.force_revoke_strategy(other_strategy, sender=bunny)
 
 
 # REPORTING_MANAGER
@@ -139,16 +138,6 @@ def test_process_report__reporting_role_closed__reverts(
     vault.add_strategy(new_strategy, sender=gov)
     with ape.reverts("not allowed"):
         vault.process_report(new_strategy, sender=bunny)
-
-
-def test_sweep__accounting_role_closed__reverts(vault, mock_token, bunny):
-    with ape.reverts():
-        vault.sweep(mock_token, sender=bunny)
-
-
-def test_update_profit_unlock__accounting_role_closed__reverts(vault, bunny):
-    with ape.reverts():
-        vault.set_profit_max_unlock_time(WEEK * 2, sender=bunny)
 
 
 def test_process_report__set_reporting_role_open(
@@ -175,15 +164,6 @@ def test_process_report__set_reporting_role_open(
     assert event[0].strategy == new_strategy.address and event[0].gain == fish_amount
 
 
-def test_update_profit_unlock__set_accounting_role_open(vault, bunny, gov):
-    vault.set_open_role(ROLES.ACCOUNTING_MANAGER, sender=gov)
-    tx = vault.set_profit_max_unlock_time(WEEK * 2, sender=bunny)
-    event = list(tx.decode_logs(vault.UpdateProfitMaxUnlockTime))
-    assert len(event) == 1
-    assert event[0].profit_max_unlock_time == WEEK * 2
-    vault.profit_max_unlock_time() == WEEK * 2
-
-    
 def test_process_report__set_reporting_role_open_then_close__reverts(
     vault,
     create_strategy,
@@ -210,6 +190,35 @@ def test_process_report__set_reporting_role_open_then_close__reverts(
     vault.close_open_role(ROLES.REPORTING_MANAGER, sender=gov)
     with ape.reverts("not allowed"):
         vault.process_report(new_strategy, sender=bunny)
+
+
+# PROFIT UNLOCK MANGAGER
+
+
+def test_update_profit_unlock__profit_unlock_role_closed__reverts(vault, bunny):
+    with ape.reverts():
+        vault.set_profit_max_unlock_time(WEEK * 2, sender=bunny)
+
+
+def test_update_profit_unlock__set_profit_unlock_role_role_open(vault, bunny, gov):
+    vault.set_open_role(ROLES.PROFIT_UNLOCK_MANAGER, sender=gov)
+    tx = vault.set_profit_max_unlock_time(WEEK * 2, sender=bunny)
+    event = list(tx.decode_logs(vault.UpdateProfitMaxUnlockTime))
+    assert len(event) == 1
+    assert event[0].profit_max_unlock_time == WEEK * 2
+    vault.profit_max_unlock_time() == WEEK * 2
+
+
+def test_update_profit_unlock__set_profit_unlock_role_role_open_then_close__reverts(vault, bunny, gov):
+    vault.set_open_role(ROLES.PROFIT_UNLOCK_MANAGER, sender=gov)
+    tx = vault.set_profit_max_unlock_time(WEEK * 2, sender=bunny)
+    event = list(tx.decode_logs(vault.UpdateProfitMaxUnlockTime))
+    assert len(event) == 1
+    assert event[0].profit_max_unlock_time == WEEK * 2
+    vault.profit_max_unlock_time() == WEEK * 2
+    vault.close_open_role(ROLES.PROFIT_UNLOCK_MANAGER, sender=gov)
+    with ape.reverts():
+        vault.set_profit_max_unlock_time(WEEK, sender=bunny)
 
 
 # ACCOUNTING MANAGEMENT
@@ -438,4 +447,32 @@ def test_shutdown_vault__set_emergency_role_open(vault, bunny, gov):
 
 # QUEUE MANAGER
 
-# PROFIT UNLOCK MANAGER
+
+def test_set_queue_manager__queue_manager_closed__reverts(bunny, vault):
+    with ape.reverts("not allowed"):
+        vault.set_queue_manager(bunny, sender=bunny)
+
+
+def test_set_queue_manager__queue_manager_open(gov, vault, bunny):
+    # We temporarily give bunny the role of DEBT_MANAGER
+    vault.set_open_role(ROLES.QUEUE_MANAGER, sender=gov)
+
+    assert vault.queue_manager() != bunny
+    vault.set_queue_manager(bunny, sender=bunny)
+    assert vault.queue_manager() == bunny
+
+
+def test_set_queue_manager__queue_manager_open_then_close__reverts(
+    gov, vault, bunny, fish
+):
+    # We temporarily give bunny the role of DEBT_MANAGER
+    vault.set_open_role(ROLES.QUEUE_MANAGER, sender=gov)
+
+    assert vault.queue_manager() != bunny
+    vault.set_queue_manager(bunny, sender=bunny)
+    assert vault.queue_manager() == bunny
+
+    vault.close_open_role(ROLES.QUEUE_MANAGER, sender=gov)
+
+    with ape.reverts("not allowed"):
+        vault.set_queue_manager(fish, sender=fish)

@@ -59,10 +59,6 @@ event StrategyRevoked:
     strategy: indexed(address)
     loss: uint256
 
-event StrategyMigrated:
-    old_strategy: indexed(address)
-    new_strategy: indexed(address)
-
 event StrategyReported:
     strategy: indexed(address)
     gain: uint256
@@ -126,6 +122,7 @@ API_VERSION: constant(String[28]) = "0.1.0"
 enum Roles:
     ADD_STRATEGY_MANAGER # can add strategies to the vault
     REVOKE_STRATEGY_MANAGER # can remove strategies from the vault
+    FORCE_REVOKE_MANAGER # can force revoke a strategy causing a loss
     ACCOUNTANT_MANAGER # can set the accountant that assesss fees
     QUEUE_MANAGER # can set the queue manager
     REPORTING_MANAGER # calls report for a strategy
@@ -136,8 +133,6 @@ enum Roles:
     PROFIT_UNLOCK_MANAGER # sets the profit_max_unlock_time
     SWEEPER # can sweep tokens from the vault
     EMERGENCY_MANAGER # can shutdown vault in an emergency
-    KEEPER
-    STRATEGY_MANAGER
 
 # IMMUTABLE #
 ASSET: immutable(ERC20)
@@ -506,12 +501,12 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
     if sender != owner:
         self._spend_allowance(owner, sender, shares_to_burn)
 
-    strategies: DynArray[address, 10] = _strategies
+    _strategies: DynArray[address, 10] = strategies
 
     queue_manager: address = self.queue_manager
     if queue_manager != empty(address):
-        if len(_strategies) == 0 or (len(_strategies) != 0 and IQueueManager(queue_manager).should_override(self)):
-            strategies = IQueueManager(queue_manager).withdraw_queue(self)
+        if len(_strategies) == 0 or IQueueManager(queue_manager).should_override(self):
+            _strategies = IQueueManager(queue_manager).withdraw_queue(self)
 
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
@@ -538,7 +533,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
 
         # NOTE: to compare against real withdrawals from strategies
         previous_balance: uint256 = ASSET.balanceOf(self)
-        for strategy in strategies:
+        for strategy in _strategies:
             assert self.strategies[strategy].activation != 0, "inactive strategy"
           
             # Starts with all the assets needed
@@ -620,7 +615,7 @@ def _add_strategy(new_strategy: address):
    log StrategyAdded(new_strategy)
 
 @internal
-def _revoke_strategy(old_strategy: address, force: bool):
+def _revoke_strategy(old_strategy: address, force: bool=False):
    assert self.strategies[old_strategy].activation != 0, "strategy not active"
    loss: uint256 = 0
 
@@ -906,7 +901,7 @@ def set_accountant(new_accountant: address):
 
 @external
 def set_queue_manager(new_queue_manager: address):
-    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
+    self._enforce_role(msg.sender, Roles.QUEUE_MANAGER)
     self.queue_manager = new_queue_manager
     log UpdateQueueManager(new_queue_manager)
 
@@ -926,7 +921,7 @@ def set_minimum_total_idle(minimum_total_idle: uint256):
 def set_profit_max_unlock_time(new_profit_max_unlock_time: uint256):
     # no need to update locking period as the current period will use the old rate
     # and on the next report it will be reset with the new unlocking time
-    self._enforce_role(msg.sender, Roles.ACCOUNTING_MANAGER)
+    self._enforce_role(msg.sender, Roles.PROFIT_UNLOCK_MANAGER)
     self.profit_max_unlock_time = new_profit_max_unlock_time
     log UpdateProfitMaxUnlockTime(new_profit_max_unlock_time)
 
@@ -982,7 +977,6 @@ def available_deposit_limit() -> uint256:
 
 ## REPORTING MANAGEMENT ##
 @external
-@nonreentrant("lock")
 def process_report(strategy: address) -> (uint256, uint256):
     self._enforce_role(msg.sender, Roles.REPORTING_MANAGER)
     return self._process_report(strategy)
@@ -1019,9 +1013,9 @@ def force_revoke_strategy(old_strategy: address):
     The vault will remove the inputed strategy and write off any debt left in it as loss. 
     This function is a dangerous function as it can force a strategy to take a loss. 
     All possible assets should be removed from the strategy first via update_debt
-    Note that if a strategy is removed erroneously it can be readded and the loss will be credited as profit. Fees will apply
+    Note that if a strategy is removed erroneously it can be re-added and the loss will be credited as profit. Fees will apply
     """
-    self._enforce_role(msg.sender, Roles.STRATEGY_MANAGER)
+    self._enforce_role(msg.sender, Roles.FORCE_REVOKE_MANAGER)
     self._revoke_strategy(old_strategy, True)
 
 ## DEBT MANAGEMENT ##

@@ -1,5 +1,5 @@
 import ape
-from utils.constants import ROLES
+from utils.constants import ROLES, WEEK
 from utils.utils import days_to_secs
 
 
@@ -38,32 +38,27 @@ def test_revoke_strategy__revoke_strategy_manager(vault, strategy, gov, bunny):
     assert event[0].strategy == strategy.address
 
 
-def test_migrate_strategy__no_strategy_manager__reverts(
+def test_force_revoke_strategy__no_revoke_strategy_manager__reverts(
     vault, strategy, create_strategy, bunny
 ):
-    new_strategy = create_strategy(vault)
+
     with ape.reverts("not allowed"):
-        vault.migrate_strategy(strategy, new_strategy, sender=bunny)
+        vault.force_revoke_strategy(strategy, sender=bunny)
 
 
-def test_migrate_strategy__strategy_manager(
+def test_force_revoke_strategy__revoke_strategy_manager(
     vault, strategy, create_strategy, gov, bunny
 ):
     # We temporarily give bunny the role of STRATEGY_MANAGER
-    vault.set_role(bunny.address, ROLES.STRATEGY_MANAGER, sender=gov)
+    vault.set_role(bunny.address, ROLES.FORCE_REVOKE_MANAGER, sender=gov)
 
-    new_strategy = create_strategy(vault)
-
-    tx = vault.migrate_strategy(new_strategy, strategy, sender=bunny)
+    tx = vault.force_revoke_strategy(strategy, sender=bunny)
 
     event = list(tx.decode_logs(vault.StrategyRevoked))
     assert len(event) == 1
     assert event[0].strategy == strategy.address
+    assert event[0].loss == 0
 
-    event = list(tx.decode_logs(vault.StrategyMigrated))
-    assert len(event) == 1
-    assert event[0].old_strategy == strategy.address
-    assert event[0].new_strategy == new_strategy.address
 
 
 # ACCOUNTING MANAGEMENT
@@ -201,8 +196,8 @@ def test_shutdown_vault__emergency_manager(gov, vault, bunny):
     event = list(tx.decode_logs(vault.Shutdown))
     assert len(event) == 1
     # lets ensure that we give the EMERGENCY_MANAGER DEBT_MANAGER permissions after shutdown
-    # EMERGENCY_MANAGER=2048 DEBT_MANGER=32 -> binary or operation should give us 2080 (1000100000)
-    assert vault.roles(bunny) == 2080
+    # EMERGENCY_MANAGER=4096 DEBT_MANGER=64 -> binary or operation should give us 4160 (10001000000)
+    assert vault.roles(bunny) == 4160
 
 
 # REPORTING_MANAGER
@@ -261,20 +256,35 @@ def test_set_accountant__accountant_manager(gov, vault, bunny):
 
 # QUEUE MANAGER
 
+
+def test_set_queue_manager__no_queue_manager__reverts(bunny, vault):
+    with ape.reverts("not allowed"):
+        vault.set_queue_manager(bunny, sender=bunny)
+
+
+def test_set_queue_manager__queue_manager(gov, vault, bunny):
+    # We temporarily give bunny the role of DEBT_MANAGER
+    vault.set_role(bunny.address, ROLES.QUEUE_MANAGER, sender=gov)
+
+    assert vault.queue_manager() != bunny
+    vault.set_queue_manager(bunny, sender=bunny)
+    assert vault.queue_manager() == bunny
+
+
 # PROFIT UNLOCK MANAGER
-"""
+
+
 def test_set_profit_unlcok__no_profit_unlock_manager__reverts(bunny, vault):
     with ape.reverts("not allowed"):
-        vault.set_profit_max_unlcock_time(bunny, sender=bunny)
+        vault.set_profit_max_unlock_time(WEEK // 2, sender=bunny)
 
 
 def test_set_profit_unlcok__profit_unlcok_manager(gov, vault, bunny):
-    # We temporarily give bunny the role of DEBT_MANAGER
+    # We temporarily give bunny the role of profit unlock manager
     vault.set_role(bunny.address, ROLES.PROFIT_UNLOCK_MANAGER, sender=gov)
 
     time = WEEK // 2
-    assert vault.profit_max_unlcock_time() != time
-    vault.set_profit_max_unlcock_time(time, sender=bunny)
-    assert vault.profit_max_unlcock_time() == time
+    assert vault.profit_max_unlock_time() != time
+    vault.set_profit_max_unlock_time(time, sender=bunny)
+    assert vault.profit_max_unlock_time() == time
 
-"""
