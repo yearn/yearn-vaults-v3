@@ -20,6 +20,7 @@ interface IAccountant:
 
 interface IQueueManager:
     def withdraw_queue(vault: address) -> (DynArray[address, 10]): nonpayable
+    def should_override(vault: address) -> (bool): nonpayable
 
 interface IFactory:
     def protocol_fee_config() -> (uint16, uint32, address): view
@@ -497,7 +498,8 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
 
     queue_manager: address = self.queue_manager
     if queue_manager != empty(address):
-        strategies = IQueueManager(queue_manager).withdraw_queue(self)
+        if len(_strategies) == 0 or (len(_strategies) != 0 and IQueueManager(queue_manager).should_override(self)):
+            strategies = IQueueManager(queue_manager).withdraw_queue(self)
 
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
