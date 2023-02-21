@@ -201,7 +201,20 @@ def create_vault(project, gov, vault_factory):
 
         vault.set_role(
             gov.address,
-            ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+            ROLES.ADD_STRATEGY_MANAGER
+            | ROLES.REVOKE_STRATEGY_MANAGER
+            | ROLES.ACCOUNTANT_MANAGER
+            | ROLES.QUEUE_MANAGER
+            | ROLES.REPORTING_MANAGER
+            | ROLES.DEBT_MANAGER
+            | ROLES.MAX_DEBT_MANAGER
+            | ROLES.DEPOSIT_LIMIT_MANAGER
+            | ROLES.MINIMUM_IDLE_MANAGER
+            | ROLES.PROFIT_UNLOCK_MANAGER
+            | ROLES.EMERGENCY_MANAGER
+            | ROLES.SWEEPER
+            | ROLES.KEEPER
+            | ROLES.STRATEGY_MANAGER,
             sender=gov,
         )
 
