@@ -644,7 +644,7 @@ def _revoke_strategy(strategy: address, force: bool=False):
     queue_manager: address = self.queue_manager
     if queue_manager != empty(address):
         # tell the queue_manager we removed a strategy
-        IQueueManager(queue_manager).remove_strategy(old_strategy)
+        IQueueManager(queue_manager).remove_strategy(strategy)
 
     log StrategyChanged(strategy, StrategyChangeType.REVOKED)
 

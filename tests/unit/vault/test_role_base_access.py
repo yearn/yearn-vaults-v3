@@ -1,5 +1,5 @@
 import ape
-from utils.constants import ROLES, WEEK
+from utils.constants import ROLES, WEEK, StrategyChangeType
 from utils.utils import days_to_secs
 
 
@@ -18,9 +18,10 @@ def test_add_strategy__add_strategy_manager(vault, create_strategy, gov, bunny):
 
     new_strategy = create_strategy(vault)
     tx = vault.add_strategy(new_strategy, sender=bunny)
-    event = list(tx.decode_logs(vault.StrategyAdded))
+    event = list(tx.decode_logs(vault.StrategyChanged))
     assert len(event) == 1
     assert event[0].strategy == new_strategy.address
+    assert event[0].change_type == StrategyChangeType.ADDED
 
 
 def test_revoke_strategy__no_revoke_strategy_manager__reverts(vault, strategy, bunny):
@@ -33,9 +34,10 @@ def test_revoke_strategy__revoke_strategy_manager(vault, strategy, gov, bunny):
     vault.set_role(bunny.address, ROLES.REVOKE_STRATEGY_MANAGER, sender=gov)
 
     tx = vault.revoke_strategy(strategy, sender=bunny)
-    event = list(tx.decode_logs(vault.StrategyRevoked))
+    event = list(tx.decode_logs(vault.StrategyChanged))
     assert len(event) == 1
     assert event[0].strategy == strategy.address
+    assert event[0].change_type == StrategyChangeType.REVOKED
 
 
 def test_force_revoke_strategy__no_revoke_strategy_manager__reverts(
@@ -54,10 +56,10 @@ def test_force_revoke_strategy__revoke_strategy_manager(
 
     tx = vault.force_revoke_strategy(strategy, sender=bunny)
 
-    event = list(tx.decode_logs(vault.StrategyRevoked))
+    event = list(tx.decode_logs(vault.StrategyChanged))
     assert len(event) == 1
     assert event[0].strategy == strategy.address
-    assert event[0].loss == 0
+    assert event[0].change_type == StrategyChangeType.REVOKED
 
 
 # ACCOUNTING MANAGEMENT

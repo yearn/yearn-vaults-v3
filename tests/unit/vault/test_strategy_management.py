@@ -3,7 +3,7 @@ import pytest
 from ape import chain
 from utils import checks
 from utils.utils import sleep
-from utils.constants import ROLES, ZERO_ADDRESS, DAY
+from utils.constants import ROLES, ZERO_ADDRESS, DAY, StrategyChangeType
 
 
 def test_add_strategy__with_valid_strategy(chain, gov, vault, create_strategy):
@@ -11,10 +11,11 @@ def test_add_strategy__with_valid_strategy(chain, gov, vault, create_strategy):
 
     snapshot = chain.pending_timestamp
     tx = vault.add_strategy(new_strategy.address, sender=gov)
-    event = list(tx.decode_logs(vault.StrategyAdded))
+    event = list(tx.decode_logs(vault.StrategyChanged))
 
     assert len(event) == 1
     assert event[0].strategy == new_strategy.address
+    assert event[0].change_type == StrategyChangeType.ADDED
 
     strategy_params = vault.strategies(new_strategy)
     assert strategy_params.activation == pytest.approx(snapshot, abs=1)
@@ -52,10 +53,11 @@ def test_add_strategy__with_generic_strategy(
 
     snapshot = chain.pending_timestamp
     tx = vault.add_strategy(strategy.address, sender=gov)
-    event = list(tx.decode_logs(vault.StrategyAdded))
+    event = list(tx.decode_logs(vault.StrategyChanged))
 
     assert len(event) == 1
     assert event[0].strategy == strategy.address
+    assert event[0].change_type == StrategyChangeType.ADDED
 
     strategy_params = vault.strategies(strategy)
     assert strategy_params.activation == pytest.approx(snapshot, abs=1)
@@ -66,11 +68,11 @@ def test_add_strategy__with_generic_strategy(
 
 def test_revoke_strategy__with_existing_strategy(gov, vault, strategy):
     tx = vault.revoke_strategy(strategy.address, sender=gov)
-    event = list(tx.decode_logs(vault.StrategyRevoked))
+    event = list(tx.decode_logs(vault.StrategyChanged))
 
     assert len(event) == 1
     assert event[0].strategy == strategy.address
-    assert event[0].loss == 0
+    assert event[0].change_type == StrategyChangeType.REVOKED
 
     strategy_params = vault.strategies(strategy)
     checks.check_revoked_strategy(strategy_params)
@@ -100,11 +102,11 @@ def test_revoke_strategy__with_inactive_strategy__fails_with_error(
 
 def test_force_revoke_strategy__with_existing_strategy(gov, vault, strategy):
     tx = vault.force_revoke_strategy(strategy.address, sender=gov)
-    event = list(tx.decode_logs(vault.StrategyRevoked))
+    event = list(tx.decode_logs(vault.StrategyChanged))
 
     assert len(event) == 1
     assert event[0].strategy == strategy.address
-    assert event[0].loss == 0
+    assert event[0].change_type == StrategyChangeType.REVOKED
 
     strategy_params = vault.strategies(strategy)
     checks.check_revoked_strategy(strategy_params)
@@ -120,11 +122,23 @@ def test_force_revoke_strategy__with_non_zero_debt(
     add_debt_to_strategy(gov, strategy, vault, new_debt)
 
     tx = vault.force_revoke_strategy(strategy.address, sender=gov)
-    event = list(tx.decode_logs(vault.StrategyRevoked))
 
+    # strategy report error
+    event = list(tx.decode_logs(vault.StrategyReported))
     assert len(event) == 1
     assert event[0].strategy == strategy.address
+    assert event[0].gain == 0
     assert event[0].loss == new_debt
+    assert event[0].current_debt == 0
+    assert event[0].total_fees == 0
+    assert event[0].total_refunds == 0
+
+    # strategy changed event
+    event = list(tx.decode_logs(vault.StrategyChanged))
+    assert len(event) == 1
+    assert event[0].strategy == strategy.address
+    assert event[0].change_type == StrategyChangeType.REVOKED
+
     assert vault.total_debt() == 0
     assert vault.price_per_share() == 0
 

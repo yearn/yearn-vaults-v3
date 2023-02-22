@@ -23,3 +23,8 @@ class ROLES(IntFlag):
     PROFIT_UNLOCK_MANAGER = 1024
     SWEEPER = 2048
     EMERGENCY_MANAGER = 4096
+
+
+class StrategyChangeType(IntFlag):
+    ADDED = 1
+    REVOKED = 2

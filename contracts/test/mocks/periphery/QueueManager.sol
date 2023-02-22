@@ -16,7 +16,11 @@ contract QueueManager {
         governance = msg.sender;
     }
 
-    function get_strategies(address vault) external view returns (address[] memory) {
+    function get_strategies(address vault)
+        external
+        view
+        returns (address[] memory)
+    {
         return strategies[vault];
     }
 
@@ -44,7 +48,7 @@ contract QueueManager {
             if (_strategy == strategy) {
                 if (i != currentStack.length - 1) {
                     // if it isn't the last strategy in the stack, move each strategy down one place
-                    for(i; i < currentStack.length - 1; ++i) {
+                    for (i; i < currentStack.length - 1; ++i) {
                         currentStack[i] = currentStack[i + 1];
                     }
                 }

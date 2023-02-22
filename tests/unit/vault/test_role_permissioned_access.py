@@ -1,5 +1,5 @@
 import ape
-from utils.constants import ROLES, WEEK
+from utils.constants import ROLES, WEEK, StrategyChangeType
 from utils.utils import from_units
 
 
@@ -47,9 +47,10 @@ def test_add_strategy__set_add_strategy_role_open(vault, create_strategy, bunny,
     new_strategy = create_strategy(vault)
     vault.set_open_role(ROLES.ADD_STRATEGY_MANAGER, sender=gov)
     tx = vault.add_strategy(new_strategy, sender=bunny)
-    event = list(tx.decode_logs(vault.StrategyAdded))
+    event = list(tx.decode_logs(vault.StrategyChanged))
     assert len(event) == 1
     assert event[0].strategy == new_strategy.address
+    assert event[0].change_type == StrategyChangeType.ADDED
 
 
 def test_revoke_strategy__set_revoke_strategy_role_open(
@@ -59,9 +60,10 @@ def test_revoke_strategy__set_revoke_strategy_role_open(
     vault.add_strategy(new_strategy, sender=gov)
     vault.set_open_role(ROLES.REVOKE_STRATEGY_MANAGER, sender=gov)
     tx = vault.revoke_strategy(new_strategy, sender=bunny)
-    event = list(tx.decode_logs(vault.StrategyRevoked))
+    event = list(tx.decode_logs(vault.StrategyChanged))
     assert len(event) == 1
     assert event[0].strategy == new_strategy.address
+    assert event[0].change_type == StrategyChangeType.REVOKED
 
 
 def test_force_revoke_strategy__set_revoke_strategy_role_open(
@@ -72,9 +74,10 @@ def test_force_revoke_strategy__set_revoke_strategy_role_open(
     vault.add_strategy(new_strategy, sender=gov)
     vault.set_open_role(ROLES.FORCE_REVOKE_MANAGER, sender=gov)
     tx = vault.force_revoke_strategy(new_strategy, sender=bunny)
-    event = list(tx.decode_logs(vault.StrategyRevoked))
+    event = list(tx.decode_logs(vault.StrategyChanged))
     assert len(event) == 1
-    assert event[0].strategy == new_strategy.address and event[0].loss == 0
+    assert event[0].strategy == new_strategy.address
+    assert event[0].change_type == StrategyChangeType.REVOKED
 
 
 def test_add_strategy__set_add_strategy_role_open_then_close__reverts(
@@ -83,9 +86,10 @@ def test_add_strategy__set_add_strategy_role_open_then_close__reverts(
     new_strategy = create_strategy(vault)
     vault.set_open_role(ROLES.ADD_STRATEGY_MANAGER, sender=gov)
     tx = vault.add_strategy(new_strategy, sender=bunny)
-    event = list(tx.decode_logs(vault.StrategyAdded))
+    event = list(tx.decode_logs(vault.StrategyChanged))
     assert len(event) == 1
     assert event[0].strategy == new_strategy.address
+    assert event[0].change_type == StrategyChangeType.ADDED
     # close the role
     vault.close_open_role(ROLES.ADD_STRATEGY_MANAGER, sender=gov)
     with ape.reverts("not allowed"):
@@ -99,9 +103,10 @@ def test_revoke_strategy__set_revoke_strategy_role_open_then_close__reverts(
     vault.add_strategy(new_strategy, sender=gov)
     vault.set_open_role(ROLES.REVOKE_STRATEGY_MANAGER, sender=gov)
     tx = vault.revoke_strategy(new_strategy, sender=bunny)
-    event = list(tx.decode_logs(vault.StrategyRevoked))
+    event = list(tx.decode_logs(vault.StrategyChanged))
     assert len(event) == 1
     assert event[0].strategy == new_strategy.address
+    assert event[0].change_type == StrategyChangeType.REVOKED
     # close the role
     vault.close_open_role(ROLES.REVOKE_STRATEGY_MANAGER, sender=gov)
     with ape.reverts("not allowed"):
@@ -116,9 +121,10 @@ def test_force_revoke_strategy__set_revoke_strategy_role_open(
     vault.add_strategy(new_strategy, sender=gov)
     vault.set_open_role(ROLES.FORCE_REVOKE_MANAGER, sender=gov)
     tx = vault.force_revoke_strategy(new_strategy, sender=bunny)
-    event = list(tx.decode_logs(vault.StrategyRevoked))
+    event = list(tx.decode_logs(vault.StrategyChanged))
     assert len(event) == 1
-    assert event[0].strategy == new_strategy.address and event[0].loss == 0
+    assert event[0].strategy == new_strategy.address
+    assert event[0].change_type == StrategyChangeType.REVOKED
     other_strategy = create_strategy(vault)
     vault.add_strategy(other_strategy, sender=gov)
     vault.close_open_role(ROLES.FORCE_REVOKE_MANAGER, sender=gov)
