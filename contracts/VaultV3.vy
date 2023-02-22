@@ -121,6 +121,10 @@ enum Roles:
     ACCOUNTING_MANAGER
     KEEPER
 
+enum Rounding:
+    ROUND_DOWN
+    ROUND_UP
+
 # IMMUTABLE #
 ASSET: immutable(ERC20)
 DECIMALS: immutable(uint256)
@@ -309,7 +313,7 @@ def _total_assets() -> uint256:
 
 @view
 @internal
-def _convert_to_assets(shares: uint256) -> uint256:
+def _convert_to_assets(shares: uint256, rounding: Rounding) -> uint256:
     """ 
     assets = shares * (total_assets / total_supply) --- (== price_per_share * shares)
     """
@@ -319,11 +323,13 @@ def _convert_to_assets(shares: uint256) -> uint256:
         return shares
 
     amount: uint256 = shares * self._total_assets() / _total_supply
+    if rounding == Rounding.ROUND_UP:
+        amount += 1
     return amount
 
 @view
 @internal
-def _convert_to_shares(assets: uint256) -> uint256:
+def _convert_to_shares(assets: uint256, rounding: Rounding) -> uint256:
     """
     shares = amount * (total_supply / total_assets) --- (== amount / price_per_share)
     """
@@ -334,6 +340,8 @@ def _convert_to_shares(assets: uint256) -> uint256:
        return assets
 
     shares: uint256 = assets * self._total_supply() / total_assets
+    if rounding == Rounding.ROUND_UP:
+        shares += 1
     return shares
 
 
@@ -435,7 +443,7 @@ def _max_deposit(receiver: address) -> uint256:
 @internal
 def _max_redeem(owner: address) -> uint256:
     # NOTE: this will return the max amount that is available to redeem using ERC4626 (which can only withdraw from the vault contract)
-    return min(self.balance_of[owner], self._convert_to_shares(self.total_idle))
+    return min(self.balance_of[owner], self._convert_to_shares(self.total_idle, Rounding.ROUND_DOWN))
 
 
 @internal
@@ -496,7 +504,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
     assert shares_balance >= shares, "insufficient shares to redeem"
     assert shares > 0, "no shares to redeem"
 
-    requested_assets: uint256 = self._convert_to_assets(shares)
+    requested_assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_DOWN)
 
     # load to memory to save gas
     curr_total_idle: uint256 = self.total_idle
@@ -814,17 +822,17 @@ def _process_report(strategy: address) -> (uint256, uint256):
     accountant_fees_shares: uint256 = 0
     protocol_fees_shares: uint256 = 0
     if loss + total_fees > 0:
-        shares_to_burn += self._convert_to_shares(loss + total_fees)
+        shares_to_burn += self._convert_to_shares(loss + total_fees, Rounding.ROUND_UP)
         # Vault calculates the amount of shares to mint as fees before changing totalAssets / totalSupply
         if total_fees > 0:
-            accountant_fees_shares = self._convert_to_shares(total_fees - protocol_fees)
+            accountant_fees_shares = self._convert_to_shares(total_fees - protocol_fees, Rounding.ROUND_DOWN)
             if protocol_fees > 0:
-              protocol_fees_shares = self._convert_to_shares(protocol_fees)
+              protocol_fees_shares = self._convert_to_shares(protocol_fees, Rounding.ROUND_DOWN)
 
     newly_locked_shares: uint256 = 0
     if total_refunds > 0:
         # if refunds are non-zero, transfer shares worth of assets
-        total_refunds_shares: uint256 = min(self._convert_to_shares(total_refunds), self.balance_of[accountant])
+        total_refunds_shares: uint256 = min(self._convert_to_shares(total_refunds, Rounding.ROUND_DOWN), self.balance_of[accountant])
         # Shares received as a refund are locked to avoid sudden pps change (like profits)
         self._transfer(accountant, self, total_refunds_shares)
         newly_locked_shares += total_refunds_shares
@@ -890,8 +898,8 @@ def _process_report(strategy: address) -> (uint256, uint256):
         gain,
         loss,
         self.strategies[strategy].current_debt,
-        self._convert_to_assets(protocol_fees_shares),
-        self._convert_to_assets(protocol_fees_shares + accountant_fees_shares),
+        self._convert_to_assets(protocol_fees_shares, Rounding.ROUND_DOWN),
+        self._convert_to_assets(protocol_fees_shares + accountant_fees_shares, Rounding.ROUND_DOWN),
         total_refunds
     )
     return (gain, loss)
@@ -960,7 +968,7 @@ def unlocked_shares() -> uint256:
 @view
 @external
 def price_per_share() -> uint256:
-    return self._convert_to_assets(10 ** DECIMALS)
+    return self._convert_to_assets(10 ** DECIMALS, Rounding.ROUND_DOWN)
 
 @view
 @external
@@ -1043,13 +1051,13 @@ def deposit(assets: uint256, receiver: address) -> uint256:
 
 @external
 def mint(shares: uint256, receiver: address) -> uint256:
-    assets: uint256 = self._convert_to_assets(shares)
+    assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_UP)
     self._deposit(msg.sender, receiver, assets)
     return assets
 
 @external
 def withdraw(assets: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
-    shares: uint256 = self._convert_to_shares(assets)
+    shares: uint256 = self._convert_to_shares(assets, Rounding.ROUND_UP)
     self._redeem(msg.sender, receiver, owner, shares, strategies)
     return shares
 
@@ -1116,22 +1124,22 @@ def totalAssets() -> uint256:
 @view
 @external
 def convertToShares(assets: uint256) -> uint256:
-    return self._convert_to_shares(assets)
+    return self._convert_to_shares(assets, Rounding.ROUND_DOWN)
 
 @view
 @external
 def previewDeposit(assets: uint256) -> uint256:
-    return self._convert_to_shares(assets)
+    return self._convert_to_shares(assets, Rounding.ROUND_DOWN)
 
 @view
 @external
 def previewMint(shares: uint256) -> uint256:
-    return self._convert_to_assets(shares)
+    return self._convert_to_assets(shares, Rounding.ROUND_UP)
 
 @view
 @external
 def convertToAssets(shares: uint256) -> uint256:
-    return self._convert_to_assets(shares)
+    return self._convert_to_assets(shares, Rounding.ROUND_UP)
 
 @view
 @external
@@ -1142,14 +1150,14 @@ def maxDeposit(receiver: address) -> uint256:
 @external
 def maxMint(receiver: address) -> uint256:
     max_deposit: uint256 = self._max_deposit(receiver)
-    return self._convert_to_shares(max_deposit)
+    return self._convert_to_shares(max_deposit, Rounding.ROUND_DOWN)
 
 @view
 @external
 def maxWithdraw(owner: address) -> uint256:
     # NOTE: as the withdraw function that complies with ERC4626 won't withdraw from strategies, this just uses liquidity available in the vault contract
     max_withdraw: uint256 = self._max_redeem(owner) # should be moved to a max_withdraw internal function
-    return self._convert_to_assets(max_withdraw)
+    return self._convert_to_assets(max_withdraw, Rounding.ROUND_DOWN)
 
 @view
 @external
@@ -1160,12 +1168,12 @@ def maxRedeem(owner: address) -> uint256:
 @view
 @external
 def previewWithdraw(assets: uint256) -> uint256:
-    return self._convert_to_shares(assets)
+    return self._convert_to_shares(assets, Rounding.ROUND_UP)
 
 @view
 @external
 def previewRedeem(shares: uint256) -> uint256:
-   return self._convert_to_assets(shares)
+   return self._convert_to_assets(shares, Rounding.ROUND_DOWN)
 
 @view
 @external
