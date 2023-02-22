@@ -460,8 +460,24 @@ def _max_deposit(receiver: address) -> uint256:
 @internal
 def _max_redeem(owner: address) -> uint256:
     # NOTE: this will return the max amount that is available to redeem using ERC4626 (which can only withdraw from the vault contract)
-    return min(self.balance_of[owner], self._convert_to_shares(self.total_idle, Rounding.ROUND_DOWN))
+    if self.queue_manager != empty(address):
+        # if a queue_manager is set we assume full redeems are possible
+        return self.balance_of[owner]
+    else:
+        # NOTE: this will return the max amount that is available to redeem using ERC4626 
+        # (which can only withdraw from the vault contract)
+        return min(self.balance_of[owner], self._convert_to_shares(self.total_idle, Rounding.ROUND_DOWN))
 
+@view
+@internal
+def _max_withdraw(owner: address) -> uint256:
+    if self.queue_manager != empty(address):
+        # if a queue_manager is set we assume full withdraws are possible
+        return self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN)
+    else:
+        # NOTE: this will return the max amount that is available to withdraw using ERC4626 
+        # (which can only withdraw from the vault contract)
+        return min(self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN), self.total_idle)
 
 @internal
 def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256:
@@ -1180,14 +1196,15 @@ def maxMint(receiver: address) -> uint256:
 @view
 @external
 def maxWithdraw(owner: address) -> uint256:
-    # NOTE: as the withdraw function that complies with ERC4626 won't withdraw from strategies, this just uses liquidity available in the vault contract
-    max_withdraw: uint256 = self._max_redeem(owner) # should be moved to a max_withdraw internal function
-    return self._convert_to_assets(max_withdraw, Rounding.ROUND_DOWN)
+    # NOTE: if a queue_manager is not set a withdraw function that complies with ERC4626 won't withdraw from strategies, 
+    #       so this will just uses liquidity available in the vault contract
+    return self._max_withdraw(owner)
 
 @view
 @external
 def maxRedeem(owner: address) -> uint256:
-    # NOTE: as the withdraw function that complies with ERC4626 won't withdraw from strategies, this just uses liquidity available in the vault contract
+    # NOTE: if a queue_manager is not set a redeem function that complies with ERC4626 won't withdraw from strategies, 
+    #       so this will just uses liquidity available in the vault contract
     return self._max_redeem(owner)
 
 @view
