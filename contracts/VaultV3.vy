@@ -21,6 +21,8 @@ interface IAccountant:
 interface IQueueManager:
     def withdraw_queue(vault: address) -> (DynArray[address, 10]): nonpayable
     def should_override(vault: address) -> (bool): nonpayable
+    def new_strategy(strategy: address): nonpayable
+    def remove_strategy(strategy: address): nonpayable
 
 interface IFactory:
     def protocol_fee_config() -> (uint16, uint32, address): view
@@ -613,6 +615,11 @@ def _add_strategy(new_strategy: address):
         max_debt: 0
     })
 
+    queue_manager: address = self.queue_manager
+    if queue_manager != empty(address):        
+        # tell the queue_manager we have a new strategy
+        IQueueManager(queue_manager).new_strategy(new_strategy)
+
     log StrategyChanged(new_strategy, StrategyChangeType.ADDED)
 
 @internal
@@ -633,6 +640,11 @@ def _revoke_strategy(strategy: address, force: bool=False):
       current_debt: 0,
       max_debt: 0
     })
+
+    queue_manager: address = self.queue_manager
+    if queue_manager != empty(address):
+        # tell the queue_manager we removed a strategy
+        IQueueManager(queue_manager).remove_strategy(old_strategy)
 
     log StrategyChanged(strategy, StrategyChangeType.REVOKED)
 
