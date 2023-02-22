@@ -1,5 +1,5 @@
 black==22.3.0
-eth-ape==0.5.9
-ape-solidity==0.5.4
-ape-vyper==0.5.2
-ape-hardhat==0.5.5
+eth-ape==0.6.3
+ape-solidity==0.6.0
+ape-vyper==0.6.1
+ape-hardhat==0.6.0
