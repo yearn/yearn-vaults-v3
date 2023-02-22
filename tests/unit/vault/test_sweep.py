@@ -7,7 +7,11 @@ from utils.constants import ROLES
 def set_role(vault, gov):
     vault.set_role(
         gov.address,
-        ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+        ROLES.ADD_STRATEGY_MANAGER
+        | ROLES.REVOKE_STRATEGY_MANAGER
+        | ROLES.DEBT_MANAGER
+        | ROLES.MAX_DEBT_MANAGER
+        | ROLES.SWEEPER,
         sender=gov,
     )
 

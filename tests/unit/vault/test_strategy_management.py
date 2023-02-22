@@ -3,7 +3,7 @@ import pytest
 from ape import chain
 from utils import checks
 from utils.utils import sleep
-from utils.constants import ROLES, ZERO_ADDRESS, DAY
+from utils.constants import ROLES, ZERO_ADDRESS, DAY, StrategyChangeType
 
 
 def test_add_strategy__with_valid_strategy(chain, gov, vault, create_strategy):
@@ -11,10 +11,11 @@ def test_add_strategy__with_valid_strategy(chain, gov, vault, create_strategy):
 
     snapshot = chain.pending_timestamp
     tx = vault.add_strategy(new_strategy.address, sender=gov)
-    event = list(tx.decode_logs(vault.StrategyAdded))
+    event = list(tx.decode_logs(vault.StrategyChanged))
 
     assert len(event) == 1
     assert event[0].strategy == new_strategy.address
+    assert event[0].change_type == StrategyChangeType.ADDED
 
     strategy_params = vault.strategies(new_strategy)
     assert strategy_params.activation == pytest.approx(snapshot, abs=1)
@@ -52,10 +53,11 @@ def test_add_strategy__with_generic_strategy(
 
     snapshot = chain.pending_timestamp
     tx = vault.add_strategy(strategy.address, sender=gov)
-    event = list(tx.decode_logs(vault.StrategyAdded))
+    event = list(tx.decode_logs(vault.StrategyChanged))
 
     assert len(event) == 1
     assert event[0].strategy == strategy.address
+    assert event[0].change_type == StrategyChangeType.ADDED
 
     strategy_params = vault.strategies(strategy)
     assert strategy_params.activation == pytest.approx(snapshot, abs=1)
@@ -66,10 +68,11 @@ def test_add_strategy__with_generic_strategy(
 
 def test_revoke_strategy__with_existing_strategy(gov, vault, strategy):
     tx = vault.revoke_strategy(strategy.address, sender=gov)
-    event = list(tx.decode_logs(vault.StrategyRevoked))
+    event = list(tx.decode_logs(vault.StrategyChanged))
 
     assert len(event) == 1
     assert event[0].strategy == strategy.address
+    assert event[0].change_type == StrategyChangeType.REVOKED
 
     strategy_params = vault.strategies(strategy)
     checks.check_revoked_strategy(strategy_params)
@@ -97,335 +100,56 @@ def test_revoke_strategy__with_inactive_strategy__fails_with_error(
         vault.revoke_strategy(strategy.address, sender=gov)
 
 
-def test_migrate_strategy__with_no_debt(chain, gov, vault, strategy, create_strategy):
-    new_strategy = create_strategy(vault)
-    old_strategy = strategy
-    old_strategy_params = vault.strategies(old_strategy)
-    old_current_debt = old_strategy_params.current_debt
-    old_max_debt = old_strategy_params.max_debt
-    old_activation = old_strategy_params.activation
-    old_last_report = old_strategy_params.last_report
-
-    snapshot = chain.pending_timestamp
-    tx = vault.migrate_strategy(new_strategy.address, old_strategy.address, sender=gov)
-    event = list(tx.decode_logs(vault.StrategyMigrated))
+def test_force_revoke_strategy__with_existing_strategy(gov, vault, strategy):
+    tx = vault.force_revoke_strategy(strategy.address, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyChanged))
 
     assert len(event) == 1
-    assert event[0].old_strategy == old_strategy.address
-    assert event[0].new_strategy == new_strategy.address
+    assert event[0].strategy == strategy.address
+    assert event[0].change_type == StrategyChangeType.REVOKED
 
-    new_strategy_params = vault.strategies(new_strategy)
-    assert new_strategy_params.activation == old_activation
-    assert new_strategy_params.current_debt == old_current_debt
-    assert new_strategy_params.max_debt == old_max_debt
-    assert new_strategy_params.last_report == old_last_report
-
-    old_strategy_params = vault.strategies(old_strategy)
-    checks.check_revoked_strategy(old_strategy_params)
+    strategy_params = vault.strategies(strategy)
+    checks.check_revoked_strategy(strategy_params)
 
 
-def test_migrate_strategy__with_existing_debt__reverts(
-    gov,
-    asset,
-    vault,
-    strategy,
-    mint_and_deposit_into_vault,
-    create_strategy,
-    add_debt_to_strategy,
+def test_force_revoke_strategy__with_non_zero_debt(
+    gov, asset, vault, strategy, mint_and_deposit_into_vault, add_debt_to_strategy
 ):
     mint_and_deposit_into_vault(vault)
     vault_balance = asset.balanceOf(vault)
     new_debt = vault_balance
-    old_strategy = strategy
-    new_strategy = create_strategy(vault)
 
     add_debt_to_strategy(gov, strategy, vault, new_debt)
 
-    with ape.reverts("old strategy has debt"):
-        vault.migrate_strategy(
-            new_strategy.address, old_strategy.address, False, sender=gov
-        )
+    tx = vault.force_revoke_strategy(strategy.address, sender=gov)
 
-
-def test_migrate_strategy__with_existing_debt__migrates(
-    gov,
-    asset,
-    vault,
-    strategy,
-    mint_and_deposit_into_vault,
-    create_strategy,
-    add_debt_to_strategy,
-):
-    mint_and_deposit_into_vault(vault)
-    vault_balance = asset.balanceOf(vault)
-    new_debt = vault_balance
-    old_strategy = strategy
-    new_strategy = create_strategy(vault)
-
-    add_debt_to_strategy(gov, strategy, vault, new_debt)
-
-    old_strategy_params = vault.strategies(old_strategy)
-    old_current_debt = old_strategy_params.current_debt
-    old_max_debt = old_strategy_params.max_debt
-    old_activation = old_strategy_params.activation
-    old_last_report = old_strategy_params.last_report
-
-    snapshot = chain.pending_timestamp
-    tx = vault.migrate_strategy(new_strategy.address, old_strategy.address, sender=gov)
-
-    event = list(tx.decode_logs(vault.StrategyMigrated))
-
+    # strategy report error
+    event = list(tx.decode_logs(vault.StrategyReported))
     assert len(event) == 1
-    assert event[0].old_strategy == old_strategy.address
-    assert event[0].new_strategy == new_strategy.address
+    assert event[0].strategy == strategy.address
+    assert event[0].gain == 0
+    assert event[0].loss == new_debt
+    assert event[0].current_debt == 0
+    assert event[0].total_fees == 0
+    assert event[0].total_refunds == 0
 
-    new_strategy_params = vault.strategies(new_strategy)
-    assert new_strategy_params.activation == old_activation
-    assert new_strategy_params.current_debt == old_current_debt
-    assert new_strategy_params.max_debt == old_max_debt
-    assert new_strategy_params.last_report == old_last_report
-
-    old_strategy_params = vault.strategies(old_strategy)
-    checks.check_revoked_strategy(old_strategy_params)
-
-
-def test_migrate_locked_strategy__with_existing_debt__reverts(
-    gov,
-    asset,
-    user_deposit,
-    create_vault,
-    mint_and_deposit_into_vault,
-    create_locked_strategy,
-    add_strategy_to_vault,
-    add_debt_to_strategy,
-    fish_amount,
-    fish,
-):
-    vault = create_vault(asset)
-    locked_strategy = create_locked_strategy(vault)
-    amount = fish_amount
-    shares = amount
-
-    vault.set_role(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
-    user_deposit(fish, vault, asset, amount)
-    add_strategy_to_vault(gov, locked_strategy, vault)
-    add_debt_to_strategy(gov, locked_strategy, vault, amount)
-
-    assert vault.totalAssets() == amount
-    assert vault.strategies(locked_strategy).current_debt == amount
-
-    amount_to_lock = amount // 2
-    locked_strategy.setLockedFunds(amount_to_lock, DAY, sender=gov)
-    assert locked_strategy.lockedBalance() == amount_to_lock
-
-    old_strategy = locked_strategy
-    new_strategy = create_locked_strategy(vault)
-
-    with ape.reverts("strat not liquid"):
-        vault.migrate_strategy(new_strategy.address, old_strategy.address, sender=gov)
-
-    # wait the lock period of time and we should be able to migrate
-    sleep(DAY + 1)
-
-    # unlock funds
-    locked_strategy.freeLockedFunds(sender=gov)
-
-    old_strategy_params = vault.strategies(old_strategy)
-    old_current_debt = old_strategy_params.current_debt
-    old_max_debt = old_strategy_params.max_debt
-    old_activation = old_strategy_params.activation
-    old_last_report = old_strategy_params.last_report
-
-    snapshot = chain.pending_timestamp
-    tx = vault.migrate_strategy(new_strategy.address, old_strategy.address, sender=gov)
-
-    event = list(tx.decode_logs(vault.StrategyMigrated))
-
+    # strategy changed event
+    event = list(tx.decode_logs(vault.StrategyChanged))
     assert len(event) == 1
-    assert event[0].old_strategy == old_strategy.address
-    assert event[0].new_strategy == new_strategy.address
+    assert event[0].strategy == strategy.address
+    assert event[0].change_type == StrategyChangeType.REVOKED
 
-    new_strategy_params = vault.strategies(new_strategy)
-    assert new_strategy_params.activation == old_activation
-    assert new_strategy_params.current_debt == old_current_debt
-    assert new_strategy_params.max_debt == old_max_debt
-    assert new_strategy_params.last_report == old_last_report
+    assert vault.total_debt() == 0
+    assert vault.price_per_share() == 0
 
-    old_strategy_params = vault.strategies(old_strategy)
-    checks.check_revoked_strategy(old_strategy_params)
+    strategy_params = vault.strategies(strategy)
+    checks.check_revoked_strategy(strategy_params)
 
 
-def test_migrate_lossy_strategy__with_existing_debt__migrates(
-    gov,
-    asset,
-    user_deposit,
-    create_vault,
-    mint_and_deposit_into_vault,
-    create_lossy_strategy,
-    add_strategy_to_vault,
-    add_debt_to_strategy,
-    fish_amount,
-    fish,
-):
-    vault = create_vault(asset)
-    lossy_strategy = create_lossy_strategy(vault)
-    amount = fish_amount
-    shares = amount
-
-    vault.set_role(gov.address, ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER, sender=gov)
-    user_deposit(fish, vault, asset, amount)
-    add_strategy_to_vault(gov, lossy_strategy, vault)
-    add_debt_to_strategy(gov, lossy_strategy, vault, amount)
-
-    assert vault.totalAssets() == amount
-    assert vault.strategies(lossy_strategy).current_debt == amount
-
-    amount_to_loose = amount // 2
-    lossy_strategy.setLoss(gov, amount_to_loose, sender=gov)
-    assert asset.balanceOf(lossy_strategy.address) == amount - amount_to_loose
-
-    old_strategy = lossy_strategy
-    new_strategy = create_lossy_strategy(vault)
-
-    old_strategy_params = vault.strategies(old_strategy)
-    old_current_debt = old_strategy_params.current_debt
-    old_max_debt = old_strategy_params.max_debt
-    old_activation = old_strategy_params.activation
-    old_last_report = old_strategy_params.last_report
-
-    snapshot = chain.pending_timestamp
-    tx = vault.migrate_strategy(new_strategy.address, old_strategy.address, sender=gov)
-
-    event = list(tx.decode_logs(vault.StrategyMigrated))
-
-    assert len(event) == 1
-    assert event[0].old_strategy == old_strategy.address
-    assert event[0].new_strategy == new_strategy.address
-
-    # Funds should still migrate and current debt should stay the same since the loss hasn't been reported
-    new_strategy_params = vault.strategies(new_strategy)
-    assert new_strategy_params.activation == old_activation
-    assert new_strategy_params.current_debt == old_current_debt
-    assert new_strategy_params.max_debt == old_max_debt
-    assert new_strategy_params.last_report == old_last_report
-
-    old_strategy_params = vault.strategies(old_strategy)
-    checks.check_revoked_strategy(old_strategy_params)
-
-
-def test_migrate_strategy__with_inactive_old_strategy__fails_with_error(
+def test_force_revoke_strategy__with_inactive_strategy__fails_with_error(
     gov, vault, create_strategy
 ):
-    old_strategy = create_strategy(vault)
-    new_strategy = create_strategy(vault)
+    strategy = create_strategy(vault)
 
-    with ape.reverts("old strategy not active"):
-        vault.migrate_strategy(new_strategy.address, old_strategy.address, sender=gov)
-
-
-def test_migrate_strategy__with_generic_strategy(
-    gov, asset, vault, strategy, create_generic_strategy
-):
-    old_strategy = strategy
-    new_strategy = create_generic_strategy(asset)
-
-    old_strategy_params = vault.strategies(old_strategy)
-    old_current_debt = old_strategy_params.current_debt
-    old_max_debt = old_strategy_params.max_debt
-    old_activation = old_strategy_params.activation
-    old_last_report = old_strategy_params.last_report
-
-    snapshot = chain.pending_timestamp
-    tx = vault.migrate_strategy(
-        new_strategy.address, old_strategy.address, False, sender=gov
-    )
-    event = list(tx.decode_logs(vault.StrategyMigrated))
-
-    assert len(event) == 1
-    assert event[0].old_strategy == old_strategy.address
-    assert event[0].new_strategy == new_strategy.address
-
-    new_strategy_params = vault.strategies(new_strategy)
-    assert new_strategy_params.activation == old_activation
-    assert new_strategy_params.current_debt == old_current_debt
-    assert new_strategy_params.max_debt == old_max_debt
-    assert new_strategy_params.last_report == old_last_report
-
-    old_strategy_params = vault.strategies(old_strategy)
-    checks.check_revoked_strategy(old_strategy_params)
-
-
-def test_migrate_generic_strategy__with_generic_strategy__reverts(
-    gov, asset, vault, generic_strategy, create_generic_strategy
-):
-    old_strategy = generic_strategy
-    new_strategy = create_generic_strategy(asset)
-
-    with ape.reverts():
-        vault.migrate_strategy(new_strategy.address, old_strategy.address, sender=gov)
-
-
-def test_migrate_generic_strategy__with_generic_strategy(
-    gov, asset, vault, generic_strategy, create_generic_strategy
-):
-    old_strategy = generic_strategy
-    new_strategy = create_generic_strategy(asset)
-
-    old_strategy_params = vault.strategies(old_strategy)
-    old_current_debt = old_strategy_params.current_debt
-    old_max_debt = old_strategy_params.max_debt
-    old_activation = old_strategy_params.activation
-    old_last_report = old_strategy_params.last_report
-
-    snapshot = chain.pending_timestamp
-    tx = vault.migrate_strategy(
-        new_strategy.address, old_strategy.address, False, sender=gov
-    )
-    event = list(tx.decode_logs(vault.StrategyMigrated))
-
-    assert len(event) == 1
-    assert event[0].old_strategy == old_strategy.address
-    assert event[0].new_strategy == new_strategy.address
-
-    new_strategy_params = vault.strategies(new_strategy)
-    assert new_strategy_params.activation == old_activation
-    assert new_strategy_params.current_debt == old_current_debt
-    assert new_strategy_params.max_debt == old_max_debt
-    assert new_strategy_params.last_report == old_last_report
-
-    old_strategy_params = vault.strategies(old_strategy)
-    checks.check_revoked_strategy(old_strategy_params)
-
-
-def test_migrate_strategy__with_incorrect_asset__fails_with_error(
-    gov, vault, strategy, mock_token, create_strategy, create_vault
-):
-    old_strategy = strategy
-    other_vault = create_vault(mock_token)
-    new_strategy = create_strategy(other_vault)
-
-    with ape.reverts("invalid asset"):
-        vault.migrate_strategy(new_strategy.address, old_strategy.address, sender=gov)
-
-
-def test_migrate_strategy__with_active_new_strategy__fails_with_error(
-    gov, vault, strategy, create_strategy
-):
-    old_strategy = strategy
-    new_strategy = create_strategy(vault)
-
-    # activate strategy
-    vault.add_strategy(new_strategy.address, sender=gov)
-
-    with ape.reverts("strategy already active"):
-        vault.migrate_strategy(new_strategy.address, old_strategy.address, sender=gov)
-
-
-def test_migrate_strategy__with_zero_address_new_strategy__fails_with_error(
-    gov, vault, strategy
-):
-    old_strategy = strategy
-    new_strategy = ZERO_ADDRESS
-
-    with ape.reverts("strategy cannot be zero address"):
-        vault.migrate_strategy(new_strategy, old_strategy.address, sender=gov)
+    with ape.reverts("strategy not active"):
+        vault.force_revoke_strategy(strategy.address, sender=gov)

@@ -201,7 +201,19 @@ def create_vault(project, gov, vault_factory):
 
         vault.set_role(
             gov.address,
-            ROLES.STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.ACCOUNTING_MANAGER,
+            ROLES.ADD_STRATEGY_MANAGER
+            | ROLES.REVOKE_STRATEGY_MANAGER
+            | ROLES.FORCE_REVOKE_MANAGER
+            | ROLES.ACCOUNTANT_MANAGER
+            | ROLES.QUEUE_MANAGER
+            | ROLES.REPORTING_MANAGER
+            | ROLES.DEBT_MANAGER
+            | ROLES.MAX_DEBT_MANAGER
+            | ROLES.DEPOSIT_LIMIT_MANAGER
+            | ROLES.MINIMUM_IDLE_MANAGER
+            | ROLES.PROFIT_UNLOCK_MANAGER
+            | ROLES.SWEEPER
+            | ROLES.EMERGENCY_MANAGER,
             sender=gov,
         )
 
@@ -323,6 +335,16 @@ def deploy_flexible_accountant(project, gov):
         return flexible_accountant
 
     yield deploy_flexible_accountant
+
+
+@pytest.fixture(scope="session")
+def deploy_generic_queue_manager(project, gov):
+    def deploy_generic_queue_manager():
+        queue_manager = gov.deploy(project.QueueManager)
+
+        return queue_manager
+
+    yield deploy_generic_queue_manager
 
 
 @pytest.fixture(scope="session")
