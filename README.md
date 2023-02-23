@@ -13,8 +13,10 @@ Install requirements.
 
 ```
 python3 -m pip install -r requirements.txt
-yarn
+ape plugins install .
 ```
+
+Install foundry from [getfoundry.sh](https://getfoundry.sh/)
 
 Compile smart contracts with:
 
