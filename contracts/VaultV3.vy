@@ -117,15 +117,15 @@ API_VERSION: constant(String[28]) = "3.1.0"
 # ENUMS #
 # Each permissioned function has its own Role.
 # Roles can be combined in any combination or all kept seperate.
-# Follows python Enum patterns so the first role == 1 and doubles each time.
+# Follows python Enum patterns so the first Enum == 1 and doubles each time.
 enum Roles:
     ADD_STRATEGY_MANAGER # can add strategies to the vault
     REVOKE_STRATEGY_MANAGER # can remove strategies from the vault
-    FORCE_REVOKE_MANAGER # can force revoke a strategy causing a loss
+    FORCE_REVOKE_MANAGER # can force remove a strategy causing a loss
     ACCOUNTANT_MANAGER # can set the accountant that assesss fees
-    QUEUE_MANAGER # can set the queue manager
-    REPORTING_MANAGER # calls report for a strategy
-    DEBT_MANAGER # adds and remove debt from strategies
+    QUEUE_MANAGER # can set the queue_manager
+    REPORTING_MANAGER # calls report for strategies
+    DEBT_MANAGER # adds and removes debt from strategies
     MAX_DEBT_MANAGER # can set the max debt for a strategy
     DEPOSIT_LIMIT_MANAGER # sets deposit limit for the vault
     MINIMUM_IDLE_MANAGER # sets the minimun total idle the vault should keep
@@ -165,7 +165,9 @@ total_idle: public(uint256)
 minimum_total_idle: public(uint256)
 # Maximum amount of tokens that the vault can accept. If totalAssets > deposit_limit, deposits will revert
 deposit_limit: public(uint256)
+# Contract that charges fees and can give refunds
 accountant: public(address)
+# Contract that will supply a optimal withdrawal queue of strategies
 queue_manager: public(address)
 # HashMap mapping addresses to their roles
 roles: public(HashMap[address, Roles])
@@ -183,11 +185,15 @@ name: public(String[64])
 # ERC20 - symbol of the token
 symbol: public(String[32])
 
+# The amount of time profits will unlock over
 profit_max_unlock_time: public(uint256)
+# The timestamp of when the current unlocking period ends
 full_profit_unlock_date: public(uint256)
+# The per second rate at which profit will unlcok
 profit_unlocking_rate: public(uint256)
+# Last timestamp of the most recent _report() call
 last_profit_update: uint256
-
+# Last timestamp of when locked shares were burned
 last_report: public(uint256)
 
 # `nonces` track `permit` approvals with signature.
@@ -288,7 +294,7 @@ def _burn_shares(shares: uint256, owner: address):
 @view
 @internal
 def _unlocked_shares() -> uint256:
-  # To avoid sudden price_per_share, shares are minted and insta-locked.
+  # To avoid sudden price_per_share increases, shares are minted and insta-locked.
   # Shares that have been locked are gradually unlocked over profit_max_unlock_time seconds
   _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
   unlocked_shares: uint256 = 0
@@ -338,10 +344,12 @@ def _convert_to_assets(shares: uint256, rounding: Rounding) -> uint256:
     # if total_supply is 0, price_per_share is 1
     if total_supply == 0: 
         return shares
+
     numerator: uint256 = shares * self._total_assets()
     amount: uint256 = numerator / total_supply
     if rounding == Rounding.ROUND_UP and numerator % total_supply != 0:
         amount += 1
+
     return amount
 
 @view
@@ -352,13 +360,15 @@ def _convert_to_shares(assets: uint256, rounding: Rounding) -> uint256:
     """
     total_assets: uint256 = self._total_assets()
 
-    # if total_supply is 0, price_per_share is 1
+    # if total_assets is 0, price_per_share is 1
     if total_assets == 0:
        return assets
+
     numerator: uint256 = assets * self._total_supply()
     shares: uint256 = numerator / total_assets
     if rounding == Rounding.ROUND_UP and numerator % total_assets != 0:
         shares += 1
+
     return shares
 
 
@@ -459,7 +469,6 @@ def _max_deposit(receiver: address) -> uint256:
 @view
 @internal
 def _max_redeem(owner: address) -> uint256:
-    # NOTE: this will return the max amount that is available to redeem using ERC4626 (which can only withdraw from the vault contract)
     if self.queue_manager != empty(address):
         # if a queue_manager is set we assume full redeems are possible
         return self.balance_of[owner]
@@ -522,18 +531,10 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
     losses_user_share: uint256 = assets_to_withdraw - assets_to_withdraw * strategy_assets / strategy_current_debt
     return losses_user_share
 
-
 @internal
 def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: uint256, strategies: DynArray[address, 10]) -> uint256:
     if sender != owner:
         self._spend_allowance(owner, sender, shares_to_burn)
-
-    _strategies: DynArray[address, 10] = strategies
-
-    queue_manager: address = self.queue_manager
-    if queue_manager != empty(address):
-        if len(_strategies) == 0 or IQueueManager(queue_manager).should_override(self):
-            _strategies = IQueueManager(queue_manager).withdraw_queue(self)
 
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
@@ -551,6 +552,14 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
     
     # If there are not enough assets in the Vault contract, we try to free funds from strategies specified in the input
     if requested_assets > curr_total_idle:
+
+        _strategies: DynArray[address, 10] = strategies
+
+        queue_manager: address = self.queue_manager
+        if queue_manager != empty(address):
+            if len(_strategies) == 0 or IQueueManager(queue_manager).should_override(self):
+                _strategies = IQueueManager(queue_manager).withdraw_queue(self)
+
         # load to memory to save gas
         curr_total_debt: uint256 = self.total_debt
 
@@ -569,7 +578,8 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
             # CHECK FOR UNREALISED LOSSES
             # If unrealised losses > 0, then the user will take the proportional share and realise it (required to avoid users withdrawing from lossy strategies) 
             # NOTE: assets_to_withdraw will be capped to strategy's current_debt within the function
-            # NOTE: strategies need to manage the fact that realising part of the loss can mean the realisation of 100% of the loss !! (i.e. if for withdrawing 10% of the strategy it needs to unwind the whole position, generated losses might be bigger)
+            # NOTE: strategies need to manage the fact that realising part of the loss can mean the realisation of 100% of the loss !! 
+            #  (i.e. if for withdrawing 10% of the strategy it needs to unwind the whole position, generated losses might be bigger)
             unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_to_withdraw)
             if unrealised_losses_share > 0:
                 # User now "needs" less assets to be unlocked (as he took some as losses)
@@ -639,6 +649,7 @@ def _add_strategy(new_strategy: address):
         max_debt: 0
     })
 
+    # we cache queue_manager since expected behavior is it being set
     queue_manager: address = self.queue_manager
     if queue_manager != empty(address):        
         # tell the queue_manager we have a new strategy
@@ -665,6 +676,7 @@ def _revoke_strategy(strategy: address, force: bool=False):
       max_debt: 0
     })
 
+    # we cache queue_manager since expected behavior is it being set
     queue_manager: address = self.queue_manager
     if queue_manager != empty(address):
         # tell the queue_manager we removed a strategy
