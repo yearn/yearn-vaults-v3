@@ -832,7 +832,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     newly_locked_shares: uint256 = 0
     if total_refunds > 0:
         # if refunds are non-zero, transfer shares worth of assets
-        total_refunds_shares: uint256 = min(self._convert_to_shares(total_refunds, Rounding.ROUND_DOWN), self.balance_of[accountant])
+        total_refunds_shares: uint256 = min(self._convert_to_shares(total_refunds, Rounding.ROUND_UP), self.balance_of[accountant])
         # Shares received as a refund are locked to avoid sudden pps change (like profits)
         self._transfer(accountant, self, total_refunds_shares)
         newly_locked_shares += total_refunds_shares
@@ -1139,7 +1139,7 @@ def previewMint(shares: uint256) -> uint256:
 @view
 @external
 def convertToAssets(shares: uint256) -> uint256:
-    return self._convert_to_assets(shares, Rounding.ROUND_UP)
+    return self._convert_to_assets(shares, Rounding.ROUND_DOWN)
 
 @view
 @external
