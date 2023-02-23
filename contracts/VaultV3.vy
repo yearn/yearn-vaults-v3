@@ -317,13 +317,13 @@ def _convert_to_assets(shares: uint256, rounding: Rounding) -> uint256:
     """ 
     assets = shares * (total_assets / total_supply) --- (== price_per_share * shares)
     """
-    _total_supply: uint256 = self._total_supply()
+    total_supply: uint256 = self._total_supply()
     # if total_supply is 0, price_per_share is 1
-    if _total_supply == 0: 
+    if total_supply == 0: 
         return shares
-
-    amount: uint256 = shares * self._total_assets() / _total_supply
-    if rounding == Rounding.ROUND_UP:
+    numerator: uint256 = shares * self._total_assets()
+    amount: uint256 = numerator / total_supply
+    if rounding == Rounding.ROUND_UP and numerator % total_supply != 0:
         amount += 1
     return amount
 
@@ -338,9 +338,9 @@ def _convert_to_shares(assets: uint256, rounding: Rounding) -> uint256:
     # if total_supply is 0, price_per_share is 1
     if total_assets == 0:
        return assets
-
-    shares: uint256 = assets * self._total_supply() / total_assets
-    if rounding == Rounding.ROUND_UP:
+    numerator: uint256 = assets * self._total_supply()
+    shares: uint256 = numerator / total_assets
+    if rounding == Rounding.ROUND_UP and numerator % total_assets != 0:
         shares += 1
     return shares
 
