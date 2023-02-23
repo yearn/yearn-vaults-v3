@@ -366,6 +366,4 @@ def test_max_redeem__with_queue__with_balance_greater_than_total_idle__returns_b
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, strategy_deposit)
 
-    queue_manager.setQueue(vault, [strategy], sender=gov)
-
-    assert vault.maxWithdraw(fish.address) == assets
+    assert vault.maxRedeem(fish.address) == assets
