@@ -8,6 +8,7 @@ def test_liquid_strategy__with_fee(
     strategy = create_strategy(vault)
     amount = 10**18
 
+    chain.provider._make_request("anvil_setBalance", [vault.address, 10**18])
     mint_and_deposit_into_strategy(strategy, vault, amount)
 
     assert asset.balanceOf(strategy) == amount
@@ -20,6 +21,7 @@ def test_locked_strategy__with_locked_asset(
     strategy = create_locked_strategy(vault)
     amount = 10 * 10**18
     locked_amount = 10**18
+    chain.provider._make_request("anvil_setBalance", [vault.address, 10**18])
 
     mint_and_deposit_into_strategy(strategy, vault, amount)
     assert asset.balanceOf(strategy) == amount
@@ -52,7 +54,7 @@ def test_lossy_strategy__with_multiple_losses(
     strategy = create_lossy_strategy(vault)
     amount = 10 * 10**18
     loss = 10**18
-
+    chain.provider._make_request("anvil_setBalance", [vault.address, 10**18])
     mint_and_deposit_into_strategy(strategy, vault, amount)
     assert asset.balanceOf(strategy) == amount
     assert strategy.maxWithdraw(vault) == amount

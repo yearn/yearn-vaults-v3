@@ -30,14 +30,8 @@ jobs:
       # TODO: Force recompiles until ape compile caching is fixed
       run: ape compile --force --size
 
-    # Needed to use hardhat
-    - name: Setup node.js
-      uses: actions/setup-node@v1
-      with:
-        node-version: '14.x'
-
-    - name: Install hardhat
-      run: npm install hardhat
+    - name: Install Foundry
+      uses: foundry-rs/foundry-toolchain@v1
 
     - name: output current installation
       run: pip freeze

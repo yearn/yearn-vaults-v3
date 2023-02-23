@@ -2,7 +2,7 @@ name: yearn-v3
 plugins:
   - name: solidity
   - name: vyper
-  - name: hardhat
+  - name: foundry
 
 default_ecosystem: ethereum
 dependencies:
@@ -16,4 +16,4 @@ solidity:
 
 ethereum:
   local:
-    default_provider: hardhat
+    default_provider: foundry

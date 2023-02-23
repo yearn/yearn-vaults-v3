@@ -150,7 +150,7 @@ def vault_blueprint(project, gov):
 
     c = w3.eth.contract(abi=[], bytecode=deploy_bytecode)
     deploy_transaction = c.constructor()
-    tx_info = {"from": gov.address, "value": 0, "gasPrice": 0}
+    tx_info = {"from": gov.address, "value": 0, "gasPrice": 10**10}
     tx_hash = deploy_transaction.transact(tx_info)
 
     return w3.eth.get_transaction_receipt(tx_hash)["contractAddress"]
@@ -523,6 +523,9 @@ def initial_set_up(
                 performance_fee,
                 refund_ratio,
             )
+            chain.provider._make_request(
+                "anvil_setBalance", [accountant.address, 10**18]
+            )
 
             if accountant_mint:
                 airdrop_asset(gov, asset, accountant, accountant_mint)
@@ -574,6 +577,9 @@ def initial_set_up_lossy(
                 management_fee,
                 performance_fee,
                 refund_ratio,
+            )
+            chain.provider._make_request(
+                "anvil_setBalance", [accountant.address, 10**18]
             )
             if accountant_mint:
                 airdrop_asset(gov, asset, accountant, accountant_mint)
