@@ -13,15 +13,6 @@ interface IStrategyERC4626 {
 
     function vault() external view returns (address _vault);
 
-    function harvestTrigger() external view returns (bool);
-
-    // - manual: called by governance or guard, behaves similarly to freeFunds but can incur in losses.
-    // - vault: called by vault.update_debt if vault is on emergencyFreeFunds mode.
-    // function emergencyFreeFunds(uint256 _amountToWithdraw) external;
-
-    // - `investTrigger() -> bool`: returns true when the strategy has available funds to invest and space for them.
-    function investTrigger() external view returns (bool);
-
     // - `invest()`: strategy will invest loose funds into the strategy. only callable by keepers
     function invest() external;
 

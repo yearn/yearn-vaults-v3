@@ -1,4 +1,4 @@
-# Yearn System Specification (DRAFT)
+# Yearn System Specification
 
 ### Definitions
 - Asset: Any ERC20-compliant token
@@ -8,6 +8,7 @@
 - Vault: ERC4626 compliant Smart contract that receives Assets from Depositors to then distribute them among the different Strategies added to the vault, managing accounting and Assets distribution. 
 - Role: the different flags an Account can have in the Vault so that the Account can do certain specific actions. Can be fulfilled by a smart contract or an EOA.
 - Accountant: smart contract that receives P&L reporting and returns shares and refunds to the strategy
+- Queue_Manager: smart contract that can be configured by management to hold the optimal withdrawal queues for each vault
 
 # VaultV3 Specification
 The Vault code has been designed as an unopinionated system to distribute funds of depositors into different opportunities (aka Strategies) and manage accounting in a robust way. That's all.
@@ -41,7 +42,7 @@ When deploying a new vault, it requires the following parameters:
 - name: name of Shares as described in ERC20
 - symbol: symbol of Shares ERC20
 - role_manager: account that can assign and revoke Roles
-- PROFIT_MAX_UNLOCK_TIME: max amount of time profit will be locked before being distributed
+- profit_max_unlock_time: max amount of time profit will be locked before being distributed
 
 ## Normal Operation
 
@@ -53,9 +54,9 @@ Deposits are limited under depositLimit and shutdown parameters. Read below for 
 ### Withdrawals / Redeems
 Users can redeem their shares at any point in time if there is liquidity available. 
 
-The redeem function will check if there are enough idle funds to serve the request. If there are not enough, it will revert. 
-
 Optionally, a user can specify a list of strategies to withdraw from. If a list of strategies is passed, the vault will try to withdraw from them.
+
+If a user passed array is not defined. The redeem function will check if there is a queue_manager set to get a valid withdraw queue from. If neither happens the vault will check if there are enough idle funds to serve the request. If there are not enough, it will revert. 
 
 If not enough funds have been recovered to honor the full request, the transaction will revert.
 
@@ -79,10 +80,12 @@ Fee assessment and distribution is handled by the Accountant module.
 
 It will report the amount of fees that need to be charged and the vault will issue shares for that amount of fees.
 
+There is also an optional protocol_fee that can be charged based on the configuration of the VaultFactory.vy
+
 ### Profit distribution 
 Profit from different process_report calls will accumulate in a buffer. This buffer will be linearly unlocked over the locking period seconds at profit_distribution_rate. 
 
-Profits will be locked for a max period of time of PROFIT_MAX_UNLOCK_TIME seconds and will be gradually distributed. To avoid spending too much gas for profit unlock, the amount of time a profit will be locked is a weighted average between the new profit and the previous profit. 
+Profits will be locked for a max period of time of profit_max_unlock_time seconds and will be gradually distributed. To avoid spending too much gas for profit unlock, the amount of time a profit will be locked is a weighted average between the new profit and the previous profit. 
 
 new_locking_period = locked_profit * pending_time_to_unlock + new_profit * PROFIT_MAX_UNLOCK_TIME / (locked_profit + new_profit)
 new_profit_distribution_rate = (locked_profit + new_profit) / new_locking_period
@@ -94,35 +97,60 @@ Issue of new shares due to fees will also unlock profit so that pps does not go 
 Both of this offsets will prevent frontrunning (as the profit was already earned and was not distributed yet)
 
 ## Vault Management
-Vault management is split in two fields: strategy management and debt management
+Vault management is split into function specific roles. Each permissioned function has its owne corresponding Role.
+
+This means roles can be combined all to one address, each distributed to seperate addresses or any combination in between
+
+## Roles
+Vault functions that are permissioned will be callable by accounts that hold specific roles. 
+
+These are: 
+- ADD_STRATEGY_MANAGER: role than can add strategies to the vault
+- REVOKE_STRATEGY_MANAGER: role that can remove strategies from the vault
+- FORCE_REVOKE_MANAGER: role that can force remove a strategy causing a loss
+- ACCOUNTANT_MANAGER: role that can set the accountant that assesss fees
+- QUEUE_MANAGER: role that can set the queue_manager
+- REPORTING_MANAGER: role that calls report for strategies
+- DEBT_MANAGER: role that adds and removes debt from strategies
+- MAX_DEBT_MANAGER: role that can set the max debt for a strategy
+- DEPOSIT_LIMIT_MANAGER: role that sets deposit limit for the vault
+- MINIMUM_IDLE_MANAGER: role that sets the minimun total idle the vault should keep
+- PROFIT_UNLOCK_MANAGER: role that sets the profit_max_unlock_time
+- SWEEPER: role that can sweep tokens from the vault
+- EMERGENCY_MANAGER: role that can shutdown vault in an emergency
+
+Every role can be filled by an EOA, multisig or other smart contracts. Each role can be filled by several accounts.
+
+The account that manages roles is a single account, set in `role_manager`.
+
+This role_manager can be an EOA, a multisig or a Governance Module that relays calls. 
 
 ### Strategy Management
-This responsibility is taken by callers with STRATEGY_MANAGER role
+This responsibility is taken by callers with ADD_STRATEGY_MANAGER, REVOKE_STRATEGY_MANAGER and FORCE_REVOKE_MANAGER roles
 
-A vault can have strategies added, removed and migrated 
+A vault can have strategies added, removed oe forcefully removed 
 
 Added strategies will be eligible to receive funds from the vault, when the max_debt is set to > 0
 
 Revoked strategies will return all debt and stop being eligible to receive more. It can only be done when the strategy's current_debt is 0
 
-Strategy migration is the process of replacing an existing strategy with a new one, which will inherit all parameters, including its debt
+Force revoking a strategy is only used in cases of a faulty strategy that cannot otherwise have its current_debt reduced to 0. Force revoking a strategy will result in a loss being reported by the vault.
+
+#### Setting the periphery contracts
+The accountant and the queue_manager contracts can each be set by the ACCOUNTANT_MANAGER and QUEUE_MANAGER respectfully
+
+The contracts are not needed for the vault to function but are recommended for optimal use
+
+#### Reporting profits
+The REPORTING_MANAGER is in charge of calling process_report() for each strategy in the vault according to its own time line
+
+This call will do the neccesary accounting and profit locking for the individual strategy as well as charging fees
 
 ### Debt Management
 This responsibility is taken by callers with DEBT_MANAGER role
 
-#### Setting minimum idle funds
-The debt manager can specify how many funds the vault should try to have reserved to serve withdrawal requests
+This role can increase or decrease strategies specific debt.
 
-These funds will remain in the vault unless requested by a Depositor
-
-#### Setting maximum debt for a specific strategy
-The maximum amount of tokens the vault will allow a strategy to owe at any moment in time.
-
-Stored in strategies[strategy].max_debt
-
-When a debt rebalance is triggered, the Vault will cap the new target debt to this number (max_debt)
-
-#### Rebalance Debt
 The vault sends and receives funds to/from strategies. The function updateDebt(strategy, target_debt) will set the current_debt of the strategy to target_debt (if possible)
 
 If the strategy currently has less debt than the target_debt, the vault will send funds to it.
@@ -131,20 +159,43 @@ The vault checks that the `minimumTotalIdle` parameter is respected (i.e. there'
 
 If the strategy has more debt than the max_debt, the vault will request the funds back. These funds may be locked in the strategy, which will result in the strategy returning less funds than requested by the vault. 
 
-## Roles
-Vault functions that are permissioned will be callable by accounts that hold specific roles. 
+#### Setting maximum debt for a specific strategy
+The MAX_DEBT_MANAGER can set the maximum amount of tokens the vault will allow a strategy to owe at any moment in time.
 
-These are: 
-- STRATEGY_MANAGER: role for accounts that can add, remove or migrate strategies
-- DEBT_MANAGER: role for accounts that can rebalance and manage debt related params
-- EMERGENCY_MANAGER: role for accounts that can activate the shutdown mode
-- ACCOUNTING_MANAGER: role for accounts that can process reports (save strategy p&l) and change accountant parameters
+Stored in strategies[strategy].max_debt
 
-Every role can be filled by an EOA, multisig or other smart contracts. Each role can be filled by several accounts.
+When a debt rebalance is triggered, the Vault will cap the new target debt to this number (max_debt)
 
-The account that manages roles is a single account, set in `role_manager`.
+#### Setting the deposit limit
+The DEPOSIT_LIMIT_MANAGER is in charge of setting the deposit_limit for the vault
 
-This role_manager can be an EOA, a multisig or a Governance Module that relays calls. 
+On deployment deposit_limit defaults to 0 and will need to be increase to make the vault functional
+
+#### Setting minimum idle funds
+The MINIMUM_IDLE_MANAGER can specify how many funds the vault should try to have reserved to serve withdrawal requests
+
+These funds will remain in the vault unless requested by a Depositor
+
+It is recommended that if no queue_manager is set some amount of funds should remain idle to service withdrawals
+
+#### Setting the profit unlock period
+The PROFIT_UNLOCK_MANAGER is in charge of updating and setting the profit_max_unlock_time which controls how fast profits will unlock
+
+This can be customized based on the vault based on aspects such as number of strategies, TVL, expected returns etc.
+
+#### Sweeping funds
+The SWEEPER role can sweep funds out of the vault that are not part of the vaults total_assets
+
+The vault will not allow the sweeping of either its own token of the tokens of any of the active strategies
+
+The vaults 'asset' can be swept but only the amount > total_idle to be able to sweep any airdropped 'asset'
+
+This functionality should be reserved primarily for sweeping airdropped tokens of value. Due to the 4626 nature of strategies it is possible for the vault to deposit directly into 3rd party protocols that may issue rewards retroactively
+
+#### Shutting down the vault
+In an emergency the EMERGENCY_MANAGER can shutdown the vault
+
+This will also give the EMERGENCY_MANAGER the DEBT_MANAGER roles as well so funds can start to be returned from the strategies
 
 ## Strategy Minimum API
 Strategies are completely independent smart contracts that can be implemented following the proposed template or in any other way.
@@ -161,17 +212,10 @@ In any case, to be compatible with the vault, they need to implement the followi
 
 This means that the vault can deposit into any ERC4626 vault but also that a non-compliant strategy can be implemented provided that these functions have been implemented (even in a non ERC4626 compliant way). 
 
-Anything else is left to the strategy writer. However, to make security review easier, the Yearn's template has the following optional functions: 
-- tend(): a function that will be called by bots. It will do anything to maintain a position, act on certain triggers, ...
-- tendTrigger(): implementation that trigger bots that will call tend function on the contract
-- invest(): deposit funds into underlying protocol
-- emergencyFreeFunds(): close the position and return funds to the strategy. Losses might be accepted here.
-
-
 ## ERC4626 compliance
 Vault Shares are ERC4626 compliant. 
 
-The most important implication is that `withdraw` and `redeem` functions as presented in ERC4626, the liquidity to redeem shares will just be the one in the vault. No strategies will be passed to the redeem function to withdraw from with the ERC4626 compliant `withdraw` and `redeem` function. 
+The most important implication is that `withdraw` and `redeem` functions as presented in ERC4626, if no queue_manager is set the liquidity to redeem shares will just be the one in the vault. No strategies will be passed to the redeem function to withdraw from with the ERC4626 compliant `withdraw` and `redeem` function. 
 
 ## Emergency Operation
 

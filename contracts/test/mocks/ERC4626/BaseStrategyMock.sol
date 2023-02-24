@@ -42,13 +42,7 @@ abstract contract ERC4626BaseStrategyMock is ERC4626BaseStrategy {
         return IERC20(asset()).balanceOf(address(this));
     }
 
-    // function _emergencyFreeFunds(uint256 _amountToWithdraw) internal override {}
-
     function _invest() internal override {}
-
-    function harvestTrigger() external view override returns (bool) {}
-
-    function investTrigger() external view override returns (bool) {}
 
     function delegatedAssets()
         external

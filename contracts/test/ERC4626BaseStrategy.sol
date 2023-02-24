@@ -48,8 +48,6 @@ abstract contract ERC4626BaseStrategy is IStrategyERC4626, ERC4626 {
         // TODO: add permissioning ?
     }
 
-    function investTrigger() external view virtual override returns (bool) {}
-
     function freeFunds(uint256 _amount)
         external
         override
