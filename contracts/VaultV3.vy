@@ -1107,7 +1107,7 @@ def add_strategy(new_strategy: address):
 def revoke_strategy(strategy: address):
     """
     @notice Revoke a strategy.
-    @param old_strategy The strategy to revoke.
+    @param strategy The strategy to revoke.
     """
     self._enforce_role(msg.sender, Roles.REVOKE_STRATEGY_MANAGER)
     self._revoke_strategy(strategy)
