@@ -1,4 +1,4 @@
-# Yearn System Specification (DRAFT)
+# Yearn System Specification
 
 ### Definitions
 - Asset: Any ERC20-compliant token
