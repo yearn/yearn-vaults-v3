@@ -3,6 +3,7 @@
 This repository contains the Smart Contracts for Yearns V3 vault implementation.
 
 [VaultFactory.vy](contracts/VaultFactory.vy) - The base factory that all vaults will be deployed from and used to configure protocol fees
+
 [Vault.vy](contracts/VaultV3.vy) - The ERC4626 compliant Vault that will handle all logic associated with deposits, withdraws, strategy mangaement, profit reporting etc.
 
 ## Requirements
@@ -13,11 +14,11 @@ You will need:
  - Python 3.8 or later
  - Linux or macOS
  - Windows: Install Windows Subsystem Linux (WSL) with Python 3.8 or later
- - (Hardhat](https://hardhat.org/) installed globally
+ - [Hardhat](https://hardhat.org/) installed globally
 
 ## Installation
 
-Fork the repository and =clone onto your local devie 
+Fork the repository and clone onto your local devie 
 
 ```
 git clone https://github.com/user/yearn-vaults-v3
