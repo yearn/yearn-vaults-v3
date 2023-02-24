@@ -934,6 +934,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     self.strategies[strategy].last_report = block.timestamp
 
+    # We have to recalculate the fees paid for cases with an overall loss
     log StrategyReported(
         strategy,
         gain,
