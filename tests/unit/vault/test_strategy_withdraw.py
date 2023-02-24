@@ -815,7 +815,7 @@ def test_withdraw__with_multiple_liquid_strategies_more_assets_than_debt__withdr
     assert event[0].new_debt == 0
     assert event[1].strategy == second_strategy.address
     assert event[1].current_debt == amount_per_strategy
-    assert event[1].new_debt == 0    
+    assert event[1].new_debt == 0
 
     checks.check_vault_empty(vault)
     assert asset.balanceOf(vault) == 0
