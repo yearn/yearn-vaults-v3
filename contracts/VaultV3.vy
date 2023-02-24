@@ -618,7 +618,14 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
             requested_assets -= loss
             curr_total_debt -= assets_to_withdraw
             # Vault will reduce debt because the unrealised loss has been taken by user
-            self.strategies[strategy].current_debt -= (assets_to_withdraw + unrealised_losses_share)
+            current_debt: uint256 = self.strategies[strategy].current_debt
+            new_debt: uint256 = current_debt - (assets_to_withdraw + unrealised_losses_share)
+        
+            # Update strategies storage
+            self.strategies[strategy].current_debt = new_debt
+            # Log the debt update
+            log DebtUpdated(strategy, current_debt, new_debt)
+
             # NOTE: the user will receive less tokens (the rest were lost)
             # break if we have enough total idle to serve initial request 
             if requested_assets <= curr_total_idle:
