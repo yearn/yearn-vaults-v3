@@ -74,6 +74,9 @@ event DebtUpdated:
     new_debt: uint256
 
 # STORAGE MANAGEMENT EVENTS
+event UpdateRoleManager:
+    role_manager: indexed(address)
+
 event UpdateAccountant:
     accountant: indexed(address)
 
@@ -112,20 +115,20 @@ struct StrategyParams:
 MAX_BPS: constant(uint256) = 10_000
 MAX_BPS_EXTENDED: constant(uint256) = 1_000_000_000_000
 PROTOCOL_FEE_ASSESSMENT_PERIOD: constant(uint256) = 24 * 3600 # assess once a day
-API_VERSION: constant(String[28]) = "0.1.0"
+API_VERSION: constant(String[28]) = "3.1.0"
 
 # ENUMS #
 # Each permissioned function has its own Role.
 # Roles can be combined in any combination or all kept seperate.
-# Follows python Enum patterns so the first role == 1 and doubles each time.
+# Follows python Enum patterns so the first Enum == 1 and doubles each time.
 enum Roles:
     ADD_STRATEGY_MANAGER # can add strategies to the vault
     REVOKE_STRATEGY_MANAGER # can remove strategies from the vault
-    FORCE_REVOKE_MANAGER # can force revoke a strategy causing a loss
+    FORCE_REVOKE_MANAGER # can force remove a strategy causing a loss
     ACCOUNTANT_MANAGER # can set the accountant that assesss fees
-    QUEUE_MANAGER # can set the queue manager
-    REPORTING_MANAGER # calls report for a strategy
-    DEBT_MANAGER # adds and remove debt from strategies
+    QUEUE_MANAGER # can set the queue_manager
+    REPORTING_MANAGER # calls report for strategies
+    DEBT_MANAGER # adds and removes debt from strategies
     MAX_DEBT_MANAGER # can set the max debt for a strategy
     DEPOSIT_LIMIT_MANAGER # sets deposit limit for the vault
     MINIMUM_IDLE_MANAGER # sets the minimun total idle the vault should keep
@@ -136,6 +139,10 @@ enum Roles:
 enum StrategyChangeType:
     ADDED
     REVOKED
+
+enum Rounding:
+    ROUND_DOWN
+    ROUND_UP
 
 # IMMUTABLE #
 ASSET: immutable(ERC20)
@@ -161,7 +168,9 @@ total_idle: public(uint256)
 minimum_total_idle: public(uint256)
 # Maximum amount of tokens that the vault can accept. If totalAssets > deposit_limit, deposits will revert
 deposit_limit: public(uint256)
+# Contract that charges fees and can give refunds
 accountant: public(address)
+# Contract that will supply a optimal withdrawal queue of strategies
 queue_manager: public(address)
 # HashMap mapping addresses to their roles
 roles: public(HashMap[address, Roles])
@@ -179,11 +188,16 @@ name: public(String[64])
 # ERC20 - symbol of the token
 symbol: public(String[32])
 
+# The amount of time profits will unlock over
 profit_max_unlock_time: public(uint256)
+# The timestamp of when the current unlocking period ends
 full_profit_unlock_date: public(uint256)
+# The per second rate at which profit will unlcok
 profit_unlocking_rate: public(uint256)
+# Last timestamp of the most recent _report() call
 last_profit_update: uint256
 
+# Last protocol fees were charged
 last_report: public(uint256)
 
 # `nonces` track `permit` approvals with signature.
@@ -194,6 +208,20 @@ PERMIT_TYPE_HASH: constant(bytes32) = keccak256("Permit(address owner,address sp
 # Constructor
 @external
 def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: address, profit_max_unlock_time: uint256):
+    """
+    @notice
+        The constructor for the vault. Sets the asset, name, symbol, and role manager.
+    @param asset
+        The address of the asset that the vault will accept.
+    @param name
+        The name of the vault token.
+    @param symbol
+        The symbol of the vault token.
+    @param role_manager 
+        The address that can add and remove roles to addresses
+    @param profit_max_unlock_time
+        The maximum amount of time that the profit can be locked for
+    """
     ASSET = asset
     DECIMALS = convert(ERC20Detailed(asset.address).decimals(), uint256)
     assert 10 ** (2 * DECIMALS) <= max_value(uint256) # dev: token decimals too high
@@ -297,6 +325,7 @@ def _unlocked_shares() -> uint256:
 
     return unlocked_shares
 
+
 @view
 @internal
 def _total_supply() -> uint256:
@@ -328,31 +357,39 @@ def _total_assets() -> uint256:
 
 @view
 @internal
-def _convert_to_assets(shares: uint256) -> uint256:
+def _convert_to_assets(shares: uint256, rounding: Rounding) -> uint256:
     """ 
     assets = shares * (total_assets / total_supply) --- (== price_per_share * shares)
     """
-    _total_supply: uint256 = self._total_supply()
+    total_supply: uint256 = self._total_supply()
     # if total_supply is 0, price_per_share is 1
-    if _total_supply == 0: 
+    if total_supply == 0: 
         return shares
 
-    amount: uint256 = shares * self._total_assets() / _total_supply
+    numerator: uint256 = shares * self._total_assets()
+    amount: uint256 = numerator / total_supply
+    if rounding == Rounding.ROUND_UP and numerator % total_supply != 0:
+        amount += 1
+
     return amount
 
 @view
 @internal
-def _convert_to_shares(assets: uint256) -> uint256:
+def _convert_to_shares(assets: uint256, rounding: Rounding) -> uint256:
     """
     shares = amount * (total_supply / total_assets) --- (== amount / price_per_share)
     """
     total_assets: uint256 = self._total_assets()
 
-    # if total_supply is 0, price_per_share is 1
+    # if total_assets is 0, price_per_share is 1
     if total_assets == 0:
        return assets
 
-    shares: uint256 = assets * self._total_supply() / total_assets
+    numerator: uint256 = assets * self._total_supply()
+    shares: uint256 = numerator / total_assets
+    if rounding == Rounding.ROUND_UP and numerator % total_assets != 0:
+        shares += 1
+
     return shares
 
 
@@ -453,9 +490,24 @@ def _max_deposit(receiver: address) -> uint256:
 @view
 @internal
 def _max_redeem(owner: address) -> uint256:
-    # NOTE: this will return the max amount that is available to redeem using ERC4626 (which can only withdraw from the vault contract)
-    return min(self.balance_of[owner], self._convert_to_shares(self.total_idle))
+    if self.queue_manager != empty(address):
+        # if a queue_manager is set we assume full redeems are possible
+        return self.balance_of[owner]
+    else:
+        # NOTE: this will return the max amount that is available to redeem using ERC4626 
+        # (which can only withdraw from the vault contract)
+        return min(self.balance_of[owner], self._convert_to_shares(self.total_idle, Rounding.ROUND_DOWN))
 
+@view
+@internal
+def _max_withdraw(owner: address) -> uint256:
+    if self.queue_manager != empty(address):
+        # if a queue_manager is set we assume full withdraws are possible
+        return self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN)
+    else:
+        # NOTE: this will return the max amount that is available to withdraw using ERC4626 
+        # (which can only withdraw from the vault contract)
+        return min(self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN), self.total_idle)
 
 @internal
 def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256:
@@ -500,18 +552,10 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
     losses_user_share: uint256 = assets_to_withdraw - assets_to_withdraw * strategy_assets / strategy_current_debt
     return losses_user_share
 
-
 @internal
 def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: uint256, strategies: DynArray[address, 10]) -> uint256:
     if sender != owner:
         self._spend_allowance(owner, sender, shares_to_burn)
-
-    _strategies: DynArray[address, 10] = strategies
-
-    queue_manager: address = self.queue_manager
-    if queue_manager != empty(address):
-        if len(_strategies) == 0 or IQueueManager(queue_manager).should_override(self):
-            _strategies = IQueueManager(queue_manager).withdraw_queue(self)
 
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
@@ -522,13 +566,21 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
     assert shares_balance >= shares, "insufficient shares to redeem"
     assert shares > 0, "no shares to redeem"
 
-    requested_assets: uint256 = self._convert_to_assets(shares)
+    requested_assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_DOWN)
 
     # load to memory to save gas
     curr_total_idle: uint256 = self.total_idle
     
     # If there are not enough assets in the Vault contract, we try to free funds from strategies specified in the input
     if requested_assets > curr_total_idle:
+
+        _strategies: DynArray[address, 10] = strategies
+
+        queue_manager: address = self.queue_manager
+        if queue_manager != empty(address):
+            if len(_strategies) == 0 or IQueueManager(queue_manager).should_override(self):
+                _strategies = IQueueManager(queue_manager).withdraw_queue(self)
+
         # load to memory to save gas
         curr_total_debt: uint256 = self.total_debt
 
@@ -547,7 +599,8 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
             # CHECK FOR UNREALISED LOSSES
             # If unrealised losses > 0, then the user will take the proportional share and realise it (required to avoid users withdrawing from lossy strategies) 
             # NOTE: assets_to_withdraw will be capped to strategy's current_debt within the function
-            # NOTE: strategies need to manage the fact that realising part of the loss can mean the realisation of 100% of the loss !! (i.e. if for withdrawing 10% of the strategy it needs to unwind the whole position, generated losses might be bigger)
+            # NOTE: strategies need to manage the fact that realising part of the loss can mean the realisation of 100% of the loss !! 
+            #  (i.e. if for withdrawing 10% of the strategy it needs to unwind the whole position, generated losses might be bigger)
             unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_to_withdraw)
             if unrealised_losses_share > 0:
                 # User now "needs" less assets to be unlocked (as he took some as losses)
@@ -582,7 +635,14 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
             requested_assets -= loss
             curr_total_debt -= assets_to_withdraw
             # Vault will reduce debt because the unrealised loss has been taken by user
-            self.strategies[strategy].current_debt -= (assets_to_withdraw + unrealised_losses_share)
+            current_debt: uint256 = self.strategies[strategy].current_debt
+            new_debt: uint256 = current_debt - (assets_to_withdraw + unrealised_losses_share)
+        
+            # Update strategies storage
+            self.strategies[strategy].current_debt = new_debt
+            # Log the debt update
+            log DebtUpdated(strategy, current_debt, new_debt)
+
             # NOTE: the user will receive less tokens (the rest were lost)
             # break if we have enough total idle to serve initial request 
             if requested_assets <= curr_total_idle:
@@ -617,6 +677,7 @@ def _add_strategy(new_strategy: address):
         max_debt: 0
     })
 
+    # we cache queue_manager since expected behavior is it being set
     queue_manager: address = self.queue_manager
     if queue_manager != empty(address):        
         # tell the queue_manager we have a new strategy
@@ -643,6 +704,7 @@ def _revoke_strategy(strategy: address, force: bool=False):
       max_debt: 0
     })
 
+    # we cache queue_manager since expected behavior is it being set
     queue_manager: address = self.queue_manager
     if queue_manager != empty(address):
         # tell the queue_manager we removed a strategy
@@ -768,8 +830,8 @@ def _assess_protocol_fees() -> (uint256, address):
             seconds_since_last_report = min(seconds_since_last_report, block.timestamp - convert(protocol_fee_last_change, uint256))
             protocol_fees = convert(protocol_fee_bps, uint256) * self._total_assets() * seconds_since_last_report / 24 / 365 / 3600 / MAX_BPS
             self.last_report = block.timestamp
-    return (protocol_fees, protocol_fee_recipient)
 
+    return (protocol_fees, protocol_fee_recipient)
 
 ## ACCOUNTING MANAGEMENT ##
 @internal
@@ -824,17 +886,17 @@ def _process_report(strategy: address) -> (uint256, uint256):
     accountant_fees_shares: uint256 = 0
     protocol_fees_shares: uint256 = 0
     if loss + total_fees > 0:
-        shares_to_burn += self._convert_to_shares(loss + total_fees)
+        shares_to_burn += self._convert_to_shares(loss + total_fees, Rounding.ROUND_UP)
         # Vault calculates the amount of shares to mint as fees before changing totalAssets / totalSupply
         if total_fees > 0:
-            accountant_fees_shares = self._convert_to_shares(total_fees - protocol_fees)
+            accountant_fees_shares = self._convert_to_shares(total_fees - protocol_fees, Rounding.ROUND_DOWN)
             if protocol_fees > 0:
-                protocol_fees_shares = self._convert_to_shares(protocol_fees)
+              protocol_fees_shares = self._convert_to_shares(protocol_fees, Rounding.ROUND_DOWN)
 
     newly_locked_shares: uint256 = 0
     if total_refunds > 0:
         # if refunds are non-zero, transfer shares worth of assets
-        total_refunds_shares: uint256 = min(self._convert_to_shares(total_refunds), self.balance_of[accountant])
+        total_refunds_shares: uint256 = min(self._convert_to_shares(total_refunds, Rounding.ROUND_UP), self.balance_of[accountant])
         # Shares received as a refund are locked to avoid sudden pps change (like profits)
         self._transfer(accountant, self, total_refunds_shares)
         newly_locked_shares += total_refunds_shares
@@ -896,13 +958,14 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     self.strategies[strategy].last_report = block.timestamp
 
+    # We have to recalculate the fees paid for cases with an overall loss
     log StrategyReported(
         strategy,
         gain,
         loss,
         self.strategies[strategy].current_debt,
-        self._convert_to_assets(protocol_fees_shares),
-        self._convert_to_assets(protocol_fees_shares + accountant_fees_shares),
+        self._convert_to_assets(protocol_fees_shares, Rounding.ROUND_DOWN),
+        self._convert_to_assets(protocol_fees_shares + accountant_fees_shares, Rounding.ROUND_DOWN),
         total_refunds
     )
     return (gain, loss)
@@ -911,30 +974,50 @@ def _process_report(strategy: address) -> (uint256, uint256):
 # SETTERS #
 @external
 def set_accountant(new_accountant: address):
+    """
+    @notice Set the new accountant address.
+    @param new_accountant The new accountant address.
+    """
     self._enforce_role(msg.sender, Roles.ACCOUNTANT_MANAGER)
     self.accountant = new_accountant
     log UpdateAccountant(new_accountant)
 
 @external
 def set_queue_manager(new_queue_manager: address):
+    """
+    @notice Set the new queue manager address.
+    @param new_queue_manager The new queue manager address.
+    """
     self._enforce_role(msg.sender, Roles.QUEUE_MANAGER)
     self.queue_manager = new_queue_manager
     log UpdateQueueManager(new_queue_manager)
 
 @external
 def set_deposit_limit(deposit_limit: uint256):
+    """
+    @notice Set the new deposit limit.
+    @param deposit_limit The new deposit limit.
+    """
     self._enforce_role(msg.sender, Roles.DEPOSIT_LIMIT_MANAGER)
     self.deposit_limit = deposit_limit
     log UpdateDepositLimit(deposit_limit)
 
 @external
 def set_minimum_total_idle(minimum_total_idle: uint256):
+    """
+    @notice Set the new minimum total idle.
+    @param minimum_total_idle The new minimum total idle.
+    """
     self._enforce_role(msg.sender, Roles.MINIMUM_IDLE_MANAGER)
     self.minimum_total_idle = minimum_total_idle
     log UpdateMinimumTotalIdle(minimum_total_idle)
 
 @external
 def set_profit_max_unlock_time(new_profit_max_unlock_time: uint256):
+    """
+    @notice Set the new profit max unlock time.
+    @param new_profit_max_unlock_time The new profit max unlock time.
+    """
     # no need to update locking period as the current period will use the old rate
     # and on the next report it will be reset with the new unlocking time
     self._enforce_role(msg.sender, Roles.PROFIT_UNLOCK_MANAGER)
@@ -948,50 +1031,81 @@ def _enforce_role(account: address, role: Roles):
 
 @external
 def set_role(account: address, role: Roles):
+    """
+    @notice Set the role of an account.
+    @param account The account to set the role for.
+    @param role The role to set.
+    """
     assert msg.sender == self.role_manager
     self.roles[account] = role
 
 @external
 def set_open_role(role: Roles):
+    """
+    @notice Set the role to be open.
+    @param role The role to set.
+    """
     assert msg.sender == self.role_manager
     self.open_roles[role] = True
 
 @external
 def close_open_role(role: Roles):
+    """
+    @notice Close the role.
+    @param role The role to close.
+    """
     assert msg.sender == self.role_manager
     self.open_roles[role] = False
     
 @external
 def transfer_role_manager(role_manager: address):
+    """
+    @notice Transfer the role manager to a new address.
+    @param role_manager The new role manager address.
+    """
     assert msg.sender == self.role_manager
     self.future_role_manager = role_manager
 
 @external
 def accept_role_manager():
+    """
+    @notice Accept the role manager transfer.
+    """
     assert msg.sender == self.future_role_manager
     self.role_manager = msg.sender
     self.future_role_manager = empty(address)
+    log UpdateRoleManager(msg.sender)
 
 # VAULT STATUS VIEWS
 @view
 @external
 def unlocked_shares() -> uint256:
-  return self._unlocked_shares()
-
+    """
+    @notice Get the amount of shares that are not locked.
+    @return The amount of shares that are not locked.
+    """
+    return self._unlocked_shares()
 
 @view
 @external
 def price_per_share() -> uint256:
     """
+    @notice Get the price per share.
+    @return The price per share.
     This value offers limited precision.
     Integrations the require exact precision should use convertToAssets or
     convertToShares instead.
     """
-    return self._convert_to_assets(10 ** DECIMALS)
+    return self._convert_to_assets(10 ** DECIMALS, Rounding.ROUND_DOWN)
+
 
 @view
 @external
 def available_deposit_limit() -> uint256:
+    """
+    @notice Get the available deposit limit.
+    @return The available deposit limit.
+    """
     if self.deposit_limit > self._total_assets():
         return self.deposit_limit - self._total_assets()
     return 0
@@ -999,11 +1113,21 @@ def available_deposit_limit() -> uint256:
 ## REPORTING MANAGEMENT ##
 @external
 def process_report(strategy: address) -> (uint256, uint256):
+    """
+    @notice Process the report of a strategy.
+    @param strategy The strategy to process the report for.
+    @return The gain and loss of the strategy.
+    """
     self._enforce_role(msg.sender, Roles.REPORTING_MANAGER)
     return self._process_report(strategy)
 
 @external
 def sweep(token: address) -> (uint256):
+    """
+    @notice Sweep the token from airdop or sent by mistake.
+    @param token The token to sweep.
+    @return The amount of dust swept.
+    """
     self._enforce_role(msg.sender, Roles.SWEEPER)
     assert token != self, "can't sweep self"
     assert self.strategies[token].activation == 0, "can't sweep strategy"
@@ -1020,18 +1144,28 @@ def sweep(token: address) -> (uint256):
 ## STRATEGY MANAGEMENT ##
 @external
 def add_strategy(new_strategy: address):
+    """
+    @notice Add a new strategy.
+    @param new_strategy The new strategy to add.
+    """
     self._enforce_role(msg.sender, Roles.ADD_STRATEGY_MANAGER)
     self._add_strategy(new_strategy)
 
 @external
 def revoke_strategy(strategy: address):
+    """
+    @notice Revoke a strategy.
+    @param strategy The strategy to revoke.
+    """
     self._enforce_role(msg.sender, Roles.REVOKE_STRATEGY_MANAGER)
     self._revoke_strategy(strategy)
 
 @external
 def force_revoke_strategy(strategy: address):
     """
-    The vault will remove the inputed strategy and write off any debt left in it as loss. 
+    @notice Force revoke a strategy.
+    @param strategy The strategy to force revoke.
+    @dev The vault will remove the inputed strategy and write off any debt left in it as loss. 
     This function is a dangerous function as it can force a strategy to take a loss. 
     All possible assets should be removed from the strategy first via update_debt
     Note that if a strategy is removed erroneously it can be re-added and the loss will be credited as profit. Fees will apply
@@ -1042,21 +1176,34 @@ def force_revoke_strategy(strategy: address):
 ## DEBT MANAGEMENT ##
 @external
 def update_max_debt_for_strategy(strategy: address, new_max_debt: uint256):
+    """
+    @notice Update the max debt for a strategy.
+    @param strategy The strategy to update the max debt for.
+    @param new_max_debt The new max debt for the strategy.
+    """
     self._enforce_role(msg.sender, Roles.MAX_DEBT_MANAGER)
     assert self.strategies[strategy].activation != 0, "inactive strategy"
     self.strategies[strategy].max_debt = new_max_debt
-
     log UpdatedMaxDebtForStrategy(msg.sender, strategy, new_max_debt)
 
 @external
 @nonreentrant("lock")
 def update_debt(strategy: address, target_debt: uint256) -> uint256:
+    """
+    @notice Update the debt for a strategy.
+    @param strategy The strategy to update the debt for.
+    @param target_debt The target debt for the strategy.
+    @return The amount of debt added or removed.
+    """
     self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
     return self._update_debt(strategy, target_debt)
 
 ## EMERGENCY MANAGEMENT ##
 @external
 def shutdown_vault():
+    """
+    @notice Shutdown the vault.
+    """
     self._enforce_role(msg.sender, Roles.EMERGENCY_MANAGER)
     assert self.shutdown == False
     self.shutdown = True
@@ -1069,19 +1216,31 @@ def shutdown_vault():
 @external
 @nonreentrant("lock")
 def deposit(assets: uint256, receiver: address) -> uint256:
+    """
+    @notice Deposit assets into the vault.
+    @param assets The amount of assets to deposit.
+    @param receiver The address to receive the shares.
+    @return The amount of shares minted.
+    """
     return self._deposit(msg.sender, receiver, assets)
 
 @external
 @nonreentrant("lock")
 def mint(shares: uint256, receiver: address) -> uint256:
-    assets: uint256 = self._convert_to_assets(shares)
+    """
+    @notice Mint shares for the receiver.
+    @param shares The amount of shares to mint.
+    @param receiver The address to receive the shares.
+    @return The amount of shares minted.
+    """
+    assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_UP)
     self._deposit(msg.sender, receiver, assets)
     return assets
 
 @external
 @nonreentrant("lock")
 def withdraw(assets: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
-    shares: uint256 = self._convert_to_shares(assets)
+    shares: uint256 = self._convert_to_shares(assets, Rounding.ROUND_UP)
     self._redeem(msg.sender, receiver, owner, shares, strategies)
     return shares
 
@@ -1093,35 +1252,82 @@ def redeem(shares: uint256, receiver: address, owner: address, strategies: DynAr
 
 @external
 def approve(spender: address, amount: uint256) -> bool:
+    """
+    @notice Approve an address to spend the vault's shares.
+    @param spender The address to approve.
+    @param amount The amount of shares to approve.
+    @return True if the approval was successful.
+    """
     return self._approve(msg.sender, spender, amount)
 
 @external
 def transfer(receiver: address, amount: uint256) -> bool:
+    """
+    @notice Transfer shares to a receiver.
+    @param receiver The address to transfer shares to.
+    @param amount The amount of shares to transfer.
+    @return True if the transfer was successful.
+    """
     assert receiver not in [self, empty(address)]
     self._transfer(msg.sender, receiver, amount)
     return True
 
 @external
 def transferFrom(sender: address, receiver: address, amount: uint256) -> bool:
+    """
+    @notice Transfer shares from a sender to a receiver.
+    @param sender The address to transfer shares from.
+    @param receiver The address to transfer shares to.
+    @param amount The amount of shares to transfer.
+    @return True if the transfer was successful.
+    """
     assert receiver not in [self, empty(address)]
     return self._transfer_from(sender, receiver, amount)
 
 ## ERC20+4626 compatibility
 @external
 def increaseAllowance(spender: address, amount: uint256) -> bool:
+    """
+    @notice Increase the allowance for a spender.
+    @param spender The address to increase the allowance for.
+    @param amount The amount to increase the allowance by.
+    @return True if the increase was successful.
+    """
     return self._increase_allowance(msg.sender, spender, amount)
 
 @external
 def decreaseAllowance(spender: address, amount: uint256) -> bool:
+    """
+    @notice Decrease the allowance for a spender.
+    @param spender The address to decrease the allowance for.
+    @param amount The amount to decrease the allowance by.
+    @return True if the decrease was successful.
+    """
     return self._decrease_allowance(msg.sender, spender, amount)
 
 @external
 def permit(owner: address, spender: address, amount: uint256, deadline: uint256, v: uint8, r: bytes32, s: bytes32) -> bool:
+    """
+    @notice Approve an address to spend the vault's shares.
+    @param owner The address to approve.
+    @param spender The address to approve.
+    @param amount The amount of shares to approve.
+    @param deadline The deadline for the permit.
+    @param v The v component of the signature.
+    @param r The r component of the signature.
+    @param s The s component of the signature.
+    @return True if the approval was successful.
+    """
     return self._permit(owner, spender, amount, deadline, v, r, s)
 
 @view
 @external
 def balanceOf(addr: address) -> uint256:
+    """
+    @notice Get the balance of a user.
+    @param addr The address to get the balance of.
+    @return The balance of the user.
+    """
     if(addr == self):
       return self.balance_of[addr] - self._unlocked_shares()
     return self.balance_of[addr]
@@ -1129,86 +1335,163 @@ def balanceOf(addr: address) -> uint256:
 @view
 @external
 def totalSupply() -> uint256:
+    """
+    @notice Get the total supply of shares.
+    @return The total supply of shares.
+    """
     return self._total_supply()
 
 @view
 @external
 def asset() -> address:
+    """
+    @notice Get the address of the asset.
+    @return The address of the asset.
+    """
     return ASSET.address
 
 @view
 @external
 def decimals() -> uint256:
+    """
+    @notice Get the number of decimals of the asset/share.
+    @return The number of decimals of the asset/share.
+    """
     return DECIMALS
 
 @view
 @external
 def totalAssets() -> uint256:
+    """
+    @notice Get the total assets held by the vault.
+    @return The total assets held by the vault.
+    """
     return self._total_assets()
 
 @view
 @external
 def convertToShares(assets: uint256) -> uint256:
-    return self._convert_to_shares(assets)
+    """
+    @notice Convert an amount of assets to shares.
+    @param assets The amount of assets to convert.
+    @return The amount of shares.
+    """
+    return self._convert_to_shares(assets, Rounding.ROUND_DOWN)
 
 @view
 @external
 def previewDeposit(assets: uint256) -> uint256:
-    return self._convert_to_shares(assets)
+    """
+    @notice Preview the amount of shares that would be minted for a deposit.
+    @param assets The amount of assets to deposit.
+    @return The amount of shares that would be minted.
+    """
+    return self._convert_to_shares(assets, Rounding.ROUND_DOWN)
 
 @view
 @external
 def previewMint(shares: uint256) -> uint256:
-    return self._convert_to_assets(shares)
+    """
+    @notice Preview the amount of assets that would be deposited for a mint.
+    @param shares The amount of shares to mint.
+    @return The amount of assets that would be deposited.
+    """
+    return self._convert_to_assets(shares, Rounding.ROUND_UP)
 
 @view
 @external
 def convertToAssets(shares: uint256) -> uint256:
-    return self._convert_to_assets(shares)
+    """
+    @notice Convert an amount of shares to assets.
+    @param shares The amount of shares to convert.
+    @return The amount of assets.
+    """
+    return self._convert_to_assets(shares, Rounding.ROUND_DOWN)
 
 @view
 @external
 def maxDeposit(receiver: address) -> uint256:
+    """
+    @notice Get the maximum amount of assets that can be deposited.
+    @param receiver The address that will receive the shares.
+    @return The maximum amount of assets that can be deposited.
+    """
     return self._max_deposit(receiver)
 
 @view
 @external
 def maxMint(receiver: address) -> uint256:
+    """
+    @notice Get the maximum amount of shares that can be minted.
+    @param receiver The address that will receive the shares.
+    @return The maximum amount of shares that can be minted.
+    """
     max_deposit: uint256 = self._max_deposit(receiver)
-    return self._convert_to_shares(max_deposit)
+    return self._convert_to_shares(max_deposit, Rounding.ROUND_DOWN)
 
 @view
 @external
 def maxWithdraw(owner: address) -> uint256:
-    # NOTE: as the withdraw function that complies with ERC4626 won't withdraw from strategies, this just uses liquidity available in the vault contract
-    max_withdraw: uint256 = self._max_redeem(owner) # should be moved to a max_withdraw internal function
-    return self._convert_to_assets(max_withdraw)
+    """
+    @notice Get the maximum amount of assets that can be withdrawn.
+    @param owner The address that owns the shares.
+    @return The maximum amount of assets that can be withdrawn.
+    """
+    # NOTE: if a queue_manager is not set a withdraw function that complies with ERC4626 won't withdraw from strategies, 
+    #       so this will just uses liquidity available in the vault contract
+    return self._max_withdraw(owner)
 
 @view
 @external
 def maxRedeem(owner: address) -> uint256:
-    # NOTE: as the withdraw function that complies with ERC4626 won't withdraw from strategies, this just uses liquidity available in the vault contract
+    """
+    @notice Get the maximum amount of shares that can be redeemed.
+    @param owner The address that owns the shares.
+    @return The maximum amount of shares that can be redeemed.
+    """
+    # NOTE: if a queue_manager is not set a redeem function that complies with ERC4626 won't withdraw from strategies, 
+    #       so this will just uses liquidity available in the vault contract
     return self._max_redeem(owner)
 
 @view
 @external
 def previewWithdraw(assets: uint256) -> uint256:
-    return self._convert_to_shares(assets)
+    """
+    @notice Preview the amount of shares that would be redeemed for a withdraw.
+    @param assets The amount of assets to withdraw.
+    @return The amount of shares that would be redeemed.
+    """
+    return self._convert_to_shares(assets, Rounding.ROUND_UP)
 
 @view
 @external
 def previewRedeem(shares: uint256) -> uint256:
-   return self._convert_to_assets(shares)
+    """
+    @notice Preview the amount of assets that would be withdrawn for a redeem.
+    @param shares The amount of shares to redeem.
+    @return The amount of assets that would be withdrawn.
+    """
+    return self._convert_to_assets(shares, Rounding.ROUND_DOWN)
 
 @view
 @external
 def api_version() -> String[28]:
+    """
+    @notice Get the API version of the vault.
+    @return The API version of the vault.
+    """
     return API_VERSION
 
 @view
 @external
 def assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256) -> uint256:
-  return self._assess_share_of_unrealised_losses(strategy, assets_needed)
+    """
+    @notice Assess the share of unrealised losses that a strategy has.
+    @param strategy The address of the strategy.
+    @param assets_needed The amount of assets needed to be withdrawn.
+    @return The share of unrealised losses that the strategy has.
+    """
+    return self._assess_share_of_unrealised_losses(strategy, assets_needed)
 
 # eip-1344
 @view
@@ -1227,4 +1510,8 @@ def domain_separator() -> bytes32:
 @view
 @external
 def DOMAIN_SEPARATOR() -> bytes32:
+    """
+    @notice Get the domain separator.
+    @return The domain separator.
+    """
     return self.domain_separator()

@@ -116,6 +116,13 @@ def test_withdraw__with_liquid_strategy__withdraws(
     assert event[n].shares == shares
     assert event[n].assets == amount
 
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 1
+    assert event[0].strategy == strategy.address
+    assert event[0].current_debt == amount
+    assert event[0].new_debt == 0
+
     checks.check_vault_empty(vault)
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(strategy) == 0
@@ -167,6 +174,16 @@ def test_withdraw__with_multiple_liquid_strategies__withdraws(
     assert event[n].shares == shares
     assert event[n].assets == amount
 
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 2
+    assert event[0].strategy == first_strategy.address
+    assert event[0].current_debt == amount_per_strategy
+    assert event[0].new_debt == 0
+    assert event[1].strategy == second_strategy.address
+    assert event[1].current_debt == amount_per_strategy
+    assert event[1].new_debt == 0
+
     checks.check_vault_empty(vault)
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(first_strategy) == 0
@@ -174,7 +191,7 @@ def test_withdraw__with_multiple_liquid_strategies__withdraws(
     assert asset.balanceOf(fish) == amount
 
 
-def test_withdraw__locked_funds_with_locked_and_liquid_strategy__withdraws(
+def test_withdraw__locked_funds_with_locked_and_liquid_strategy__reverts(
     gov,
     fish,
     fish_amount,
@@ -272,6 +289,16 @@ def test_withdraw__with_locked_and_liquid_strategy__withdraws(
     assert event[n].shares == shares
     assert event[n].assets == amount_to_withdraw
 
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 2
+    assert event[0].strategy == locked_strategy.address
+    assert event[0].current_debt == amount_per_strategy
+    assert event[0].new_debt == amount_per_strategy - amount_to_lock
+    assert event[1].strategy == liquid_strategy.address
+    assert event[1].current_debt == amount_per_strategy
+    assert event[1].new_debt == 0
+
     assert vault.totalAssets() == amount_to_lock
     assert vault.totalSupply() == amount_to_lock
     assert vault.total_idle() == 0
@@ -332,6 +359,13 @@ def test_withdraw__with_lossy_strategy__withdraws_less_than_deposited(
     assert event[n].owner == fish
     assert event[n].shares == shares
     assert event[n].assets == amount_to_withdraw - amount_to_lose
+
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 1
+    assert event[0].strategy == lossy_strategy.address
+    assert event[0].current_debt == amount_per_strategy
+    assert event[0].new_debt == 0
 
     assert vault.totalAssets() == 0
     assert vault.totalSupply() == 0
@@ -396,6 +430,16 @@ def test_withdraw__with_lossy_and_liquid_strategy__withdraws_less_than_deposited
     assert event[n].owner == fish
     assert event[n].shares == shares
     assert event[n].assets == amount_to_withdraw - amount_to_lose
+
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 2
+    assert event[0].strategy == lossy_strategy.address
+    assert event[0].current_debt == amount_per_strategy
+    assert event[0].new_debt == 0
+    assert event[1].strategy == liquid_strategy.address
+    assert event[1].current_debt == amount_per_strategy
+    assert event[1].new_debt == 0
 
     assert vault.totalAssets() == 0
     assert vault.totalSupply() == 0
@@ -462,6 +506,16 @@ def test_withdraw__with_liquid_and_lossy_strategy__withdraws_less_than_deposited
     assert event[n].shares == shares
     assert event[n].assets == amount_to_withdraw - amount_to_lose
 
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 2
+    assert event[0].strategy == liquid_strategy.address
+    assert event[0].current_debt == amount_per_strategy
+    assert event[0].new_debt == 0
+    assert event[1].strategy == lossy_strategy.address
+    assert event[1].current_debt == amount_per_strategy
+    assert event[1].new_debt == 0
+
     assert vault.totalAssets() == 0
     assert vault.totalSupply() == 0
     assert vault.total_idle() == 0
@@ -526,6 +580,16 @@ def test_withdraw__with_liquid_and_lossy_strategy_that_losses_while_withdrawing_
     assert event[n].owner == fish
     assert event[n].shares == shares
     assert event[n].assets == amount_to_withdraw - amount_to_lose
+
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 2
+    assert event[0].strategy == liquid_strategy.address
+    assert event[0].current_debt == amount_per_strategy
+    assert event[0].new_debt == 0
+    assert event[1].strategy == lossy_strategy.address
+    assert event[1].current_debt == amount_per_strategy
+    assert event[1].new_debt == 0
 
     assert vault.totalAssets() == 0
     assert vault.totalSupply() == 0
@@ -594,6 +658,13 @@ def test_withdraw__half_of_assets_from_lossy_strategy_that_losses_while_withdraw
     )  # only half of the total shares should be burnt
     assert event[n].assets == amount_to_withdraw - amount_to_lose
 
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 1
+    assert event[0].strategy == lossy_strategy.address
+    assert event[0].current_debt == amount_per_strategy
+    assert event[0].new_debt == 0
+
     assert vault.totalAssets() == amount // 2
     assert vault.totalSupply() == shares // 2
     assert vault.total_idle() == 0
@@ -660,6 +731,13 @@ def test_withdraw__half_of_strategy_assets_from_lossy_strategy_with_unrealised_l
     assert event[n].owner == fish
     assert event[n].shares == shares // 4
     assert event[n].assets == amount_to_withdraw - amount_to_lose // 2
+
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 1
+    assert event[0].strategy == lossy_strategy.address
+    assert event[0].current_debt == amount_per_strategy
+    assert event[0].new_debt == amount_per_strategy - amount_to_withdraw
 
     assert vault.totalAssets() == amount - amount_to_withdraw
     assert vault.totalSupply() == amount - amount_to_withdraw
@@ -728,6 +806,16 @@ def test_withdraw__with_multiple_liquid_strategies_more_assets_than_debt__withdr
     assert event[n].owner == fish
     assert event[n].shares == shares
     assert event[n].assets == amount
+
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 2
+    assert event[0].strategy == first_strategy.address
+    assert event[0].current_debt == amount_per_strategy
+    assert event[0].new_debt == 0
+    assert event[1].strategy == second_strategy.address
+    assert event[1].current_debt == amount_per_strategy
+    assert event[1].new_debt == 0
 
     checks.check_vault_empty(vault)
     assert asset.balanceOf(vault) == 0
