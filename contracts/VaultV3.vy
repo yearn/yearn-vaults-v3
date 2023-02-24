@@ -74,6 +74,9 @@ event DebtUpdated:
     new_debt: uint256
 
 # STORAGE MANAGEMENT EVENTS
+event UpdateRoleManager:
+    role_manager: indexed(address)
+
 event UpdateAccountant:
     accountant: indexed(address)
 
@@ -193,7 +196,8 @@ full_profit_unlock_date: public(uint256)
 profit_unlocking_rate: public(uint256)
 # Last timestamp of the most recent _report() call
 last_profit_update: uint256
-# Last timestamp of when locked shares were burned
+
+# Last protocol fees were charged
 last_report: public(uint256)
 
 # `nonces` track `permit` approvals with signature.
@@ -798,7 +802,8 @@ def _assess_protocol_fees() -> (uint256, address):
       protocol_fee_bps, protocol_fee_last_change, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
 
       if(protocol_fee_bps > 0):
-        # NOTE: charge fees since last report OR last fee change (this will mean less fees are charged after a change in protocol_fees, but fees should not change frequently)
+        # NOTE: charge fees since last report OR last fee change 
+        # (this will mean less fees are charged after a change in protocol_fees, but fees should not change frequently)
         seconds_since_last_report = min(seconds_since_last_report, block.timestamp - convert(protocol_fee_last_change, uint256))
         protocol_fees = convert(protocol_fee_bps, uint256) * self._total_assets() * seconds_since_last_report / 24 / 365 / 3600 / MAX_BPS
         self.last_report = block.timestamp
@@ -968,7 +973,7 @@ def set_minimum_total_idle(minimum_total_idle: uint256):
 
 @external
 def set_profit_max_unlock_time(new_profit_max_unlock_time: uint256):
-    # no need to update locking period as the current period will use the old rate
+    # no need to update current locking period as the current period will use the old rate
     # and on the next report it will be reset with the new unlocking time
     self._enforce_role(msg.sender, Roles.PROFIT_UNLOCK_MANAGER)
     self.profit_max_unlock_time = new_profit_max_unlock_time
@@ -1004,13 +1009,13 @@ def accept_role_manager():
     assert msg.sender == self.future_role_manager
     self.role_manager = msg.sender
     self.future_role_manager = empty(address)
+    log UpdateRoleManager(msg.sender)
 
 # VAULT STATUS VIEWS
 @view
 @external
 def unlocked_shares() -> uint256:
   return self._unlocked_shares()
-
 
 @view
 @external
@@ -1073,7 +1078,6 @@ def update_max_debt_for_strategy(strategy: address, new_max_debt: uint256):
     self._enforce_role(msg.sender, Roles.MAX_DEBT_MANAGER)
     assert self.strategies[strategy].activation != 0, "inactive strategy"
     self.strategies[strategy].max_debt = new_max_debt
-
     log UpdatedMaxDebtForStrategy(msg.sender, strategy, new_max_debt)
 
 @external
