@@ -240,8 +240,8 @@ def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: a
 @internal
 def _spend_allowance(owner: address, spender: address, amount: uint256):
     # Unlimited approval does nothing (saves an SSTORE)
-    current_allowance: uint256 = self.allowance[owner][spender]
-    if (current_allowance < max_value(uint256)):
+    if (self.allowance[owner][spender] < max_value(uint256)):
+        current_allowance: uint256 = self.allowance[owner][spender]
         assert current_allowance >= amount, "insufficient allowance"
         self._approve(owner, spender, current_allowance - amount)
 
@@ -312,40 +312,37 @@ def _burn_shares(shares: uint256, owner: address):
 @view
 @internal
 def _unlocked_shares() -> uint256:
-    # To avoid sudden price_per_share spikes, profit must be processed through an unlocking period.
-    # The mechanism involves shares to be minted to the vault which are unlocked gradually over time.
-    # Shares that have been locked are gradually unlocked over profit_max_unlock_time seconds
-    _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
-    unlocked_shares: uint256 = 0
-    if _full_profit_unlock_date > block.timestamp:
-        unlocked_shares = self.profit_unlocking_rate * (block.timestamp - self.last_profit_update) / MAX_BPS_EXTENDED
-    elif _full_profit_unlock_date != 0:
-        # All shares have been unlocked
-        unlocked_shares = self.balance_of[self]
+  # To avoid sudden price_per_share increases, shares are minted and insta-locked.
+  # Shares that have been locked are gradually unlocked over profit_max_unlock_time seconds
+  _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
+  unlocked_shares: uint256 = 0
+  if _full_profit_unlock_date > block.timestamp:
+    unlocked_shares = self.profit_unlocking_rate * (block.timestamp - self.last_profit_update) / MAX_BPS_EXTENDED
+  elif _full_profit_unlock_date != 0:
+    # All shares have been unlocked
+    unlocked_shares = self.balance_of[self]
 
-    return unlocked_shares
-
+  return unlocked_shares
 
 @view
 @internal
 def _total_supply() -> uint256:
-    return self.total_supply - self._unlocked_shares()
+  return self.total_supply - self._unlocked_shares()
 
 @internal
 def _burn_unlocked_shares():
-    """
-    Burns shares that have been unlocked since last update. 
-    In case the full unlocking period has passed, it stops the unlocking
-    """
-    unlocked_shares: uint256 = self._unlocked_shares()
-    if unlocked_shares == 0:
-        return
+  """
+  Burns shares that have been unlocked since last update. In case the full unlocking period has passed, it stops the unlocking
+  """
+  unlocked_shares: uint256 = self._unlocked_shares()
+  if unlocked_shares == 0:
+    return
+  
+  # update variables (done here to keep _unlocked_shares() as a view function)
+  if self.full_profit_unlock_date > block.timestamp:
+    self.last_profit_update = block.timestamp
 
-    # Only do an SSTORE if necessary
-    if self.full_profit_unlock_date > block.timestamp:
-        self.last_profit_update = block.timestamp
-
-    self._burn_shares(unlocked_shares, self)
+  self._burn_shares(unlocked_shares, self)
 
 @view
 @internal
@@ -461,12 +458,12 @@ def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
     new_shares: uint256 = 0
     
     if total_supply == 0:
-        new_shares = amount
+      new_shares = amount
     elif total_assets > amount:
-        new_shares = amount * self._total_supply() / (total_assets - amount)
+      new_shares = amount * self._total_supply() / (total_assets - amount)
     else:
-        # after first deposit, getting here would mean that the rest of the shares would be diluted to ~0
-        assert total_assets > amount, "amount too high"
+      # after first deposit, getting here would mean that the rest of the shares would be diluted to ~0
+      assert total_assets > amount, "amount too high"
   
     # We don't make the function revert
     if new_shares == 0:
@@ -624,7 +621,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
             # If we have not received what we expected, we consider the difference a loss
             loss: uint256 = 0
             if(previous_balance + assets_to_withdraw > post_balance):
-                loss = previous_balance + assets_to_withdraw - post_balance
+              loss = previous_balance + assets_to_withdraw - post_balance
 
             # NOTE: we update the previous_balance variable here to save gas in next iteration
             previous_balance = post_balance
@@ -820,18 +817,19 @@ def _assess_protocol_fees() -> (uint256, address):
     seconds_since_last_report: uint256 = block.timestamp - self.last_report
     # to avoid wasting gas for minimal fees vault will only assess once every PROTOCOL_FEE_ASSESSMENT_PERIOD seconds
     if(seconds_since_last_report >= PROTOCOL_FEE_ASSESSMENT_PERIOD):
-        protocol_fee_bps: uint16 = 0
-        protocol_fee_last_change: uint32 = 0
+      protocol_fee_bps: uint16 = 0
+      protocol_fee_last_change: uint32 = 0
 
-        protocol_fee_bps, protocol_fee_last_change, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
+      protocol_fee_bps, protocol_fee_last_change, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
 
-        if(protocol_fee_bps > 0):
-            # NOTE: charge fees since last report OR last fee change (this will mean less fees are charged after a change in protocol_fees, but fees should not change frequently)
-            seconds_since_last_report = min(seconds_since_last_report, block.timestamp - convert(protocol_fee_last_change, uint256))
-            protocol_fees = convert(protocol_fee_bps, uint256) * self._total_assets() * seconds_since_last_report / 24 / 365 / 3600 / MAX_BPS
-            self.last_report = block.timestamp
-
+      if(protocol_fee_bps > 0):
+        # NOTE: charge fees since last report OR last fee change 
+        # (this will mean less fees are charged after a change in protocol_fees, but fees should not change frequently)
+        seconds_since_last_report = min(seconds_since_last_report, block.timestamp - convert(protocol_fee_last_change, uint256))
+        protocol_fees = convert(protocol_fee_bps, uint256) * self._total_assets() * seconds_since_last_report / 24 / 365 / 3600 / MAX_BPS
+        self.last_report = block.timestamp
     return (protocol_fees, protocol_fee_recipient)
+
 
 ## ACCOUNTING MANAGEMENT ##
 @internal
@@ -919,16 +917,15 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # no risk of underflow because they have just been minted
     previously_locked_shares: uint256 = self.balance_of[self] - newly_locked_shares
 
-    # Now that pps has updated, we can burn the shares we intended to burn as a result of losses/fees.
-    # NOTE: If a value reduction (losses / fees) has occured, prioritize burning locked profit to avoid
-    # negative impact on price per share. Price per share is reduced only if losses exceed locked value.
+    # Vault insta unlocks losses and fees to avoid pps decrease
+    # NOTE: it can only unlock shares that are previously locked. Any loss / fees over the amount of total locked shares will have an effect on pps
     if shares_to_burn > 0:
-        shares_to_burn = min(shares_to_burn, previously_locked_shares + newly_locked_shares)
-        self._burn_shares(shares_to_burn, self)
-        # we burn first the newly locked shares, then the previously locked shares
-        shares_not_to_lock: uint256 = min(shares_to_burn, newly_locked_shares)
-        newly_locked_shares -= shares_not_to_lock
-        previously_locked_shares -= (shares_to_burn - shares_not_to_lock)
+      shares_to_burn = min(shares_to_burn, previously_locked_shares + newly_locked_shares)
+      self._burn_shares(shares_to_burn, self)
+      # we burn first the newly locked shares, then the previously locked shares
+      shares_not_to_lock: uint256 = min(shares_to_burn, newly_locked_shares)
+      newly_locked_shares -= shares_not_to_lock
+      previously_locked_shares -= (shares_to_burn - shares_not_to_lock)
 
     # issue shares that were calculated above
     if accountant_fees_shares > 0:
@@ -947,14 +944,14 @@ def _process_report(strategy: address) -> (uint256, uint256):
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
     _profit_max_unlock_time: uint256 = self.profit_max_unlock_time
     if total_locked_shares > 0 and _profit_max_unlock_time > 0:
-        # new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the profit_max_unlock_time
-        new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * _profit_max_unlock_time) / total_locked_shares
-        self.profit_unlocking_rate = total_locked_shares * MAX_BPS_EXTENDED / new_profit_locking_period
-        self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
-        self.last_profit_update = block.timestamp
+      # new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the profit_max_unlock_time
+      new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * _profit_max_unlock_time) / total_locked_shares
+      self.profit_unlocking_rate = total_locked_shares * MAX_BPS_EXTENDED / new_profit_locking_period
+      self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
+      self.last_profit_update = block.timestamp
     else:
-        # NOTE: only setting this to 0 will turn in the desired effect, no need to update last_profit_update or full_profit_unlock_date
-        self.profit_unlocking_rate = 0
+      # NOTE: only setting this to 0 will turn in the desired effect, no need to update last_profit_update or full_profit_unlock_date
+      self.profit_unlocking_rate = 0
 
     self.strategies[strategy].last_report = block.timestamp
 
@@ -1092,12 +1089,8 @@ def price_per_share() -> uint256:
     """
     @notice Get the price per share.
     @return The price per share.
-    This value offers limited precision.
-    Integrations the require exact precision should use convertToAssets or
-    convertToShares instead.
     """
     return self._convert_to_assets(10 ** DECIMALS, Rounding.ROUND_DOWN)
-
 
 @view
 @external
