@@ -2,13 +2,13 @@
 
 This repository contains the Smart Contracts for Yearns V3 vault implementation.
 
-[VaultFactory.vy](contracts/VaultFactory.vy) - The base factory that all vaults will be deployed from and used to configure protocol fees
+[VaultFactory.vy](contracts/VaultFactory.vy) - The base factory that all vaults will be deployed from and used to configure protocol fees.
 
-[Vault.vy](contracts/VaultV3.vy) - The ERC4626 compliant Vault that will handle all logic associated with deposits, withdraws, strategy mangaement, profit reporting etc.
+[Vault.vy](contracts/VaultV3.vy) - The ERC4626 compliant Vault that will handle all logic associated with deposits, withdraws, strategy management, profit reporting etc.
 
 ## Requirements
 
-This repository runs on [ApeWorx](https://www.apeworx.io/). A python based development tool kit.
+This repository runs on [ApeWorx](https://www.apeworx.io/). A python based development toolkit.
 
 You will need:
  - Python 3.8 or later
