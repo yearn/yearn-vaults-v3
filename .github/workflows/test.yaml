@@ -23,6 +23,8 @@ jobs:
     - uses: ApeWorX/github-action@v2.0
       with:
         python-version: '3.9'
+        ape-version-pin: "==0.6.3"
+        ape-plugins-list: 'solidity==0.6.0 vyper==0.6.1 hardhat==0.6.0'
 
     - name: install vyper
       run: pip install git+https://github.com/vyperlang/vyper
