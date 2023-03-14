@@ -828,7 +828,8 @@ def _assess_protocol_fees() -> (uint256, address):
         if(protocol_fee_bps > 0):
             # NOTE: charge fees since last report OR last fee change (this will mean less fees are charged after a change in protocol_fees, but fees should not change frequently)
             seconds_since_last_report = min(seconds_since_last_report, block.timestamp - convert(protocol_fee_last_change, uint256))
-            protocol_fees = convert(protocol_fee_bps, uint256) * self._total_assets() * seconds_since_last_report / 24 / 365 / 3600 / MAX_BPS
+            # fees = total_assets * protocol fees bpbs * time elapsed / seconds per year / max bps
+            protocol_fees = self._total_assets() * convert(protocol_fee_bps, uint256) * seconds_since_last_report / 31_556_952 / MAX_BPS
             self.last_report = block.timestamp
 
     return (protocol_fees, protocol_fee_recipient)
