@@ -189,16 +189,16 @@ name: public(String[64])
 symbol: public(String[32])
 
 # The amount of time profits will unlock over
-profit_max_unlock_time: public(uint256)
+profit_max_unlock_time: uint256
 # The timestamp of when the current unlocking period ends
-full_profit_unlock_date: public(uint256)
+full_profit_unlock_date: uint256
 # The per second rate at which profit will unlcok
-profit_unlocking_rate: public(uint256)
+profit_unlocking_rate: uint256
 # Last timestamp of the most recent _report() call
 last_profit_update: uint256
 
 # Last protocol fees were charged
-last_report: public(uint256)
+last_report: uint256
 
 # `nonces` track `permit` approvals with signature.
 nonces: public(HashMap[address, uint256])
@@ -954,7 +954,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self.profit_unlocking_rate = total_locked_shares * MAX_BPS_EXTENDED / new_profit_locking_period
         self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
         self.last_profit_update = block.timestamp
-        
+
     else:
         # NOTE: only setting this to 0 will turn in the desired effect, no need to update last_profit_update or full_profit_unlock_date
         self.profit_unlocking_rate = 0
@@ -1094,10 +1094,9 @@ def unlocked_shares() -> uint256:
 def price_per_share() -> uint256:
     """
     @notice Get the price per share.
+    @dev This value offers limited precision. Integrations the require 
+    exact precision should use convertToAssets or convertToShares instead.
     @return The price per share.
-    This value offers limited precision.
-    Integrations the require exact precision should use convertToAssets or
-    convertToShares instead.
     """
     return self._convert_to_assets(10 ** DECIMALS, Rounding.ROUND_DOWN)
 
@@ -1495,6 +1494,45 @@ def assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256)
     @return The share of unrealised losses that the strategy has.
     """
     return self._assess_share_of_unrealised_losses(strategy, assets_needed)
+
+## Profit locking getter functions ##
+
+@view
+@external
+def profitMaxUnlockTime() -> uint256:
+    """
+    @notice Gets the current time profits are set to unlock over.
+    @return The current profit max unlock time.
+    """
+    return self.profit_max_unlock_time
+
+@view
+@external
+def fullProfitUnlockDate() -> uint256:
+    """
+    @notice Gets the timestamp at which all profits will be unlocked.
+    @return The full profit unlocking timestamp
+    """
+    return self.full_profit_unlock_date
+
+@view
+@external
+def profitUnlockingRate() -> uint256:
+    """
+    @notice The per second rate at which profits are unlocking.
+    @dev This is denominated in EXTENDED_BPS decimals.
+    @return The current profit unlocking rate.
+    """
+    return self.profit_unlocking_rate
+
+@view
+@external
+def lastReport() -> uint256:
+    """
+    @notice The timestamp of the last time protocol fees were charged.
+    @return The last report.
+    """
+    return self.last_report
 
 # eip-1344
 @view
