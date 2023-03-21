@@ -72,7 +72,7 @@ def test__report_gain_with_protocol_fees__set_pre_vault_deploy(
     assert vault.price_per_share() == int(10 ** vault.decimals())
 
     # We increase time after profit has been released and check estimation
-    chain.pending_timestamp = vault.last_report() + YEAR
+    chain.pending_timestamp = vault.lastReport() + YEAR
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))
@@ -118,7 +118,7 @@ def test__report_no_gain_with_protocol_fees__set_pre_vault_deploy(
     assert vault.price_per_share() == int(10 ** vault.decimals())
 
     # We increase time after profit has been released and check estimation
-    chain.pending_timestamp = vault.last_report() + YEAR
+    chain.pending_timestamp = vault.lastReport() + YEAR
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))
@@ -274,7 +274,7 @@ def test__report_gain_several_times_in_a_day(
     assert vault.price_per_share() == int(10 ** vault.decimals())
 
     # We increase time after profit has been released and check estimation
-    chain.pending_timestamp = vault.last_report() + YEAR
+    chain.pending_timestamp = vault.lastReport() + YEAR
     price_per_share_pre = vault.price_per_share()
     tx = vault.process_report(strategy, sender=gov)
 
@@ -292,14 +292,14 @@ def test__report_gain_several_times_in_a_day(
     assert vault.price_per_share() == int(10 ** vault.decimals())
 
     # When a day has not passed, no new protocol fees are charged
-    chain.pending_timestamp = vault.last_report() + int(days_to_secs(0.75))
+    chain.pending_timestamp = vault.lastReport() + int(days_to_secs(0.75))
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].protocol_fees == 0
 
     airdrop_asset(gov, asset, strategy, profit)
-    chain.pending_timestamp = vault.last_report() + int(days_to_secs(1))
+    chain.pending_timestamp = vault.lastReport() + int(days_to_secs(1))
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))
@@ -336,7 +336,7 @@ def test__report_no_gain_several_times_in_a_day(
     assert vault.price_per_share() == int(10 ** vault.decimals())
 
     # We increase time after profit has been released and check estimation
-    chain.pending_timestamp = vault.last_report() + YEAR
+    chain.pending_timestamp = vault.lastReport() + YEAR
     price_per_share_pre = vault.price_per_share()
     tx = vault.process_report(strategy, sender=gov)
 
@@ -358,13 +358,13 @@ def test__report_no_gain_several_times_in_a_day(
     ) == amount * 10 ** vault.decimals() // (amount + amount * 0.0025)
 
     # When a day has not passed, no new protocol fees are charged
-    chain.pending_timestamp = vault.last_report() + int(days_to_secs(0.75))
+    chain.pending_timestamp = vault.lastReport() + int(days_to_secs(0.75))
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].protocol_fees == 0
 
-    chain.pending_timestamp = vault.last_report() + int(days_to_secs(1))
+    chain.pending_timestamp = vault.lastReport() + int(days_to_secs(1))
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))

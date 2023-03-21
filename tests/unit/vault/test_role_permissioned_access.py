@@ -210,7 +210,7 @@ def test_update_profit_unlock__set_profit_unlock_role_role_open(vault, bunny, go
     event = list(tx.decode_logs(vault.UpdateProfitMaxUnlockTime))
     assert len(event) == 1
     assert event[0].profit_max_unlock_time == WEEK * 2
-    vault.profit_max_unlock_time() == WEEK * 2
+    vault.profitMaxUnlockTime() == WEEK * 2
 
 
 def test_update_profit_unlock__set_profit_unlock_role_role_open_then_close__reverts(
@@ -221,7 +221,7 @@ def test_update_profit_unlock__set_profit_unlock_role_role_open_then_close__reve
     event = list(tx.decode_logs(vault.UpdateProfitMaxUnlockTime))
     assert len(event) == 1
     assert event[0].profit_max_unlock_time == WEEK * 2
-    vault.profit_max_unlock_time() == WEEK * 2
+    assert vault.profitMaxUnlockTime() == WEEK * 2
     vault.close_open_role(ROLES.PROFIT_UNLOCK_MANAGER, sender=gov)
     with ape.reverts():
         vault.set_profit_max_unlock_time(WEEK, sender=bunny)
