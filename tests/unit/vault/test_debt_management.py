@@ -50,8 +50,8 @@ def test_update_debt__with_current_debt_less_than_new_debt(gov, asset, vault, st
     new_debt = vault_balance // 2
     current_debt = vault.strategies(strategy.address).current_debt
     difference = new_debt - current_debt
-    initial_idle = vault.total_idle()
-    initial_debt = vault.total_debt()
+    initial_idle = vault.totalIdle()
+    initial_debt = vault.totalDebt()
 
     vault.update_max_debt_for_strategy(strategy.address, new_debt, sender=gov)
 
@@ -66,8 +66,8 @@ def test_update_debt__with_current_debt_less_than_new_debt(gov, asset, vault, st
     assert vault.strategies(strategy.address).current_debt == new_debt
     assert asset.balanceOf(strategy) == new_debt
     assert asset.balanceOf(vault) == (vault_balance - new_debt)
-    assert vault.total_idle() == initial_idle - difference
-    assert vault.total_debt() == initial_debt + difference
+    assert vault.totalIdle() == initial_idle - difference
+    assert vault.totalDebt() == initial_debt + difference
 
 
 def test_update_debt__with_current_debt_equal_to_new_debt__reverts(
@@ -130,8 +130,8 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_insufficient_w
     vault.update_max_debt_for_strategy(locked_strategy.address, new_debt, sender=gov)
     # lock portion of funds to reduce withdrawable
     locked_strategy.setLockedFunds(locked_debt, DAY, sender=gov)
-    initial_idle = vault.total_idle()
-    initial_debt = vault.total_debt()
+    initial_idle = vault.totalIdle()
+    initial_debt = vault.totalDebt()
 
     tx = vault.update_debt(locked_strategy.address, new_debt, sender=gov)
     event = list(tx.decode_logs(vault.DebtUpdated))
@@ -144,8 +144,8 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_insufficient_w
     assert vault.strategies(locked_strategy.address).current_debt == locked_debt
     assert asset.balanceOf(locked_strategy) == locked_debt
     assert asset.balanceOf(vault) == (vault_balance - locked_debt)
-    assert vault.total_idle() == initial_idle + difference
-    assert vault.total_debt() == initial_debt - difference
+    assert vault.totalIdle() == initial_idle + difference
+    assert vault.totalDebt() == initial_debt - difference
 
 
 def test_update_debt__with_current_debt_greater_than_new_debt_and_sufficient_withdrawable(
@@ -157,8 +157,8 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_sufficient_wit
     difference = current_debt - new_debt
 
     add_debt_to_strategy(gov, strategy, vault, current_debt)
-    initial_idle = vault.total_idle()
-    initial_debt = vault.total_debt()
+    initial_idle = vault.totalIdle()
+    initial_debt = vault.totalDebt()
     # reduce debt in strategy
     vault.update_max_debt_for_strategy(strategy.address, new_debt, sender=gov)
 
@@ -173,8 +173,8 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_sufficient_wit
     assert vault.strategies(strategy.address).current_debt == new_debt
     assert asset.balanceOf(strategy) == new_debt
     assert asset.balanceOf(vault) == (vault_balance - new_debt)
-    assert vault.total_idle() == initial_idle + difference
-    assert vault.total_debt() == initial_debt - difference
+    assert vault.totalIdle() == initial_idle + difference
+    assert vault.totalDebt() == initial_debt - difference
 
 
 def test_update_debt__with_new_debt_greater_than_max_desired_debt(
@@ -185,8 +185,8 @@ def test_update_debt__with_new_debt_greater_than_max_desired_debt(
     max_desired_debt = vault_balance // 2
     current_debt = vault.strategies(strategy.address).current_debt
     difference = max_desired_debt - current_debt
-    initial_idle = vault.total_idle()
-    initial_debt = vault.total_debt()
+    initial_idle = vault.totalIdle()
+    initial_debt = vault.totalDebt()
 
     vault.update_max_debt_for_strategy(strategy.address, max_debt, sender=gov)
     strategy.setMaxDebt(max_desired_debt, sender=gov)
@@ -203,8 +203,8 @@ def test_update_debt__with_new_debt_greater_than_max_desired_debt(
     assert vault.strategies(strategy.address).current_debt == max_desired_debt
     assert asset.balanceOf(strategy) == max_desired_debt
     assert asset.balanceOf(vault) == (vault_balance - max_desired_debt)
-    assert vault.total_idle() == initial_idle - difference
-    assert vault.total_debt() == initial_debt + difference
+    assert vault.totalIdle() == initial_idle - difference
+    assert vault.totalDebt() == initial_debt + difference
 
 
 # def test_update_debt__with_new_debt_less_than_min_desired_debt__reverts(
@@ -261,8 +261,8 @@ def test_update_debt__with_current_debt_less_than_new_debt_and_minimum_total_idl
     new_debt = vault_balance // 2
     current_debt = vault.strategies(strategy.address).current_debt
     difference = new_debt - current_debt
-    initial_idle = vault.total_idle()
-    initial_debt = vault.total_debt()
+    initial_idle = vault.totalIdle()
+    initial_debt = vault.totalDebt()
 
     # set minimum total idle to a small value that doesn´t interfeer on update_debt
     minimum_total_idle = 1
@@ -283,10 +283,10 @@ def test_update_debt__with_current_debt_less_than_new_debt_and_minimum_total_idl
     assert vault.strategies(strategy.address).current_debt == new_debt
     assert asset.balanceOf(strategy) == new_debt
     assert asset.balanceOf(vault) == (vault_balance - new_debt)
-    assert vault.total_idle() == initial_idle - difference
-    assert vault.total_debt() == initial_debt + difference
+    assert vault.totalIdle() == initial_idle - difference
+    assert vault.totalDebt() == initial_debt + difference
 
-    assert vault.total_idle() > vault.minimum_total_idle()
+    assert vault.totalIdle() > vault.minimum_total_idle()
 
 
 def test_update_debt__with_current_debt_less_than_new_debt_and_total_idle_lower_than_minimum_total_idle__revert(
@@ -300,9 +300,9 @@ def test_update_debt__with_current_debt_less_than_new_debt_and_total_idle_lower_
     vault_balance = asset.balanceOf(vault)
     new_debt = vault_balance // 2
 
-    minimum_total_idle = vault.total_idle()
+    minimum_total_idle = vault.totalIdle()
     vault.set_minimum_total_idle(minimum_total_idle, sender=gov)
-    assert vault.minimum_total_idle() == vault.total_idle()
+    assert vault.minimum_total_idle() == vault.totalIdle()
 
     # increase debt in strategy
     vault.update_max_debt_for_strategy(strategy.address, new_debt, sender=gov)
@@ -322,8 +322,8 @@ def test_update_debt__with_current_debt_less_than_new_debt_and_minimum_total_idl
     new_debt = vault_balance
     current_debt = vault.strategies(strategy.address).current_debt
 
-    initial_idle = vault.total_idle()
-    initial_debt = vault.total_debt()
+    initial_idle = vault.totalIdle()
+    initial_debt = vault.totalDebt()
 
     # we ensure a small amount of liquidity remains in the vault
     minimum_total_idle = vault_balance - 1
@@ -348,8 +348,8 @@ def test_update_debt__with_current_debt_less_than_new_debt_and_minimum_total_idl
     assert vault.strategies(strategy.address).current_debt == expected_new_debt
     assert asset.balanceOf(strategy) == expected_new_debt
     assert asset.balanceOf(vault) == vault_balance - expected_new_differnce
-    assert vault.total_idle() == initial_idle - expected_new_differnce
-    assert vault.total_debt() == initial_debt + expected_new_differnce
+    assert vault.totalIdle() == initial_idle - expected_new_differnce
+    assert vault.totalDebt() == initial_debt + expected_new_differnce
 
 
 def test_update_debt__with_current_debt_greater_than_new_debt_and_minimum_total_idle(
@@ -367,8 +367,8 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_minimum_total_
 
     # we compute vault values again, as they have changed
     vault_balance = asset.balanceOf(vault)
-    initial_idle = vault.total_idle()
-    initial_debt = vault.total_debt()
+    initial_idle = vault.totalIdle()
+    initial_debt = vault.totalDebt()
 
     # small minimum total idle value not to interfeer with update_debt method
     minimum_total_idle = 1
@@ -390,8 +390,8 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_minimum_total_
     assert vault.strategies(strategy.address).current_debt == new_debt
     assert asset.balanceOf(strategy) == new_debt
     assert asset.balanceOf(vault) == vault_balance + difference
-    assert vault.total_idle() == initial_idle + difference
-    assert vault.total_debt() == initial_debt - difference
+    assert vault.totalIdle() == initial_idle + difference
+    assert vault.totalDebt() == initial_debt - difference
 
 
 def test_update_debt__with_current_debt_greater_than_new_debt_and_total_idle_less_than_minimum_total_idle(
@@ -410,8 +410,8 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_total_idle_les
 
     # we compute vault values again, as they have changed
     vault_balance = asset.balanceOf(vault)
-    initial_idle = vault.total_idle()
-    initial_debt = vault.total_debt()
+    initial_idle = vault.totalIdle()
+    initial_debt = vault.totalDebt()
 
     # we set minimum total idle to a value greater than debt difference
     minimum_total_idle = current_debt - new_debt + 1
@@ -436,8 +436,8 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_total_idle_les
     assert vault.strategies(strategy.address).current_debt == expected_new_debt
     assert asset.balanceOf(strategy) == expected_new_debt
     assert asset.balanceOf(vault) == vault_balance + expected_new_difference
-    assert vault.total_idle() == initial_idle + expected_new_difference
-    assert vault.total_debt() == initial_debt - expected_new_difference
+    assert vault.totalIdle() == initial_idle + expected_new_difference
+    assert vault.totalDebt() == initial_debt - expected_new_difference
 
 
 def test_update_debt__with_faulty_strategy_that_deposits_less_than_requested(
@@ -450,8 +450,8 @@ def test_update_debt__with_faulty_strategy_that_deposits_less_than_requested(
 
     add_debt_to_strategy(gov, faulty_strategy, vault, current_debt)
 
-    initial_idle = vault.total_idle()
-    initial_debt = vault.total_debt()
+    initial_idle = vault.totalIdle()
+    initial_debt = vault.totalDebt()
 
     # check the strategy only took half and vault recorded it correctly
     assert initial_idle == expected_debt
@@ -467,8 +467,8 @@ def test_update_debt__with_faulty_strategy_that_withdraws_less_than_requested(
 
     add_debt_to_strategy(gov, faulty_strategy, vault, vault_balance)
 
-    initial_idle = vault.total_idle()
-    initial_debt = vault.total_debt()
+    initial_idle = vault.totalIdle()
+    initial_debt = vault.totalDebt()
     current_debt = vault.strategies(faulty_strategy.address).current_debt
     new_debt = current_debt // 2
     difference = current_debt - new_debt
@@ -485,8 +485,8 @@ def test_update_debt__with_faulty_strategy_that_withdraws_less_than_requested(
     assert vault.strategies(faulty_strategy.address).current_debt == new_debt
     assert asset.balanceOf(faulty_strategy) == new_debt
     assert asset.balanceOf(vault) == (vault_balance - new_debt)
-    assert vault.total_idle() == initial_idle + difference
-    assert vault.total_debt() == initial_debt - difference
+    assert vault.totalIdle() == initial_idle + difference
+    assert vault.totalDebt() == initial_debt - difference
 
 
 def test_update_debt__with_faulty_strategy_that_deposits_less_than_requested_with_airdrop(
@@ -508,8 +508,8 @@ def test_update_debt__with_faulty_strategy_that_deposits_less_than_requested_wit
 
     add_debt_to_strategy(gov, faulty_strategy, vault, current_debt)
 
-    initial_idle = vault.total_idle()
-    initial_debt = vault.total_debt()
+    initial_idle = vault.totalIdle()
+    initial_debt = vault.totalDebt()
 
     # check the strategy only took half and vault recorded it correctly
     assert initial_idle == expected_debt
@@ -531,8 +531,8 @@ def test_update_debt__with_faulty_strategy_that_withdraws_less_than_requested_wi
 
     add_debt_to_strategy(gov, faulty_strategy, vault, vault_balance)
 
-    initial_idle = vault.total_idle()
-    initial_debt = vault.total_debt()
+    initial_idle = vault.totalIdle()
+    initial_debt = vault.totalDebt()
     current_debt = vault.strategies(faulty_strategy.address).current_debt
     new_debt = current_debt // 2
     difference = current_debt - new_debt
@@ -552,5 +552,5 @@ def test_update_debt__with_faulty_strategy_that_withdraws_less_than_requested_wi
     assert vault.strategies(faulty_strategy.address).current_debt == new_debt
     assert asset.balanceOf(faulty_strategy) == new_debt
     assert asset.balanceOf(vault) == (vault_balance - new_debt + fish_amount)
-    assert vault.total_idle() == initial_idle + difference
-    assert vault.total_debt() == initial_debt - difference
+    assert vault.totalIdle() == initial_idle + difference
+    assert vault.totalDebt() == initial_debt - difference

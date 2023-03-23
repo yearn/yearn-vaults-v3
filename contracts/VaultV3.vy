@@ -152,18 +152,19 @@ FACTORY: public(immutable(address))
 # STORAGE #
 # HashMap that records all the strategies that are allowed to receive assets from the vault
 strategies: public(HashMap[address, StrategyParams])
+
 # ERC20 - amount of shares per account
 balance_of: HashMap[address, uint256]
 # ERC20 - owner -> (spender -> amount)
 allowance: public(HashMap[address, HashMap[address, uint256]])
-
 # Total amount of shares that are currently minted
+# To get the ERC20 compliant version user totalSupply().
 total_supply: public(uint256)
 
 # Total amount of assets that has been deposited in strategies
-total_debt: public(uint256)
+total_debt: uint256
 # Current assets held in the vault contract. Replacing balanceOf(this) to avoid price_per_share manipulation
-total_idle: public(uint256)
+total_idle: uint256
 # Minimum amount of assets that should be kept in the vault contract to allow for fast, cheap redeems
 minimum_total_idle: public(uint256)
 # Maximum amount of tokens that the vault can accept. If totalAssets > deposit_limit, deposits will revert
@@ -1091,7 +1092,7 @@ def unlocked_shares() -> uint256:
 
 @view
 @external
-def price_per_share() -> uint256:
+def pricePerShare() -> uint256:
     """
     @notice Get the price per share.
     @dev This value offers limited precision. Integrations the require 
@@ -1103,7 +1104,7 @@ def price_per_share() -> uint256:
 
 @view
 @external
-def available_deposit_limit() -> uint256:
+def availableDepositLimit() -> uint256:
     """
     @notice Get the available deposit limit.
     @return The available deposit limit.
@@ -1369,6 +1370,25 @@ def totalAssets() -> uint256:
     @return The total assets held by the vault.
     """
     return self._total_assets()
+
+@view
+@external
+def totalIdle() -> uint256:
+    """
+    @notice Get the amount of loose `asset` the vault holds.
+    @return The current total idle.
+    """
+    return self.total_idle
+
+@view
+@external
+def totalDebt() -> uint256:
+    """
+    @notice Get the the total amount of funds invested
+    across all strategies.
+    @return The current total debt.
+    """
+    return self.total_debt
 
 @view
 @external

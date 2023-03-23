@@ -1,8 +1,8 @@
 def check_vault_empty(vault):
     assert vault.totalAssets() == 0
     assert vault.totalSupply() == 0
-    assert vault.total_idle() == 0
-    assert vault.total_debt() == 0
+    assert vault.totalIdle() == 0
+    assert vault.totalDebt() == 0
 
 
 def check_revoked_strategy(strategy_params):
