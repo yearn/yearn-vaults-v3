@@ -12,9 +12,10 @@ contract ERC4626LockedStrategy is ERC4626BaseStrategyMock {
     uint256 public lockedBalance;
     uint256 public lockedUntil;
 
-    constructor(address _vault, address _asset)
-        ERC4626BaseStrategyMock(_vault, _asset)
-    {}
+    constructor(
+        address _vault,
+        address _asset
+    ) ERC4626BaseStrategyMock(_vault, _asset) {}
 
     // only used during testing
     // locks funds for duration _lockTime
@@ -34,11 +35,9 @@ contract ERC4626LockedStrategy is ERC4626BaseStrategyMock {
         }
     }
 
-    function _freeFunds(uint256 _amount)
-        internal
-        override
-        returns (uint256 _amountFreed)
-    {}
+    function _freeFunds(
+        uint256 _amount
+    ) internal override returns (uint256 _amountFreed) {}
 
     function maxWithdraw(address) public view override returns (uint256) {
         uint256 balance = IERC20(asset()).balanceOf(address(this));

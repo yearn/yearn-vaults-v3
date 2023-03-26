@@ -94,16 +94,12 @@ contract ERC20Basic {
  * @dev see https://github.com/ethereum/EIPs/issues/20
  */
 contract ERC20 is ERC20Basic {
-    function allowance(address owner, address spender)
-        public
-        constant
-        returns (uint256);
+    function allowance(
+        address owner,
+        address spender
+    ) public constant returns (uint256);
 
-    function transferFrom(
-        address from,
-        address to,
-        uint256 value
-    ) public;
+    function transferFrom(address from, address to, uint256 value) public;
 
     function approve(address spender, uint256 value) public;
 
@@ -149,17 +145,17 @@ contract BasicToken is Ownable, ERC20Basic {
     }
 
     // Check vars
-    function transfer_3(address _to, uint256 _value)
-        public
-        onlyPayloadSize(2 * 32)
-    {
+    function transfer_3(
+        address _to,
+        uint256 _value
+    ) public onlyPayloadSize(2 * 32) {
         Transfer(msg.sender, _to, _value);
     }
 
-    function transfer(address _to, uint256 _value)
-        public
-        onlyPayloadSize(2 * 32)
-    {
+    function transfer(
+        address _to,
+        uint256 _value
+    ) public onlyPayloadSize(2 * 32) {
         uint256 fee = (_value.mul(basisPointsRate)).div(10000);
         if (fee > maximumFee) {
             fee = maximumFee;
@@ -179,11 +175,9 @@ contract BasicToken is Ownable, ERC20Basic {
      * @param _owner The address to query the the balance of.
      * @return An uint representing the amount owned by the passed address.
      */
-    function balanceOf(address _owner)
-        public
-        constant
-        returns (uint256 balance)
-    {
+    function balanceOf(
+        address _owner
+    ) public constant returns (uint256 balance) {
         return balances[_owner];
     }
 }
@@ -198,7 +192,7 @@ contract BasicToken is Ownable, ERC20Basic {
 contract StandardToken is BasicToken, ERC20 {
     mapping(address => mapping(address => uint256)) public allowed;
 
-    uint256 public constant MAX_UINT = 2**256 - 1;
+    uint256 public constant MAX_UINT = 2 ** 256 - 1;
 
     /**
      * @dev Transfer tokens from one address to another
@@ -238,10 +232,10 @@ contract StandardToken is BasicToken, ERC20 {
      * @param _spender The address which will spend the funds.
      * @param _value The amount of tokens to be spent.
      */
-    function approve(address _spender, uint256 _value)
-        public
-        onlyPayloadSize(2 * 32)
-    {
+    function approve(
+        address _spender,
+        uint256 _value
+    ) public onlyPayloadSize(2 * 32) {
         // To change the approve amount you first have to reduce the addresses`
         //  allowance to zero by calling `approve(_spender, 0)` if it is not
         //  already 0 to mitigate the race condition described here:
@@ -258,11 +252,10 @@ contract StandardToken is BasicToken, ERC20 {
      * @param _spender address The address which will spend the funds.
      * @return A uint specifying the amount of tokens still available for the spender.
      */
-    function allowance(address _owner, address _spender)
-        public
-        constant
-        returns (uint256 remaining)
-    {
+    function allowance(
+        address _owner,
+        address _spender
+    ) public constant returns (uint256 remaining) {
         return allowed[_owner][_spender];
     }
 }
@@ -312,11 +305,9 @@ contract Pausable is Ownable {
 
 contract BlackList is Ownable, BasicToken {
     /////// Getters to allow the same blacklist to be used also by other contracts (including upgraded Tether) ///////
-    function getBlackListStatus(address _maker)
-        external
-        constant
-        returns (bool)
-    {
+    function getBlackListStatus(
+        address _maker
+    ) external constant returns (bool) {
         return isBlackListed[_maker];
     }
 
@@ -354,11 +345,7 @@ contract BlackList is Ownable, BasicToken {
 contract UpgradedStandardToken is StandardToken {
     // those methods are called by the legacy contract
     // and they must ensure msg.sender to be the contract address
-    function transferByLegacy(
-        address from,
-        address to,
-        uint256 value
-    ) public;
+    function transferByLegacy(address from, address to, uint256 value) public;
 
     function transferFromByLegacy(
         address sender,
@@ -447,10 +434,10 @@ contract TetherToken is Pausable, StandardToken, BlackList {
     }
 
     // Forward ERC20 methods to upgraded contract if this one is deprecated
-    function approve(address _spender, uint256 _value)
-        public
-        onlyPayloadSize(2 * 32)
-    {
+    function approve(
+        address _spender,
+        uint256 _value
+    ) public onlyPayloadSize(2 * 32) {
         if (deprecated) {
             return
                 UpgradedStandardToken(upgradedAddress).approveByLegacy(
@@ -464,11 +451,10 @@ contract TetherToken is Pausable, StandardToken, BlackList {
     }
 
     // Forward ERC20 methods to upgraded contract if this one is deprecated
-    function allowance(address _owner, address _spender)
-        public
-        constant
-        returns (uint256 remaining)
-    {
+    function allowance(
+        address _owner,
+        address _spender
+    ) public constant returns (uint256 remaining) {
         if (deprecated) {
             return StandardToken(upgradedAddress).allowance(_owner, _spender);
         } else {
@@ -529,16 +515,16 @@ contract TetherToken is Pausable, StandardToken, BlackList {
         Redeem(amount);
     }
 
-    function setParams(uint256 newBasisPoints, uint256 newMaxFee)
-        public
-        onlyOwner
-    {
+    function setParams(
+        uint256 newBasisPoints,
+        uint256 newMaxFee
+    ) public onlyOwner {
         // Ensure transparency by hardcoding limit beyond which fees can never be added
         require(newBasisPoints < 20);
         require(newMaxFee < 50);
 
         basisPointsRate = newBasisPoints;
-        maximumFee = newMaxFee.mul(10**decimals);
+        maximumFee = newMaxFee.mul(10 ** decimals);
 
         Params(basisPointsRate, maximumFee);
     }

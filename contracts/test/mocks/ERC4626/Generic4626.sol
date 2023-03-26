@@ -7,8 +7,7 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract Generic4626 is ERC4626 {
-    constructor(address _asset)
-        ERC4626(IERC20Metadata(address(_asset)))
-        ERC20("a", "a")
-    {}
+    constructor(
+        address _asset
+    ) ERC4626(IERC20Metadata(address(_asset))) ERC20("a", "a") {}
 }

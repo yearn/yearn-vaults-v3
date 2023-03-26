@@ -16,9 +16,10 @@ abstract contract ERC4626BaseStrategy is IStrategyERC4626, ERC4626 {
     address public override vault;
     uint8 private _decimals;
 
-    constructor(address _vault, address _asset)
-        ERC4626(IERC20Metadata(address(_asset)))
-    {
+    constructor(
+        address _vault,
+        address _asset
+    ) ERC4626(IERC20Metadata(address(_asset))) {
         _initialize(_vault, _asset);
     }
 
@@ -48,11 +49,9 @@ abstract contract ERC4626BaseStrategy is IStrategyERC4626, ERC4626 {
         // TODO: add permissioning ?
     }
 
-    function freeFunds(uint256 _amount)
-        external
-        override
-        returns (uint256 _freedFunds)
-    {
+    function freeFunds(
+        uint256 _amount
+    ) external override returns (uint256 _freedFunds) {
         // TODO: add permissioning ?
     }
 
@@ -62,10 +61,9 @@ abstract contract ERC4626BaseStrategy is IStrategyERC4626, ERC4626 {
 
     function _invest() internal virtual;
 
-    function _freeFunds(uint256 _amount)
-        internal
-        virtual
-        returns (uint256 amountFreed);
+    function _freeFunds(
+        uint256 _amount
+    ) internal virtual returns (uint256 amountFreed);
 
     function _protectedTokens()
         internal
