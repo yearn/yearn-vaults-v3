@@ -52,8 +52,7 @@ def deploy_new_vault(asset: ERC20, name: String[64], symbol: String[32], role_ma
     @param profit_max_unlock_time The maximum time that the profit can be locked for
     @return The address of the new vault
     """
-    vault_address: address = 
-        create_from_blueprint(
+    vault_address: address = create_from_blueprint(
             VAULT_BLUEPRINT, 
             asset, 
             name, 
