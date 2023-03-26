@@ -15,10 +15,10 @@ abstract contract ERC4626BaseStrategyMock is ERC4626BaseStrategy {
 
     event Tend();
 
-    constructor(address _vault, address _asset)
-        ERC4626BaseStrategy(_vault, _asset)
-        ERC20("a", "a")
-    {}
+    constructor(
+        address _vault,
+        address _asset
+    ) ERC4626BaseStrategy(_vault, _asset) ERC20("a", "a") {}
 
     function tend() external {
         emit Tend();

@@ -6,33 +6,28 @@ import {ERC4626BaseStrategyMock, IERC20} from "./BaseStrategyMock.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 contract ERC4626FaultyStrategy is ERC4626BaseStrategyMock {
-    constructor(address _vault, address _asset)
-        ERC4626BaseStrategyMock(_vault, _asset)
-    {}
+    constructor(
+        address _vault,
+        address _asset
+    ) ERC4626BaseStrategyMock(_vault, _asset) {}
 
     // doesn't do anything in liquid strategy as all funds are free
-    function _freeFunds(uint256 _amount)
-        internal
-        override
-        returns (uint256 _amountFreed)
-    {
+    function _freeFunds(
+        uint256 _amount
+    ) internal override returns (uint256 _amountFreed) {
         _amountFreed = IERC20(asset()).balanceOf(address(this));
     }
 
-    function maxWithdraw(address _owner)
-        public
-        view
-        override
-        returns (uint256)
-    {
+    function maxWithdraw(
+        address _owner
+    ) public view override returns (uint256) {
         return _convertToAssets(balanceOf(_owner), Math.Rounding.Down);
     }
 
-    function deposit(uint256 _assets, address _receiver)
-        public
-        override
-        returns (uint256)
-    {
+    function deposit(
+        uint256 _assets,
+        address _receiver
+    ) public override returns (uint256) {
         require(
             _assets <= maxDeposit(_receiver),
             "ERC4626: deposit more than max"

@@ -1,6 +1,6 @@
 from ape import chain
 import pytest
-from utils.constants import ROLES
+from utils.constants import ROLES, YEAR
 from utils.utils import days_to_secs
 
 
@@ -28,7 +28,7 @@ def test__report_with_no_protocol_fees(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, amount)
 
-    assert vault.price_per_share() == int(10 ** vault.decimals())
+    assert vault.pricePerShare() == int(10 ** vault.decimals())
     # We increase time after profit has been released and check estimation
     tx = vault.process_report(strategy, sender=gov)
 
@@ -37,7 +37,7 @@ def test__report_with_no_protocol_fees(
 
     shares_protocol = vault.balanceOf(gov.address)
     assert vault.convertToAssets(shares_protocol) == 0
-    assert vault.price_per_share() == int(10 ** vault.decimals())
+    assert vault.pricePerShare() == int(10 ** vault.decimals())
 
 
 def test__report_gain_with_protocol_fees__set_pre_vault_deploy(
@@ -67,12 +67,12 @@ def test__report_gain_with_protocol_fees__set_pre_vault_deploy(
     add_debt_to_strategy(gov, strategy, vault, amount)
     airdrop_asset(gov, asset, strategy, profit)
 
-    price_per_share_pre = vault.price_per_share()
+    price_per_share_pre = vault.pricePerShare()
 
-    assert vault.price_per_share() == int(10 ** vault.decimals())
-    days_passed = 365
+    assert vault.pricePerShare() == int(10 ** vault.decimals())
+
     # We increase time after profit has been released and check estimation
-    chain.pending_timestamp = vault.last_report() + days_to_secs(days_passed)
+    chain.pending_timestamp = vault.lastReport() + YEAR
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))
@@ -83,9 +83,9 @@ def test__report_gain_with_protocol_fees__set_pre_vault_deploy(
         pytest.approx(
             price_per_share_pre * shares_protocol // (10 ** vault.decimals()), rel=1e-6
         )
-        == amount * 0.0025 * days_passed / 365
+        == amount * 0.0025
     )
-    assert vault.price_per_share() == int(10 ** vault.decimals())
+    assert vault.pricePerShare() == int(10 ** vault.decimals())
 
 
 def test__report_no_gain_with_protocol_fees__set_pre_vault_deploy(
@@ -113,12 +113,12 @@ def test__report_no_gain_with_protocol_fees__set_pre_vault_deploy(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, amount)
 
-    price_per_share_pre = vault.price_per_share()
+    price_per_share_pre = vault.pricePerShare()
 
-    assert vault.price_per_share() == int(10 ** vault.decimals())
-    days_passed = 365
+    assert vault.pricePerShare() == int(10 ** vault.decimals())
+
     # We increase time after profit has been released and check estimation
-    chain.pending_timestamp = vault.last_report() + days_to_secs(days_passed)
+    chain.pending_timestamp = vault.lastReport() + YEAR
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))
@@ -131,10 +131,10 @@ def test__report_no_gain_with_protocol_fees__set_pre_vault_deploy(
         pytest.approx(
             price_per_share_pre * shares_protocol // (10 ** vault.decimals()), rel=1e-6
         )
-        == amount * 0.0025 * days_passed / 365
+        == amount * 0.0025
     )
     assert pytest.approx(
-        vault.price_per_share(), rel=1e-8
+        vault.pricePerShare(), rel=1e-8
     ) == amount * 10 ** vault.decimals() // (amount + amount * 0.0025)
 
 
@@ -169,13 +169,11 @@ def test__report_gain_with_protocol_fees__set_post_vault_deploy(
     vault_factory.set_protocol_fee_bps(25, sender=gov)
     vault_factory.set_protocol_fee_recipient(gov.address, sender=gov)
 
-    assert vault.price_per_share() == int(10 ** vault.decimals())
-    days_passed = 365
+    assert vault.pricePerShare() == int(10 ** vault.decimals())
+
     # We increase time after profit has been released and check estimation
-    chain.pending_timestamp = (
-        vault_factory.protocol_fee_config().fee_last_change + days_to_secs(days_passed)
-    )
-    price_per_share_pre = vault.price_per_share()
+    chain.pending_timestamp = vault_factory.protocol_fee_config().fee_last_change + YEAR
+    price_per_share_pre = vault.pricePerShare()
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))
@@ -186,10 +184,10 @@ def test__report_gain_with_protocol_fees__set_post_vault_deploy(
         pytest.approx(
             price_per_share_pre * shares_protocol // (10 ** vault.decimals()), rel=1e-6
         )
-        == amount * 0.0025 * days_passed / 365
+        == amount * 0.0025
     )
 
-    assert vault.price_per_share() == int(10 ** vault.decimals())
+    assert vault.pricePerShare() == int(10 ** vault.decimals())
 
 
 def test__report_no_gain_with_protocol_fees__set_post_vault_deploy(
@@ -221,13 +219,11 @@ def test__report_no_gain_with_protocol_fees__set_post_vault_deploy(
     vault_factory.set_protocol_fee_bps(25, sender=gov)
     vault_factory.set_protocol_fee_recipient(gov.address, sender=gov)
 
-    assert vault.price_per_share() == int(10 ** vault.decimals())
-    days_passed = 365
+    assert vault.pricePerShare() == int(10 ** vault.decimals())
+
     # We increase time after profit has been released and check estimation
-    chain.pending_timestamp = (
-        vault_factory.protocol_fee_config().fee_last_change + days_to_secs(days_passed)
-    )
-    price_per_share_pre = vault.price_per_share()
+    chain.pending_timestamp = vault_factory.protocol_fee_config().fee_last_change + YEAR
+    price_per_share_pre = vault.pricePerShare()
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))
@@ -240,11 +236,11 @@ def test__report_no_gain_with_protocol_fees__set_post_vault_deploy(
         pytest.approx(
             price_per_share_pre * shares_protocol // (10 ** vault.decimals()), rel=1e-6
         )
-        == amount * 0.0025 * days_passed / 365
+        == amount * 0.0025
     )
 
     assert pytest.approx(
-        vault.price_per_share(), rel=1e-8
+        vault.pricePerShare(), rel=1e-8
     ) == amount * 10 ** vault.decimals() // (amount + amount * 0.0025)
 
 
@@ -275,11 +271,11 @@ def test__report_gain_several_times_in_a_day(
     add_debt_to_strategy(gov, strategy, vault, amount)
     airdrop_asset(gov, asset, strategy, profit)
 
-    assert vault.price_per_share() == int(10 ** vault.decimals())
-    days_passed = 365
+    assert vault.pricePerShare() == int(10 ** vault.decimals())
+
     # We increase time after profit has been released and check estimation
-    chain.pending_timestamp = vault.last_report() + days_to_secs(days_passed)
-    price_per_share_pre = vault.price_per_share()
+    chain.pending_timestamp = vault.lastReport() + YEAR
+    price_per_share_pre = vault.pricePerShare()
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))
@@ -290,25 +286,25 @@ def test__report_gain_several_times_in_a_day(
         pytest.approx(
             price_per_share_pre * shares_protocol // (10 ** vault.decimals()), rel=1e-6
         )
-        == amount * 0.0025 * days_passed / 365
+        == amount * 0.0025
     )
     # we have enough profit to offset the fees so pps doesnt change
-    assert vault.price_per_share() == int(10 ** vault.decimals())
+    assert vault.pricePerShare() == int(10 ** vault.decimals())
 
     # When a day has not passed, no new protocol fees are charged
-    chain.pending_timestamp = vault.last_report() + int(days_to_secs(0.75))
+    chain.pending_timestamp = vault.lastReport() + int(days_to_secs(0.75))
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].protocol_fees == 0
 
     airdrop_asset(gov, asset, strategy, profit)
-    chain.pending_timestamp = vault.last_report() + int(days_to_secs(1))
+    chain.pending_timestamp = vault.lastReport() + int(days_to_secs(1))
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))
     assert pytest.approx(event[0].protocol_fees, abs=1) == int(
-        (amount + profit) * 0.0025 / 365
+        (amount + profit) * 0.0025 * (days_to_secs(1) / YEAR)
     )
 
 
@@ -337,11 +333,11 @@ def test__report_no_gain_several_times_in_a_day(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, amount)
 
-    assert vault.price_per_share() == int(10 ** vault.decimals())
-    days_passed = 365
+    assert vault.pricePerShare() == int(10 ** vault.decimals())
+
     # We increase time after profit has been released and check estimation
-    chain.pending_timestamp = vault.last_report() + days_to_secs(days_passed)
-    price_per_share_pre = vault.price_per_share()
+    chain.pending_timestamp = vault.lastReport() + YEAR
+    price_per_share_pre = vault.pricePerShare()
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))
@@ -355,23 +351,25 @@ def test__report_no_gain_several_times_in_a_day(
         pytest.approx(
             price_per_share_pre * shares_protocol // (10 ** vault.decimals()), rel=1e-6
         )
-        == amount * 0.0025 * days_passed / 365
+        == amount * 0.0025
     )
     assert pytest.approx(
-        vault.price_per_share(), rel=1e-8
+        vault.pricePerShare(), rel=1e-8
     ) == amount * 10 ** vault.decimals() // (amount + amount * 0.0025)
 
     # When a day has not passed, no new protocol fees are charged
-    chain.pending_timestamp = vault.last_report() + int(days_to_secs(0.75))
+    chain.pending_timestamp = vault.lastReport() + int(days_to_secs(0.75))
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].protocol_fees == 0
 
-    chain.pending_timestamp = vault.last_report() + int(days_to_secs(1))
+    chain.pending_timestamp = vault.lastReport() + int(days_to_secs(1))
     tx = vault.process_report(strategy, sender=gov)
 
     event = list(tx.decode_logs(vault.StrategyReported))
     assert pytest.approx(event[0].protocol_fees, abs=10) == int(
-        amount / (amount + amount * 0.0025 / 365) * (amount * 0.0025 / 365)
+        amount
+        / (amount + amount * 0.0025 * (days_to_secs(1) / YEAR))
+        * (amount * 0.0025 * (days_to_secs(1) / YEAR))
     )

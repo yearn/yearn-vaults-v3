@@ -301,8 +301,8 @@ def test_withdraw__with_locked_and_liquid_strategy__withdraws(
 
     assert vault.totalAssets() == amount_to_lock
     assert vault.totalSupply() == amount_to_lock
-    assert vault.total_idle() == 0
-    assert vault.total_debt() == amount_to_lock
+    assert vault.totalIdle() == 0
+    assert vault.totalDebt() == amount_to_lock
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(liquid_strategy) == 0
     assert asset.balanceOf(locked_strategy) == amount_to_lock
@@ -369,8 +369,8 @@ def test_withdraw__with_lossy_strategy__withdraws_less_than_deposited(
 
     assert vault.totalAssets() == 0
     assert vault.totalSupply() == 0
-    assert vault.total_idle() == 0
-    assert vault.total_debt() == 0
+    assert vault.totalIdle() == 0
+    assert vault.totalDebt() == 0
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(lossy_strategy) == 0
     assert asset.balanceOf(fish) == amount_to_withdraw - amount_to_lose
@@ -443,8 +443,8 @@ def test_withdraw__with_lossy_and_liquid_strategy__withdraws_less_than_deposited
 
     assert vault.totalAssets() == 0
     assert vault.totalSupply() == 0
-    assert vault.total_idle() == 0
-    assert vault.total_debt() == 0
+    assert vault.totalIdle() == 0
+    assert vault.totalDebt() == 0
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(liquid_strategy) == 0
     assert asset.balanceOf(lossy_strategy) == 0
@@ -518,8 +518,8 @@ def test_withdraw__with_liquid_and_lossy_strategy__withdraws_less_than_deposited
 
     assert vault.totalAssets() == 0
     assert vault.totalSupply() == 0
-    assert vault.total_idle() == 0
-    assert vault.total_debt() == 0
+    assert vault.totalIdle() == 0
+    assert vault.totalDebt() == 0
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(liquid_strategy) == 0
     assert asset.balanceOf(lossy_strategy) == 0
@@ -593,8 +593,8 @@ def test_withdraw__with_liquid_and_lossy_strategy_that_losses_while_withdrawing_
 
     assert vault.totalAssets() == 0
     assert vault.totalSupply() == 0
-    assert vault.total_idle() == 0
-    assert vault.total_debt() == 0
+    assert vault.totalIdle() == 0
+    assert vault.totalDebt() == 0
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(liquid_strategy) == 0
     assert asset.balanceOf(lossy_strategy) == 0
@@ -667,9 +667,9 @@ def test_withdraw__half_of_assets_from_lossy_strategy_that_losses_while_withdraw
 
     assert vault.totalAssets() == amount // 2
     assert vault.totalSupply() == shares // 2
-    assert vault.total_idle() == 0
-    assert vault.total_debt() == amount - amount_to_withdraw
-    assert asset.balanceOf(vault) == vault.total_idle()
+    assert vault.totalIdle() == 0
+    assert vault.totalDebt() == amount - amount_to_withdraw
+    assert asset.balanceOf(vault) == vault.totalIdle()
     assert asset.balanceOf(liquid_strategy) == amount_per_strategy
     assert asset.balanceOf(lossy_strategy) == 0
     assert asset.balanceOf(fish) == amount_to_withdraw - amount_to_lose
@@ -741,8 +741,8 @@ def test_withdraw__half_of_strategy_assets_from_lossy_strategy_with_unrealised_l
 
     assert vault.totalAssets() == amount - amount_to_withdraw
     assert vault.totalSupply() == amount - amount_to_withdraw
-    assert vault.total_idle() == 0
-    assert vault.total_debt() == amount - amount_to_withdraw
+    assert vault.totalIdle() == 0
+    assert vault.totalDebt() == amount - amount_to_withdraw
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(liquid_strategy) == amount_per_strategy
     assert (

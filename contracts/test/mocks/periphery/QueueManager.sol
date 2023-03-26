@@ -16,19 +16,15 @@ contract QueueManager {
         governance = msg.sender;
     }
 
-    function get_strategies(address vault)
-        external
-        view
-        returns (address[] memory)
-    {
+    function get_strategies(
+        address vault
+    ) external view returns (address[] memory) {
         return strategies[vault];
     }
 
-    function withdraw_queue(address vault)
-        external
-        view
-        returns (address[] memory)
-    {
+    function withdraw_queue(
+        address vault
+    ) external view returns (address[] memory) {
         return queue[vault];
     }
 

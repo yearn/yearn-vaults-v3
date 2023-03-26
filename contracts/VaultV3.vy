@@ -152,18 +152,19 @@ FACTORY: public(immutable(address))
 # STORAGE #
 # HashMap that records all the strategies that are allowed to receive assets from the vault
 strategies: public(HashMap[address, StrategyParams])
+
 # ERC20 - amount of shares per account
 balance_of: HashMap[address, uint256]
 # ERC20 - owner -> (spender -> amount)
 allowance: public(HashMap[address, HashMap[address, uint256]])
-
 # Total amount of shares that are currently minted
+# To get the ERC20 compliant version user totalSupply().
 total_supply: public(uint256)
 
 # Total amount of assets that has been deposited in strategies
-total_debt: public(uint256)
+total_debt: uint256
 # Current assets held in the vault contract. Replacing balanceOf(this) to avoid price_per_share manipulation
-total_idle: public(uint256)
+total_idle: uint256
 # Minimum amount of assets that should be kept in the vault contract to allow for fast, cheap redeems
 minimum_total_idle: public(uint256)
 # Maximum amount of tokens that the vault can accept. If totalAssets > deposit_limit, deposits will revert
@@ -189,16 +190,16 @@ name: public(String[64])
 symbol: public(String[32])
 
 # The amount of time profits will unlock over
-profit_max_unlock_time: public(uint256)
+profit_max_unlock_time: uint256
 # The timestamp of when the current unlocking period ends
-full_profit_unlock_date: public(uint256)
+full_profit_unlock_date: uint256
 # The per second rate at which profit will unlcok
-profit_unlocking_rate: public(uint256)
+profit_unlocking_rate: uint256
 # Last timestamp of the most recent _report() call
 last_profit_update: uint256
 
 # Last protocol fees were charged
-last_report: public(uint256)
+last_report: uint256
 
 # `nonces` track `permit` approvals with signature.
 nonces: public(HashMap[address, uint256])
@@ -828,7 +829,8 @@ def _assess_protocol_fees() -> (uint256, address):
         if(protocol_fee_bps > 0):
             # NOTE: charge fees since last report OR last fee change (this will mean less fees are charged after a change in protocol_fees, but fees should not change frequently)
             seconds_since_last_report = min(seconds_since_last_report, block.timestamp - convert(protocol_fee_last_change, uint256))
-            protocol_fees = convert(protocol_fee_bps, uint256) * self._total_assets() * seconds_since_last_report / 24 / 365 / 3600 / MAX_BPS
+            # fees = total_assets * protocol fees bpbs * time elapsed / seconds per year / max bps
+            protocol_fees = self._total_assets() * convert(protocol_fee_bps, uint256) * seconds_since_last_report / 31_556_952 / MAX_BPS
             self.last_report = block.timestamp
 
     return (protocol_fees, protocol_fee_recipient)
@@ -937,21 +939,23 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if protocol_fees_shares > 0:
         self._issue_shares(protocol_fees_shares, protocol_fee_recipient)
 
-    # Calculate how long until the full amount of shares is unlocked
-    remaining_time: uint256 = 0
-    _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
-    if _full_profit_unlock_date > block.timestamp: 
-        remaining_time = _full_profit_unlock_date - block.timestamp
-
     # Update unlocking rate and time to fully unlocked
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
     _profit_max_unlock_time: uint256 = self.profit_max_unlock_time
     if total_locked_shares > 0 and _profit_max_unlock_time > 0:
+
+        # Calculate how long until the full amount of shares is unlocked
+        remaining_time: uint256 = 0
+        _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
+        if _full_profit_unlock_date > block.timestamp: 
+            remaining_time = _full_profit_unlock_date - block.timestamp
+
         # new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the profit_max_unlock_time
         new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * _profit_max_unlock_time) / total_locked_shares
         self.profit_unlocking_rate = total_locked_shares * MAX_BPS_EXTENDED / new_profit_locking_period
         self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
         self.last_profit_update = block.timestamp
+
     else:
         # NOTE: only setting this to 0 will turn in the desired effect, no need to update last_profit_update or full_profit_unlock_date
         self.profit_unlocking_rate = 0
@@ -1088,20 +1092,19 @@ def unlocked_shares() -> uint256:
 
 @view
 @external
-def price_per_share() -> uint256:
+def pricePerShare() -> uint256:
     """
     @notice Get the price per share.
+    @dev This value offers limited precision. Integrations the require 
+    exact precision should use convertToAssets or convertToShares instead.
     @return The price per share.
-    This value offers limited precision.
-    Integrations the require exact precision should use convertToAssets or
-    convertToShares instead.
     """
     return self._convert_to_assets(10 ** DECIMALS, Rounding.ROUND_DOWN)
 
 
 @view
 @external
-def available_deposit_limit() -> uint256:
+def availableDepositLimit() -> uint256:
     """
     @notice Get the available deposit limit.
     @return The available deposit limit.
@@ -1370,6 +1373,25 @@ def totalAssets() -> uint256:
 
 @view
 @external
+def totalIdle() -> uint256:
+    """
+    @notice Get the amount of loose `asset` the vault holds.
+    @return The current total idle.
+    """
+    return self.total_idle
+
+@view
+@external
+def totalDebt() -> uint256:
+    """
+    @notice Get the the total amount of funds invested
+    across all strategies.
+    @return The current total debt.
+    """
+    return self.total_debt
+
+@view
+@external
 def convertToShares(assets: uint256) -> uint256:
     """
     @notice Convert an amount of assets to shares.
@@ -1492,6 +1514,45 @@ def assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256)
     @return The share of unrealised losses that the strategy has.
     """
     return self._assess_share_of_unrealised_losses(strategy, assets_needed)
+
+## Profit locking getter functions ##
+
+@view
+@external
+def profitMaxUnlockTime() -> uint256:
+    """
+    @notice Gets the current time profits are set to unlock over.
+    @return The current profit max unlock time.
+    """
+    return self.profit_max_unlock_time
+
+@view
+@external
+def fullProfitUnlockDate() -> uint256:
+    """
+    @notice Gets the timestamp at which all profits will be unlocked.
+    @return The full profit unlocking timestamp
+    """
+    return self.full_profit_unlock_date
+
+@view
+@external
+def profitUnlockingRate() -> uint256:
+    """
+    @notice The per second rate at which profits are unlocking.
+    @dev This is denominated in EXTENDED_BPS decimals.
+    @return The current profit unlocking rate.
+    """
+    return self.profit_unlocking_rate
+
+@view
+@external
+def lastReport() -> uint256:
+    """
+    @notice The timestamp of the last time protocol fees were charged.
+    @return The last report.
+    """
+    return self.last_report
 
 # eip-1344
 @view

@@ -32,7 +32,7 @@ def test_lossy_strategy_flow(
     user_deposit(user_1, vault, asset, deposit_amount)
 
     assert vault.balanceOf(user_1) == deposit_amount  # 1:1 assets:shares
-    assert vault.price_per_share() / 10 ** asset.decimals() == 1.0
+    assert vault.pricePerShare() / 10 ** asset.decimals() == 1.0
 
     add_debt_to_strategy(gov, strategy, vault, deposit_amount)
     assert strategy.totalAssets() == deposit_amount
@@ -49,7 +49,7 @@ def test_lossy_strategy_flow(
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].loss == first_loss
 
-    assert vault.price_per_share() / 10 ** asset.decimals() == 0.75
+    assert vault.pricePerShare() / 10 ** asset.decimals() == 0.75
 
     # user_2 (bunny) deposit assets to vault
     airdrop_asset(gov, asset, user_2, deposit_amount)
@@ -59,14 +59,14 @@ def test_lossy_strategy_flow(
     assert vault.totalAssets() == 2 * deposit_amount - first_loss
     assert vault.balanceOf(user_2) > vault.balanceOf(user_1)
 
-    assert vault.total_idle() == deposit_amount
-    assert vault.total_debt() == deposit_amount - first_loss
+    assert vault.totalIdle() == deposit_amount
+    assert vault.totalDebt() == deposit_amount - first_loss
 
     add_debt_to_strategy(gov, strategy, vault, vault.totalAssets())
 
     assert strategy.totalAssets() == 2 * deposit_amount - first_loss
-    assert vault.total_idle() == 0
-    assert vault.total_debt() == 2 * deposit_amount - first_loss
+    assert vault.totalIdle() == 0
+    assert vault.totalDebt() == 2 * deposit_amount - first_loss
 
     tx = strategy.setLoss(gov, second_loss, sender=gov)
 
@@ -81,7 +81,7 @@ def test_lossy_strategy_flow(
         == 2 * deposit_amount - first_loss - second_loss
     )
     assert vault.totalAssets() == 2 * deposit_amount - first_loss - second_loss
-    assert vault.total_idle() == 0
+    assert vault.totalIdle() == 0
 
     # Lets set a `minimum_total_idle` value
     vault.set_minimum_total_idle(3 * deposit_amount // 4, sender=gov)
@@ -90,14 +90,14 @@ def test_lossy_strategy_flow(
     # forces to comply with `minimum_total_idle`
     add_debt_to_strategy(gov, strategy, vault, deposit_amount)
 
-    assert vault.total_idle() == 3 * deposit_amount // 4
+    assert vault.totalIdle() == 3 * deposit_amount // 4
     assert (
         strategy.totalAssets()
-        == 2 * deposit_amount - first_loss - second_loss - vault.total_idle()
+        == 2 * deposit_amount - first_loss - second_loss - vault.totalIdle()
     )
     assert vault.strategies(strategy)
 
-    # user_1 withdraws all his shares in `vault.total_idle`. Due to the lossy strategy, his shares have less value
+    # user_1 withdraws all his shares in `vault.totalIdle`. Due to the lossy strategy, his shares have less value
     # and therefore he ends up with less assets than before
     vault.redeem(MAX_INT, user_1, user_1, sender=user_1)
 
@@ -110,7 +110,7 @@ def test_lossy_strategy_flow(
         user_1_initial_balance - first_loss - second_loss * shares_ratio, 1e-5
     )
 
-    assert vault.total_idle() < vault.minimum_total_idle()
+    assert vault.totalIdle() < vault.minimum_total_idle()
 
     # we need to `update_debt` to ensure again we have minimum liquidity
     add_debt_to_strategy(gov, strategy, vault, deposit_amount // 4)
@@ -126,7 +126,7 @@ def test_lossy_strategy_flow(
     vault.redeem(vault.balanceOf(user_2), user_2, user_2, sender=user_2)
 
     assert vault.totalAssets() == 0
-    assert vault.price_per_share() / 10 ** vault.decimals() == 1.0
+    assert vault.pricePerShare() / 10 ** vault.decimals() == 1.0
     assert asset.balanceOf(user_2) < user_2_initial_balance
 
     vault.revoke_strategy(strategy, sender=gov)

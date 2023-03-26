@@ -45,7 +45,7 @@ def test_profitable_strategy_flow(
     user_deposit(user_1, vault, asset, deposit_amount)
 
     assert vault.balanceOf(user_1) == deposit_amount  # 1:1 assets:shares
-    assert vault.price_per_share() / 10 ** asset.decimals() == 1.0
+    assert vault.pricePerShare() / 10 ** asset.decimals() == 1.0
 
     initial_total_assets = vault.totalAssets()
     initial_total_supply = vault.totalSupply()
@@ -69,19 +69,19 @@ def test_profitable_strategy_flow(
         == total_fee
     )
 
-    pps = vault.price_per_share()
+    pps = vault.pricePerShare()
 
     user_2_initial_balance = asset.balanceOf(user_2)
     # user_2 (bunny) deposit assets to vault
     airdrop_asset(gov, asset, user_2, deposit_amount)
     user_deposit(user_2, vault, asset, deposit_amount)
 
-    assert vault.total_idle() == deposit_amount
+    assert vault.totalIdle() == deposit_amount
 
     strategy.totalAssets()
     add_debt_to_strategy(gov, strategy, vault, strategy.totalAssets() + deposit_amount)
 
-    assert vault.total_idle() == 0
+    assert vault.totalIdle() == 0
 
     # We generate second profit
     asset.transfer(strategy, second_profit, sender=whale)
@@ -94,7 +94,7 @@ def test_profitable_strategy_flow(
     # Users deposited same amount of assets, but they have different shares due to pps
     assert vault.balanceOf(user_1) > vault.balanceOf(user_2)
 
-    pps_before_loss = vault.price_per_share()
+    pps_before_loss = vault.pricePerShare()
     assets_before_loss = vault.totalAssets()
 
     # we create a small loss that should be damped by profit buffer
@@ -104,9 +104,9 @@ def test_profitable_strategy_flow(
     assert event[0].loss == first_loss
 
     assert vault.totalAssets() < assets_before_loss
-    assert vault.price_per_share() > pps_before_loss
+    assert vault.pricePerShare() > pps_before_loss
 
-    assert vault.total_idle() == 0
+    assert vault.totalIdle() == 0
     # Les set a `minimum_total_idle` value
     min_total_idle = deposit_amount // 2
     vault.set_minimum_total_idle(min_total_idle, sender=gov)
@@ -115,19 +115,19 @@ def test_profitable_strategy_flow(
     new_debt = strategy.totalAssets() - deposit_amount // 4
     add_debt_to_strategy(gov, strategy, vault, new_debt)
 
-    assert vault.total_idle() == min_total_idle
+    assert vault.totalIdle() == min_total_idle
     # strategy has not the desired debt, as we need to have minimum_total_idle
     assert vault.strategies(strategy).current_debt != new_debt
 
-    user_1_withdraw = vault.total_idle()
+    user_1_withdraw = vault.totalIdle()
     vault.withdraw(user_1_withdraw, user_1, user_1, sender=user_1)
 
-    assert pytest.approx(0, abs=1) == vault.total_idle()
+    assert pytest.approx(0, abs=1) == vault.totalIdle()
 
     new_debt = strategy.totalAssets() - deposit_amount // 4
     add_debt_to_strategy(gov, strategy, vault, new_debt)
 
-    assert vault.total_idle() == min_total_idle
+    assert vault.totalIdle() == min_total_idle
     # strategy has not the desired debt, as we need to have minimum_total_idle
     assert vault.strategies(strategy).current_debt != new_debt
 
@@ -161,7 +161,7 @@ def test_profitable_strategy_flow(
         sender=user_1,
     )
 
-    assert vault.total_idle() == 0
+    assert vault.totalIdle() == 0
     assert pytest.approx(0, abs=1) == vault.balanceOf(user_1)
 
     assert asset.balanceOf(user_1) > user_1_initial_balance
@@ -170,7 +170,7 @@ def test_profitable_strategy_flow(
         vault.balanceOf(user_2), user_2, user_2, [strategy.address], sender=user_2
     )
 
-    assert vault.total_idle() == 0
+    assert vault.totalIdle() == 0
     assert pytest.approx(0, abs=1) == vault.balanceOf(user_2)
     assert asset.balanceOf(user_2) > user_2_initial_balance
 

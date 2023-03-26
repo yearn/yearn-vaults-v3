@@ -315,7 +315,7 @@ def test_process_report__with_loss(
     assert vault.strategies(lossy_strategy.address).last_report == pytest.approx(
         snapshot, abs=1
     )
-    assert vault.price_per_share() / 10 ** vault.decimals() == 0.5
+    assert vault.pricePerShare() / 10 ** vault.decimals() == 0.5
 
 
 def test_process_report__with_loss_and_management_fees(
@@ -350,7 +350,7 @@ def test_process_report__with_loss_and_management_fees(
 
     # Management fees relay on duration of invest, so we need to advance in time to see results
     initial_timestamp = chain.pending_timestamp
-    initial_pps = vault.price_per_share()
+    initial_pps = vault.pricePerShare()
     chain.mine(timestamp=initial_timestamp + YEAR)
     initial_total_assets = vault.totalAssets()
 
@@ -386,7 +386,7 @@ def test_process_report__with_loss_and_management_fees(
     )
 
     # Without fees, pps would be 0.5, as loss is half of debt, but with fees pps should be even lower
-    assert vault.price_per_share() / 10 ** vault.decimals() < initial_pps / 2
+    assert vault.pricePerShare() / 10 ** vault.decimals() < initial_pps / 2
     assert vault.totalAssets() == pytest.approx(initial_total_assets - loss, 1e-5)
 
 
@@ -424,7 +424,7 @@ def test_process_report__with_loss_and_refunds(
     strategy_params = vault.strategies(lossy_strategy.address)
     initial_debt = strategy_params.current_debt
 
-    pps_before_loss = vault.price_per_share()
+    pps_before_loss = vault.pricePerShare()
     assets_before_loss = vault.totalAssets()
     supply_before_loss = vault.totalSupply()
     tx = vault.process_report(lossy_strategy.address, sender=gov)
@@ -439,10 +439,10 @@ def test_process_report__with_loss_and_refunds(
     assert event[0].total_refunds == loss
 
     # Due to refunds, pps should be the same as before the loss
-    assert vault.price_per_share() == pps_before_loss
+    assert vault.pricePerShare() == pps_before_loss
     assert vault.totalAssets() < assets_before_loss
     assert vault.totalSupply() < supply_before_loss
-    assert vault.total_debt() == new_debt - loss
+    assert vault.totalDebt() == new_debt - loss
 
 
 def test_process_report__with_loss_management_fees_and_refunds(
@@ -483,7 +483,7 @@ def test_process_report__with_loss_management_fees_and_refunds(
 
     strategy_params = vault.strategies(lossy_strategy.address)
     initial_debt = strategy_params.current_debt
-    pps_before_loss = vault.price_per_share()
+    pps_before_loss = vault.pricePerShare()
     assets_before_loss = vault.totalAssets()
 
     # let one day pass
@@ -515,7 +515,7 @@ def test_process_report__with_loss_management_fees_and_refunds(
     assert event[0].total_refunds == loss
 
     # Due to fees, pps should be slightly below 1
-    assert vault.price_per_share() < pps_before_loss
+    assert vault.pricePerShare() < pps_before_loss
     # Shares were minted at 1:1
     assert vault.convertToAssets(vault.balanceOf(accountant)) == pytest.approx(
         expected_management_fees, 1e-4

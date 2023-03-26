@@ -50,8 +50,8 @@ def test_multiple_strategy_withdraw_flow(
     current_idle = vault_balance // 4
     current_debt = vault_balance * 3 // 4
 
-    assert vault.total_idle() == current_idle
-    assert vault.total_debt() == current_debt
+    assert vault.totalIdle() == current_idle
+    assert vault.totalDebt() == current_debt
     assert asset.balanceOf(vault) == current_idle
     assert asset.balanceOf(liquid_strategy) == liquid_strategy_debt
     assert asset.balanceOf(locked_strategy) == locked_strategy_debt
@@ -68,8 +68,8 @@ def test_multiple_strategy_withdraw_flow(
     current_idle -= fish_amount // 2
 
     assert asset.balanceOf(fish) == fish_amount // 2
-    assert vault.total_idle() == current_idle
-    assert vault.total_debt() == current_debt
+    assert vault.totalIdle() == current_idle
+    assert vault.totalDebt() == current_debt
     assert asset.balanceOf(vault) == current_idle
     assert asset.balanceOf(liquid_strategy) == liquid_strategy_debt
     assert asset.balanceOf(locked_strategy) == locked_strategy_debt
@@ -78,8 +78,8 @@ def test_multiple_strategy_withdraw_flow(
     vault.withdraw(current_idle, whale.address, whale.address, [], sender=whale)
 
     assert asset.balanceOf(whale) == current_idle
-    assert vault.total_idle() == 0
-    assert vault.total_debt() == current_debt
+    assert vault.totalIdle() == 0
+    assert vault.totalDebt() == current_debt
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(liquid_strategy) == liquid_strategy_debt
     assert asset.balanceOf(locked_strategy) == locked_strategy_debt
@@ -97,8 +97,8 @@ def test_multiple_strategy_withdraw_flow(
     locked_strategy_debt -= fish_amount // 2
 
     assert asset.balanceOf(bunny) == fish_amount // 2
-    assert vault.total_idle() == 0
-    assert vault.total_debt() == current_debt
+    assert vault.totalIdle() == 0
+    assert vault.totalDebt() == current_debt
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(liquid_strategy) == liquid_strategy_debt
     assert asset.balanceOf(locked_strategy) == locked_strategy_debt
@@ -124,8 +124,8 @@ def test_multiple_strategy_withdraw_flow(
     )
 
     assert asset.balanceOf(whale) == (whale_amount - amount_to_lock)
-    assert vault.total_idle() == 0
-    assert vault.total_debt() == amount_to_lock
+    assert vault.totalIdle() == 0
+    assert vault.totalDebt() == amount_to_lock
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(liquid_strategy) == 0
     assert asset.balanceOf(locked_strategy) == amount_to_lock

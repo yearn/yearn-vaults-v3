@@ -38,7 +38,7 @@ def test_deposit__with_deposit_limit_within_deposit_limit__deposit_balance(
     assert event[0].shares == shares
     assert event[0].assets == amount
 
-    assert vault.total_idle() == amount
+    assert vault.totalIdle() == amount
     assert vault.balanceOf(fish) == amount
     assert vault.totalSupply() == amount
     assert asset.balanceOf(fish) == 0
@@ -73,7 +73,7 @@ def test_deposit_all__with_deposit_limit_within_deposit_limit__deposits(
     assert event[0].shares == shares
     assert event[0].assets == amount
 
-    assert vault.total_idle() == balance
+    assert vault.totalIdle() == balance
     assert vault.balanceOf(fish) == balance
     assert vault.totalSupply() == balance
     assert asset.balanceOf(fish) == 0
@@ -156,7 +156,7 @@ def test_mint__with_deposit_limit_within_deposit_limit__deposit_balance(
     assert event[0].shares == shares
     assert event[0].assets == amount
 
-    assert vault.total_idle() == amount
+    assert vault.totalIdle() == amount
     assert vault.balanceOf(fish) == amount
     assert vault.totalSupply() == amount
     assert asset.balanceOf(fish) == 0
@@ -538,4 +538,4 @@ def test__mint_shares_with_zero_total_supply_positive_assets(
 
     # shares should be minted at 1:1
     assert vault.balanceOf(fish) == amount
-    assert vault.price_per_share() > (10 ** vault.decimals())
+    assert vault.pricePerShare() > (10 ** vault.decimals())

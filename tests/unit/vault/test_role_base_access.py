@@ -285,6 +285,6 @@ def test_set_profit_unlcok__profit_unlcok_manager(gov, vault, bunny):
     vault.set_role(bunny.address, ROLES.PROFIT_UNLOCK_MANAGER, sender=gov)
 
     time = WEEK // 2
-    assert vault.profit_max_unlock_time() != time
+    assert vault.profitMaxUnlockTime() != time
     vault.set_profit_max_unlock_time(time, sender=bunny)
-    assert vault.profit_max_unlock_time() == time
+    assert vault.profitMaxUnlockTime() == time
