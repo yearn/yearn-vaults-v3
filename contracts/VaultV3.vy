@@ -133,7 +133,7 @@ enum Roles:
     DEPOSIT_LIMIT_MANAGER # sets deposit limit for the vault
     MINIMUM_IDLE_MANAGER # sets the minimun total idle the vault should keep
     PROFIT_UNLOCK_MANAGER # sets the profit_max_unlock_time
-    SWEEPER # can sweep tokens from the vault
+    DEBT_PURCHSER # can sweep tokens from the vault
     EMERGENCY_MANAGER # can shutdown vault in an emergency
 
 enum StrategyChangeType:
@@ -1125,24 +1125,49 @@ def process_report(strategy: address) -> (uint256, uint256):
     return self._process_report(strategy)
 
 @external
-def sweep(token: address) -> (uint256):
+def buy_debt(strategy: address, amount: uint256):
     """
-    @notice Sweep the token from airdop or sent by mistake.
-    @param token The token to sweep.
-    @return The amount of dust swept.
+    @notice Used for governance to buy bad debt from the vault.
+    @dev This should only ever be used in an emergency in place
+    of force revoking a strategy in order to not report a loss.
+    It allows the DEBT_PURCHSER role to buy the strategies debt
+    for an equal amount os `asset`. If the full amount of debt
+    is purchased revoke_strategy will be automatically called 
+    to remove the strategy.
+    @param strategy The strategy to buy the debt for
+    @param amount The amount of debt to buy from the vault.
     """
-    self._enforce_role(msg.sender, Roles.SWEEPER)
-    assert token != self, "can't sweep self"
-    assert self.strategies[token].activation == 0, "can't sweep strategy"
-    amount: uint256 = 0
-    if token == ASSET.address:
-        amount = ASSET.balanceOf(self) - self.total_idle
-    else:
-        amount = ERC20(token).balanceOf(self)
-    assert amount != 0, "no dust"
-    self.erc20_safe_transfer(token, msg.sender, amount)
-    log Sweep(token, amount)
-    return amount
+    self._enforce_role(msg.sender, Roles.DEBT_PURCHSER)
+    assert self.strategies[strategy].activation != 0, "not active"
+
+    current_debt: uint256 = self.strategies[strategy].current_debt
+
+    assert current_debt > 0, "nothing to buy"
+    assert amount > 0, "nothing to buy with"
+
+    before_balance: uint256 = ASSET.balanceOf(self)
+    self.erc20_safe_transfer_from(ASSET.address, msg.sender, self, amount)
+    after_balance: uint256 = ASSET.balanceOf(self)
+
+    assert after_balance - before_balance >= amount
+
+    shares: uint256 = IStrategy(strategy).convertToShares(amount)
+    assert shares >= IStrategy(strategy).balanceOf(self), "not enough shares"
+
+    bought: uint256 = min(current_debt, amount)
+
+    # Lower strategy debt
+    self.strategies[strategy].current_debt -= bought
+    # lower total debt
+    self.total_debt -= bought
+    # Increase total idle
+    self.total_idle += bought
+
+    if bought == current_debt:
+        self._revoke_strategy(strategy)
+
+    # Transfer the strategies shares out.
+    self.erc20_safe_transfer(strategy, msg.sender, shares)
 
 ## STRATEGY MANAGEMENT ##
 @external
