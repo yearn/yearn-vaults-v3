@@ -617,7 +617,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
                 # the unrealized loss the user should take.
                 if max_withdraw < assets_to_withdraw - unrealised_losses_share:
                     # How much would we want to withdraw
-                    needed: uint256 = assets_to_withdraw - unrealised_losses_share\
+                    needed: uint256 = assets_to_withdraw - unrealised_losses_share
                     # Get the proportion of unrealised comparing what we want vs. what we can get
                     unrealised_losses_share = unrealised_losses_share * max_withdraw / needed
                     # Adjust assets_to_withdraw so all future calcultations work correctly
