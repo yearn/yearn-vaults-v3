@@ -511,23 +511,19 @@ def _max_withdraw(owner: address) -> uint256:
         return min(self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN), self.total_idle)
 
 @internal
-def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256:
+def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
     assert self.shutdown == False # dev: shutdown
-    assert _recipient not in [self, empty(address)], "invalid recipient"
-    assets: uint256 = _assets
-    # If the amount is max_value(uint256) we assume the user wants to deposit their whole balance
-    if assets == max_value(uint256):
-        assets = ASSET.balanceOf(_sender)
+    assert recipient not in [self, empty(address)], "invalid recipient"
 
     assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
  
     self.erc20_safe_transfer_from(ASSET.address, msg.sender, self, assets)
     self.total_idle += assets
    
-    shares: uint256 = self._issue_shares_for_amount(assets, _recipient)
+    shares: uint256 = self._issue_shares_for_amount(assets, recipient)
     assert shares > 0, "cannot mint zero"
 
-    log Deposit(_sender, _recipient, assets, shares)
+    log Deposit(sender, recipient, assets, shares)
 
     return shares
 
@@ -556,17 +552,14 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
 
 @internal
 def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: uint256, strategies: DynArray[address, 10]) -> uint256:
-    if sender != owner:
-        self._spend_allowance(owner, sender, shares_to_burn)
-
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
 
-    if shares == max_value(uint256):
-        shares = shares_balance
-
-    assert shares_balance >= shares, "insufficient shares to redeem"
     assert shares > 0, "no shares to redeem"
+    assert shares_balance >= shares, "insufficient shares to redeem"
+    
+    if sender != owner:
+        self._spend_allowance(owner, sender, shares_to_burn)
 
     requested_assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_DOWN)
 
@@ -655,9 +648,6 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
             if(previous_balance + assets_to_withdraw > post_balance):
                 loss = previous_balance + assets_to_withdraw - post_balance
 
-            # NOTE: we update the previous_balance variable here to save gas in next iteration
-            previous_balance = post_balance
- 
             # NOTE: strategy's debt decreases by the full amount but the total idle increases 
             # by the actual amount only (as the difference is considered lost)
             curr_total_idle += (assets_to_withdraw - loss)
@@ -676,6 +666,9 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
             # break if we have enough total idle to serve initial request 
             if requested_assets <= curr_total_idle:
                 break
+
+            # NOTE: we update the previous_balance variable here to save gas in next iteration
+            previous_balance = post_balance
 
             assets_needed -= assets_to_withdraw
 
@@ -1262,7 +1255,7 @@ def mint(shares: uint256, receiver: address) -> uint256:
     @notice Mint shares for the receiver.
     @param shares The amount of shares to mint.
     @param receiver The address to receive the shares.
-    @return The amount of shares minted.
+    @return The amount of assets deposited.
     """
     assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_UP)
     self._deposit(msg.sender, receiver, assets)
@@ -1271,6 +1264,14 @@ def mint(shares: uint256, receiver: address) -> uint256:
 @external
 @nonreentrant("lock")
 def withdraw(assets: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
+    """
+    @notice Withdraw an amount of asset to `receiver` burning `owner`s shares.
+    @param assets The amount of asset to withdraw.
+    @param receiver The address to receive the assets.
+    @param owner The address whos shares are being burnt.
+    @param strategies Optional array of strategies to withdraw from.
+    @return The amount of shares actually burnt.
+    """
     shares: uint256 = self._convert_to_shares(assets, Rounding.ROUND_UP)
     self._redeem(msg.sender, receiver, owner, shares, strategies)
     return shares
@@ -1278,6 +1279,14 @@ def withdraw(assets: uint256, receiver: address, owner: address, strategies: Dyn
 @external
 @nonreentrant("lock")
 def redeem(shares: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
+    """
+    @notice Redeems an amount of shares of `owners` shares sending funds to `receiver`.
+    @param shares The amount of shares to burn.
+    @param receiver The address to receive the assets.
+    @param owner The address whos shares are being burnt.
+    @param strategies Optional array of strategies to withdraw from.
+    @return The amount of assets actually withdrawn.
+    """
     assets: uint256 = self._redeem(msg.sender, receiver, owner, shares, strategies)
     return assets
 
@@ -1383,12 +1392,12 @@ def asset() -> address:
 
 @view
 @external
-def decimals() -> uint256:
+def decimals() -> uint8:
     """
     @notice Get the number of decimals of the asset/share.
     @return The number of decimals of the asset/share.
     """
-    return DECIMALS
+    return convert(DECIMALS, uint8)
 
 @view
 @external
