@@ -14,7 +14,12 @@ def test_add_strategy__no_add_strategy_manager__reverts(vault, create_strategy, 
 
 def test_add_strategy__add_strategy_manager(vault, create_strategy, gov, bunny):
     # We temporarily give bunny the role of STRATEGY_MANAGER
-    vault.set_role(bunny.address, ROLES.ADD_STRATEGY_MANAGER, sender=gov)
+    tx = vault.set_role(bunny.address, ROLES.ADD_STRATEGY_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.ADD_STRATEGY_MANAGER
 
     new_strategy = create_strategy(vault)
     tx = vault.add_strategy(new_strategy, sender=bunny)
@@ -31,7 +36,12 @@ def test_revoke_strategy__no_revoke_strategy_manager__reverts(vault, strategy, b
 
 def test_revoke_strategy__revoke_strategy_manager(vault, strategy, gov, bunny):
     # We temporarily give bunny the role of STRATEGY_MANAGER
-    vault.set_role(bunny.address, ROLES.REVOKE_STRATEGY_MANAGER, sender=gov)
+    tx = vault.set_role(bunny.address, ROLES.REVOKE_STRATEGY_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.REVOKE_STRATEGY_MANAGER
 
     tx = vault.revoke_strategy(strategy, sender=bunny)
     event = list(tx.decode_logs(vault.StrategyChanged))
@@ -52,7 +62,12 @@ def test_force_revoke_strategy__revoke_strategy_manager(
     vault, strategy, create_strategy, gov, bunny
 ):
     # We temporarily give bunny the role of STRATEGY_MANAGER
-    vault.set_role(bunny.address, ROLES.FORCE_REVOKE_MANAGER, sender=gov)
+    tx = vault.set_role(bunny.address, ROLES.FORCE_REVOKE_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.FORCE_REVOKE_MANAGER
 
     tx = vault.force_revoke_strategy(strategy, sender=bunny)
 
@@ -73,7 +88,12 @@ def test_set_minimum_total_idle__no_min_idle_manager__reverts(bunny, vault):
 
 def test_set_minimum_total_idle__min_idle_manager(gov, vault, bunny):
     # We temporarily give bunny the role of DEBT_MANAGER
-    vault.set_role(bunny.address, ROLES.MINIMUM_IDLE_MANAGER, sender=gov)
+    tx = vault.set_role(bunny.address, ROLES.MINIMUM_IDLE_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.MINIMUM_IDLE_MANAGER
 
     assert vault.minimum_total_idle() == 0
     minimum_total_idle = 1
@@ -92,7 +112,12 @@ def test_update_max_debt__no_max_debt_manager__reverts(vault, strategy, bunny):
 
 def test_update_max_debt__max_debt_manager(gov, vault, strategy, bunny):
     # We temporarily give bunny the role of DEBT_MANAGER
-    vault.set_role(bunny.address, ROLES.MAX_DEBT_MANAGER, sender=gov)
+    tx = vault.set_role(bunny.address, ROLES.MAX_DEBT_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.MAX_DEBT_MANAGER
 
     assert vault.strategies(strategy).max_debt == 0
     max_debt_for_strategy = 1
@@ -108,7 +133,12 @@ def test_set_deposit_limit__no_deposit_limit_manager__reverts(bunny, vault):
 
 def test_set_deposit_limit__deposit_limit_manager(gov, vault, bunny):
     # We temporarily give bunny the role of DEBT_MANAGER
-    vault.set_role(bunny.address, ROLES.DEPOSIT_LIMIT_MANAGER, sender=gov)
+    tx = vault.set_role(bunny.address, ROLES.DEPOSIT_LIMIT_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.DEPOSIT_LIMIT_MANAGER
 
     deposit_limit = 1
     assert vault.deposit_limit() != deposit_limit
@@ -133,7 +163,12 @@ def test_sweep__sweeper(
     mint_and_deposit_into_vault,
 ):
     # We temporarily give bunny the role of ACCOUNTING_MANAGER
-    vault.set_role(bunny.address, ROLES.SWEEPER, sender=gov)
+    tx = vault.set_role(bunny.address, ROLES.SWEEPER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.SWEEPER
 
     vault_balance = 10**22
     asset_airdrop = vault_balance // 10
@@ -161,7 +196,12 @@ def test_update_debt__debt_manager(
     gov, mint_and_deposit_into_vault, vault, strategy, bunny
 ):
     # We temporarily give bunny the role of DEBT_MANAGER
-    vault.set_role(bunny.address, ROLES.DEBT_MANAGER, sender=gov)
+    tx = vault.set_role(bunny.address, ROLES.DEBT_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.DEBT_MANAGER
 
     # Provide vault with funds
     mint_and_deposit_into_vault(vault, gov, 10**18, 10**18 // 2)
@@ -188,7 +228,12 @@ def test_shutdown_vault__no_emergency_manager__reverts(vault, bunny):
 
 def test_shutdown_vault__emergency_manager(gov, vault, bunny):
     # We temporarily give bunny the role of EMERGENCY_MANAGER
-    vault.set_role(bunny.address, ROLES.EMERGENCY_MANAGER, sender=gov)
+    tx = vault.set_role(bunny.address, ROLES.EMERGENCY_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.EMERGENCY_MANAGER
 
     assert vault.shutdown() == False
     tx = vault.shutdown_vault(sender=bunny)
@@ -220,7 +265,12 @@ def test_process_report__reporting_manager(
     mint_and_deposit_into_vault,
 ):
     # We temporarily give bunny the role of ACCOUNTING_MANAGER
-    vault.set_role(bunny.address, ROLES.REPORTING_MANAGER, sender=gov)
+    tx = vault.set_role(bunny.address, ROLES.REPORTING_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.REPORTING_MANAGER
 
     # Provide liquidity into vault
     mint_and_deposit_into_vault(vault, gov, 10**18, 10**18 // 2)
@@ -248,7 +298,12 @@ def test_set_accountant__no_accountant_manager__reverts(bunny, vault):
 
 def test_set_accountant__accountant_manager(gov, vault, bunny):
     # We temporarily give bunny the role of DEBT_MANAGER
-    vault.set_role(bunny.address, ROLES.ACCOUNTANT_MANAGER, sender=gov)
+    tx = vault.set_role(bunny.address, ROLES.ACCOUNTANT_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.ACCOUNTANT_MANAGER
 
     assert vault.accountant() != bunny
     vault.set_accountant(bunny, sender=bunny)
@@ -265,7 +320,12 @@ def test_set_queue_manager__no_queue_manager__reverts(bunny, vault):
 
 def test_set_queue_manager__queue_manager(gov, vault, bunny):
     # We temporarily give bunny the role of DEBT_MANAGER
-    vault.set_role(bunny.address, ROLES.QUEUE_MANAGER, sender=gov)
+    tx = vault.set_role(bunny.address, ROLES.QUEUE_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.QUEUE_MANAGER
 
     assert vault.queue_manager() != bunny
     vault.set_queue_manager(bunny, sender=bunny)
@@ -282,7 +342,12 @@ def test_set_profit_unlcok__no_profit_unlock_manager__reverts(bunny, vault):
 
 def test_set_profit_unlcok__profit_unlcok_manager(gov, vault, bunny):
     # We temporarily give bunny the role of profit unlock manager
-    vault.set_role(bunny.address, ROLES.PROFIT_UNLOCK_MANAGER, sender=gov)
+    tx = vault.set_role(bunny.address, ROLES.PROFIT_UNLOCK_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.PROFIT_UNLOCK_MANAGER
 
     time = WEEK // 2
     assert vault.profitMaxUnlockTime() != time

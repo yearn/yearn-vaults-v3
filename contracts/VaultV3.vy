@@ -73,6 +73,15 @@ event DebtUpdated:
     current_debt: uint256
     new_debt: uint256
 
+# ROLE UPDATES
+event RoleSet:
+    account: indexed(address)
+    role: indexed(Roles)
+
+event RoleStatusChanged:
+    role: indexed(Roles)
+    status: indexed(RoleStatusChange)
+
 # STORAGE MANAGEMENT EVENTS
 event UpdateRoleManager:
     role_manager: indexed(address)
@@ -143,6 +152,10 @@ enum StrategyChangeType:
 enum Rounding:
     ROUND_DOWN
     ROUND_UP
+
+enum RoleStatusChange:
+    OPENED
+    CLOSED
 
 # IMMUTABLE #
 ASSET: immutable(ERC20)
@@ -1063,6 +1076,7 @@ def set_role(account: address, role: Roles):
     """
     assert msg.sender == self.role_manager
     self.roles[account] = role
+    log RoleSet(account, role)
 
 @external
 def set_open_role(role: Roles):
@@ -1072,6 +1086,7 @@ def set_open_role(role: Roles):
     """
     assert msg.sender == self.role_manager
     self.open_roles[role] = True
+    log RoleStatusChanged(role, RoleStatusChange.OPENED)
 
 @external
 def close_open_role(role: Roles):
@@ -1081,6 +1096,7 @@ def close_open_role(role: Roles):
     """
     assert msg.sender == self.role_manager
     self.open_roles[role] = False
+    log RoleStatusChanged(role, RoleStatusChange.CLOSED)
     
 @external
 def transfer_role_manager(role_manager: address):
