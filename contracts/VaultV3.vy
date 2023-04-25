@@ -536,10 +536,11 @@ def _deposit(_sender: address, _recipient: address, _assets: uint256) -> uint256
 def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256) -> uint256:
     """
     Returns the share of losses that a user would take if withdrawing from this strategy
-    e.g. if the strategy has unrealised losses for 10% of its current debt and the user wants to withdraw 1000 tokens, the losses that he will take are 100 token
+    e.g. if the strategy has unrealised losses for 10% of its current debt and the user 
+    wants to withdraw 1000 tokens, the losses that he will take are 100 token
     """
     strategy_current_debt: uint256 = self.strategies[strategy].current_debt
-    assets_to_withdraw: uint256 = min(assets_needed, strategy_current_debt)
+    #assets_to_withdraw: uint256 = min(assets_needed, strategy_current_debt)
     vault_shares: uint256 = IStrategy(strategy).balanceOf(self)
     strategy_assets: uint256 = IStrategy(strategy).convertToAssets(vault_shares)
     
@@ -550,7 +551,7 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
     # user will withdraw assets_to_withdraw divided by loss ratio (strategy_assets / strategy_current_debt - 1)
     # but will only receive assets_to_withdraw
     # NOTE: if there are unrealised losses, the user will take his share
-    losses_user_share: uint256 = assets_to_withdraw - assets_to_withdraw * strategy_assets / strategy_current_debt
+    losses_user_share: uint256 = assets_needed - assets_needed * strategy_assets / strategy_current_debt
     return losses_user_share
 
 @internal
@@ -593,9 +594,17 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
         previous_balance: uint256 = ASSET.balanceOf(self)
         for strategy in _strategies:
             assert self.strategies[strategy].activation != 0, "inactive strategy"
-          
-            # Starts with all the assets needed
-            assets_to_withdraw = assets_needed
+
+            current_debt: uint256 = self.strategies[strategy].current_debt
+
+            # After losses are taken, vault asks what is the max amount to withdraw
+            assets_to_withdraw = min(assets_needed, current_debt)
+
+            # continue to next strategy if nothing to withdraw
+            if assets_to_withdraw == 0:
+                continue
+
+            max_withdraw: uint256 = IStrategy(strategy).maxWithdraw(self)
 
             # CHECK FOR UNREALISED LOSSES
             # If unrealised losses > 0, then the user will take the proportional share and realise it (required to avoid users withdrawing from lossy strategies) 
@@ -604,20 +613,35 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
             #  (i.e. if for withdrawing 10% of the strategy it needs to unwind the whole position, generated losses might be bigger)
             unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_to_withdraw)
             if unrealised_losses_share > 0:
+                # If max withdraw is limiting the amount to pull, we need to adjust the portion of 
+                # the unrealized loss the user should take.
+                if max_withdraw < assets_to_withdraw - unrealised_losses_share:
+                    needed: uint256 = assets_to_withdraw - unrealised_losses_share
+                    unrealised_losses_share = unrealised_losses_share * max_withdraw / needed
+                    assets_to_withdraw = max_withdraw + unrealised_losses_share
+                
                 # User now "needs" less assets to be unlocked (as he took some as losses)
                 assets_to_withdraw -= unrealised_losses_share
                 requested_assets -= unrealised_losses_share
-                # NOTE: done here instead of waiting for regular update of these values because it's a rare case (so we can save minor amounts of gas)
+                # NOTE: done here instead of waiting for regular update of these values 
+                # because it's a rare case (so we can save minor amounts of gas)
                 assets_needed -= unrealised_losses_share
                 curr_total_debt -= unrealised_losses_share
-            
-            # After losses are taken, vault asks what is the max amount to withdraw
-            assets_to_withdraw = min(assets_to_withdraw, min(self.strategies[strategy].current_debt, IStrategy(strategy).maxWithdraw(self)))
 
-            # continue to next strategy if nothing to withdraw
+                # If max withdraw is 0 we need to realize the loss before continuing to the next strategy
+                if max_withdraw == 0:
+                    new_debt: uint256 = current_debt - unrealised_losses_share
+        
+                    # Update strategies storage
+                    self.strategies[strategy].current_debt = new_debt
+                    # Log the debt update
+                    log DebtUpdated(strategy, current_debt, new_debt)
+    
+            assets_to_withdraw = min(assets_to_withdraw, max_withdraw)
+
             if assets_to_withdraw == 0:
                 continue
-
+            
             # WITHDRAW FROM STRATEGY
             IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
             post_balance: uint256 = ASSET.balanceOf(self)
@@ -635,8 +659,8 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
             curr_total_idle += (assets_to_withdraw - loss)
             requested_assets -= loss
             curr_total_debt -= assets_to_withdraw
+
             # Vault will reduce debt because the unrealised loss has been taken by user
-            current_debt: uint256 = self.strategies[strategy].current_debt
             new_debt: uint256 = current_debt - (assets_to_withdraw + unrealised_losses_share)
         
             # Update strategies storage
