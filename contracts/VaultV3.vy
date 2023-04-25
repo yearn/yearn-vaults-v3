@@ -242,7 +242,12 @@ def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: a
 
     FACTORY = msg.sender
 
+    # Must be > 0 so we can unlock shares
+    assert profit_max_unlock_time > 0 # dev: profit unlock time too low
+    # Must be less than one year for report cycles
+    assert profit_max_unlock_time <= 31_556_952 # dev: profit unlock time too long
     self.profit_max_unlock_time = profit_max_unlock_time
+
     self.name = name
     self.symbol = symbol
     self.last_report = block.timestamp
@@ -393,13 +398,18 @@ def _convert_to_shares(assets: uint256, rounding: Rounding) -> uint256:
     """
     shares = amount * (total_supply / total_assets) --- (== amount / price_per_share)
     """
+    total_supply: uint256 = self._total_supply()
     total_assets: uint256 = self._total_assets()
 
-    # if total_assets is 0, price_per_share is 1
     if total_assets == 0:
-       return assets
+        # if total_assets and total_supply is 0, price_per_share is 1
+        if total_supply == 0:
+            return assets
+        else:
+            # Else if total_supply > 0 price_per_share is 0
+            return 0
 
-    numerator: uint256 = assets * self._total_supply()
+    numerator: uint256 = assets * total_supply
     shares: uint256 = numerator / total_assets
     if rounding == Rounding.ROUND_UP and numerator % total_assets != 0:
         shares += 1
@@ -468,7 +478,8 @@ def _issue_shares(shares: uint256, recipient: address):
 def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
     """
     Issues shares that are worth 'amount' in the underlying token (asset)
-    WARNING: this takes into account that any new assets have been summed to total_assets (otherwise pps will go down)
+    WARNING: this takes into account that any new assets have been summed 
+    to total_assets (otherwise pps will go down)
     """
     total_supply: uint256 = self._total_supply()
     total_assets: uint256 = self._total_assets()
@@ -479,7 +490,9 @@ def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
     elif total_assets > amount:
         new_shares = amount * self._total_supply() / (total_assets - amount)
     else:
-        # after first deposit, getting here would mean that the rest of the shares would be diluted to ~0
+        # If total_supply > 0 but amount = totalAssets we want to revert because
+        # after first deposit, getting here would mean that the rest of the shares
+        # would be diluted to a price_per_share of 0.
         assert total_assets > amount, "amount too high"
   
     # We don't make the function revert
@@ -549,7 +562,6 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
     wants to withdraw 1000 tokens, the losses that he will take are 100 token
     """
     strategy_current_debt: uint256 = self.strategies[strategy].current_debt
-    #assets_to_withdraw: uint256 = min(assets_needed, strategy_current_debt)
     vault_shares: uint256 = IStrategy(strategy).balanceOf(self)
     strategy_assets: uint256 = IStrategy(strategy).convertToAssets(vault_shares)
     
@@ -614,7 +626,6 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
 
             # CHECK FOR UNREALISED LOSSES
             # If unrealised losses > 0, then the user will take the proportional share and realise it (required to avoid users withdrawing from lossy strategies) 
-            # NOTE: assets_to_withdraw will be capped to strategy's current_debt within the function
             # NOTE: strategies need to manage the fact that realising part of the loss can mean the realisation of 100% of the loss !! 
             #  (i.e. if for withdrawing 10% of the strategy it needs to unwind the whole position, generated losses might be bigger)
             unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_to_withdraw)
@@ -623,9 +634,9 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
                 # the unrealized loss the user should take.
                 if max_withdraw < assets_to_withdraw - unrealised_losses_share:
                     # How much would we want to withdraw
-                    needed: uint256 = assets_to_withdraw - unrealised_losses_share
+                    wanted: uint256 = assets_to_withdraw - unrealised_losses_share
                     # Get the proportion of unrealised comparing what we want vs. what we can get
-                    unrealised_losses_share = unrealised_losses_share * max_withdraw / needed
+                    unrealised_losses_share = unrealised_losses_share * max_withdraw / wanted
                     # Adjust assets_to_withdraw so all future calcultations work correctly
                     assets_to_withdraw = max_withdraw + unrealised_losses_share
                 
@@ -976,7 +987,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Update unlocking rate and time to fully unlocked
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
     _profit_max_unlock_time: uint256 = self.profit_max_unlock_time
-    if total_locked_shares > 0 and _profit_max_unlock_time > 0:
+    if total_locked_shares > 0:
 
         # Calculate how long until the full amount of shares is unlocked
         remaining_time: uint256 = 0
@@ -1054,11 +1065,19 @@ def set_minimum_total_idle(minimum_total_idle: uint256):
 def set_profit_max_unlock_time(new_profit_max_unlock_time: uint256):
     """
     @notice Set the new profit max unlock time.
+    @dev The time is denominated in seconds and must be more than 0
+        and less than 1 year. We don't need to update locking period
+        since the current period will use the old rate and on the next
+        report it will be reset with the new unlocking time.
     @param new_profit_max_unlock_time The new profit max unlock time.
     """
-    # no need to update locking period as the current period will use the old rate
-    # and on the next report it will be reset with the new unlocking time
     self._enforce_role(msg.sender, Roles.PROFIT_UNLOCK_MANAGER)
+    
+    # Must be > 0 so we can unlock shares
+    assert new_profit_max_unlock_time > 0, "profit unlock time too low"
+    # Must be less than one year for report cycles
+    assert new_profit_max_unlock_time <= 31_556_952, "profit unlock time too long"
+
     self.profit_max_unlock_time = new_profit_max_unlock_time
     log UpdateProfitMaxUnlockTime(new_profit_max_unlock_time)
 
@@ -1249,7 +1268,7 @@ def shutdown_vault():
     
     # Shutdown the vault.
     self.shutdown = True
-    
+
     # Set deposit limit to 0.
     self.deposit_limit = 0
     log UpdateDepositLimit(0)

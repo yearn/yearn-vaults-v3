@@ -335,12 +335,12 @@ def test_set_queue_manager__queue_manager(gov, vault, bunny):
 # PROFIT UNLOCK MANAGER
 
 
-def test_set_profit_unlcok__no_profit_unlock_manager__reverts(bunny, vault):
+def test_set_profit_unlock__no_profit_unlock_manager__reverts(bunny, vault):
     with ape.reverts("not allowed"):
         vault.set_profit_max_unlock_time(WEEK // 2, sender=bunny)
 
 
-def test_set_profit_unlcok__profit_unlcok_manager(gov, vault, bunny):
+def test_set_profit_unlock__profit_unlock_manager(gov, vault, bunny):
     # We temporarily give bunny the role of profit unlock manager
     tx = vault.set_role(bunny.address, ROLES.PROFIT_UNLOCK_MANAGER, sender=gov)
 
@@ -353,3 +353,39 @@ def test_set_profit_unlcok__profit_unlcok_manager(gov, vault, bunny):
     assert vault.profitMaxUnlockTime() != time
     vault.set_profit_max_unlock_time(time, sender=bunny)
     assert vault.profitMaxUnlockTime() == time
+
+
+def test_set_profit_unlock__to_zero__reverts(gov, vault, bunny):
+    # We temporarily give bunny the role of profit unlock manager
+    tx = vault.set_role(bunny.address, ROLES.PROFIT_UNLOCK_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.PROFIT_UNLOCK_MANAGER
+
+    time = 0
+    current_time = vault.profitMaxUnlockTime()
+
+    with ape.reverts("profit unlock time too low"):
+        vault.set_profit_max_unlock_time(time, sender=bunny)
+
+    assert vault.profitMaxUnlockTime() == current_time
+
+
+def test_set_profit_unlock__to_high__reverts(gov, vault, bunny):
+    # We temporarily give bunny the role of profit unlock manager
+    tx = vault.set_role(bunny.address, ROLES.PROFIT_UNLOCK_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.PROFIT_UNLOCK_MANAGER
+
+    time = int(1e20)
+    current_time = vault.profitMaxUnlockTime()
+
+    with ape.reverts("profit unlock time too long"):
+        vault.set_profit_max_unlock_time(time, sender=bunny)
+
+    assert vault.profitMaxUnlockTime() == current_time
