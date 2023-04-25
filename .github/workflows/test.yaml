@@ -27,7 +27,7 @@ jobs:
         ape-plugins-list: 'solidity==0.6.0 vyper==0.6.1 hardhat==0.6.0'
 
     - name: install vyper
-      run: pip install git+https://github.com/vyperlang/vyper==0.3.7
+      run: pip install vyper==0.3.7
     - name: Compile contracts
       # TODO: Force recompiles until ape compile caching is fixed
       run: ape compile --force --size
