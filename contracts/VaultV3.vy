@@ -1045,8 +1045,10 @@ def set_queue_manager(new_queue_manager: address):
 def set_deposit_limit(deposit_limit: uint256):
     """
     @notice Set the new deposit limit.
+    @dev can not be changed if shutdown.
     @param deposit_limit The new deposit limit.
     """
+    assert self.shutdown == False # Dev: shutdown
     self._enforce_role(msg.sender, Roles.DEPOSIT_LIMIT_MANAGER)
     self.deposit_limit = deposit_limit
     log UpdateDepositLimit(deposit_limit)
@@ -1181,6 +1183,7 @@ def process_report(strategy: address) -> (uint256, uint256):
     return self._process_report(strategy)
 
 @external
+@nonreentrant("lock")
 def sweep(token: address) -> (uint256):
     """
     @notice Sweep the token from airdop or sent by mistake.
