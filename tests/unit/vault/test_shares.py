@@ -55,30 +55,6 @@ def test_deposit__with_deposit_limit_exceed_deposit_limit__reverts(
         vault.deposit(amount, fish.address, sender=fish)
 
 
-def test_deposit_all__with_deposit_limit_within_deposit_limit__deposits(
-    fish, asset, create_vault
-):
-    balance = asset.balanceOf(fish)
-    amount = balance
-    shares = balance
-    vault = create_vault(asset)
-
-    asset.approve(vault.address, balance, sender=fish)
-    tx = vault.deposit(MAX_INT, fish.address, sender=fish)
-    event = list(tx.decode_logs(vault.Deposit))
-
-    assert len(event) == 1
-    assert event[0].sender == fish
-    assert event[0].owner == fish
-    assert event[0].shares == shares
-    assert event[0].assets == amount
-
-    assert vault.totalIdle() == balance
-    assert vault.balanceOf(fish) == balance
-    assert vault.totalSupply() == balance
-    assert asset.balanceOf(fish) == 0
-
-
 def test_deposit_all__with_deposit_limit_exceed_deposit_limit__deposit_deposit_limit(
     fish, fish_amount, asset, create_vault
 ):
@@ -454,31 +430,6 @@ def test_redeem__with_delegation_and_insufficient_allowance__reverts(
     # withdraw as bunny to fish
     with ape.reverts("insufficient allowance"):
         vault.redeem(amount, fish.address, fish.address, sender=bunny)
-
-
-def test_redeem__with_maximum_redemption__redeem_all(
-    fish, asset, create_vault, user_deposit
-):
-    vault = create_vault(asset)
-    balance = asset.balanceOf(fish)
-    amount = balance
-    shares = amount
-
-    user_deposit(fish, vault, asset, amount)
-
-    tx = vault.redeem(MAX_INT, fish.address, fish.address, sender=fish)
-    event = list(tx.decode_logs(vault.Withdraw))
-
-    assert len(event) == 1
-    assert event[0].sender == fish
-    assert event[0].receiver == fish
-    assert event[0].owner == fish
-    assert event[0].shares == shares
-    assert event[0].assets == amount
-
-    checks.check_vault_empty(vault)
-    assert asset.balanceOf(vault) == 0
-    assert asset.balanceOf(fish) == balance
 
 
 @pytest.mark.parametrize("deposit_limit", [0, 10**18, MAX_INT])

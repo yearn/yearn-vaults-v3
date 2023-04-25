@@ -99,7 +99,8 @@ def test_lossy_strategy_flow(
 
     # user_1 withdraws all his shares in `vault.totalIdle`. Due to the lossy strategy, his shares have less value
     # and therefore he ends up with less assets than before
-    vault.redeem(MAX_INT, user_1, user_1, sender=user_1)
+    shares = vault.balanceOf(user_1)
+    vault.redeem(shares, user_1, user_1, sender=user_1)
 
     assert vault.balanceOf(user_1) == 0
 

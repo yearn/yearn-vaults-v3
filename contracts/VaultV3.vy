@@ -1246,7 +1246,14 @@ def shutdown_vault():
     """
     self._enforce_role(msg.sender, Roles.EMERGENCY_MANAGER)
     assert self.shutdown == False
+    
+    # Shutdown the vault.
     self.shutdown = True
+    
+    # Set deposit limit to 0.
+    self.deposit_limit = 0
+    log UpdateDepositLimit(0)
+
     self.roles[msg.sender] = self.roles[msg.sender] | Roles.DEBT_MANAGER
     log Shutdown()
 

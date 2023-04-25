@@ -33,6 +33,8 @@ def test_shutdown_cant_deposit_can_withdraw(
 ):
     mint_and_deposit_into_vault(vault, gov)
     vault.shutdown_vault(sender=gov)
+
+    assert vault.availableDepositLimit() == 0
     vault_balance_before = asset.balanceOf(vault)
 
     with ape.reverts():
@@ -57,6 +59,8 @@ def test_strategy_return_funds(
     assert asset.balanceOf(strategy) == vault_balance
     assert asset.balanceOf(vault) == 0
     vault.shutdown_vault(sender=gov)
+    assert vault.availableDepositLimit() == 0
+
     vault.update_debt(strategy.address, 0, sender=gov)
     assert asset.balanceOf(strategy) == 0
     assert asset.balanceOf(vault) == vault_balance
