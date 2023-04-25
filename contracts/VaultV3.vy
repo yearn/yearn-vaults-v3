@@ -616,8 +616,11 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
                 # If max withdraw is limiting the amount to pull, we need to adjust the portion of 
                 # the unrealized loss the user should take.
                 if max_withdraw < assets_to_withdraw - unrealised_losses_share:
-                    needed: uint256 = assets_to_withdraw - unrealised_losses_share
+                    # How much would we want to withdraw
+                    needed: uint256 = assets_to_withdraw - unrealised_losses_share\
+                    # Get the proportion of unrealised comparing what we want vs. what we can get
                     unrealised_losses_share = unrealised_losses_share * max_withdraw / needed
+                    # Adjust assets_to_withdraw so all future calcultations work correctly
                     assets_to_withdraw = max_withdraw + unrealised_losses_share
                 
                 # User now "needs" less assets to be unlocked (as he took some as losses)
@@ -628,8 +631,9 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
                 assets_needed -= unrealised_losses_share
                 curr_total_debt -= unrealised_losses_share
 
-                # If max withdraw is 0 we need to realize the loss before continuing to the next strategy
-                if max_withdraw == 0:
+                # If max withdraw is 0 and unrealised loss is > 0 then the strategy likely realized
+                # a 100% loss and we will need to realize that loss before moving on.
+                if max_withdraw == 0 and unrealised_losses_share > 0:
                     new_debt: uint256 = current_debt - unrealised_losses_share
         
                     # Update strategies storage
