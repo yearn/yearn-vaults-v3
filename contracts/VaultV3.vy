@@ -618,10 +618,6 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
             # What is the max amount to withdraw from this strategy.
             assets_to_withdraw = min(assets_needed, current_debt)
 
-            # Continue to next strategy if nothing to withdraw
-            if assets_to_withdraw == 0:
-                continue
-
             # Cache max_withdraw for use if unrealized loss > 0
             max_withdraw: uint256 = IStrategy(strategy).maxWithdraw(self)
 
@@ -649,7 +645,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
                 assets_needed -= unrealised_losses_share
                 curr_total_debt -= unrealised_losses_share
 
-                # If max withdraw is 0 and unrealised loss is > 0 then the strategy likely realized
+                # If max withdraw is 0 and unrealised loss is still > 0 then the strategy likely realized
                 # a 100% loss and we will need to realize that loss before moving on.
                 if max_withdraw == 0 and unrealised_losses_share > 0:
                     new_debt: uint256 = current_debt - unrealised_losses_share
