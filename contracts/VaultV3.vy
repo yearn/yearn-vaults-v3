@@ -615,17 +615,18 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
 
             current_debt: uint256 = self.strategies[strategy].current_debt
 
-            # After losses are taken, vault asks what is the max amount to withdraw
+            # What is the max amount to withdraw from this strategy.
             assets_to_withdraw = min(assets_needed, current_debt)
 
-            # continue to next strategy if nothing to withdraw
+            # Continue to next strategy if nothing to withdraw
             if assets_to_withdraw == 0:
                 continue
 
+            # Cache max_withdraw for use if unrealized loss > 0
             max_withdraw: uint256 = IStrategy(strategy).maxWithdraw(self)
 
             # CHECK FOR UNREALISED LOSSES
-            # If unrealised losses > 0, then the user will take the proportional share and realise it (required to avoid users withdrawing from lossy strategies) 
+            # If unrealised losses > 0, then the user will take the proportional share and realize it (required to avoid users withdrawing from lossy strategies) 
             # NOTE: strategies need to manage the fact that realising part of the loss can mean the realisation of 100% of the loss !! 
             #  (i.e. if for withdrawing 10% of the strategy it needs to unwind the whole position, generated losses might be bigger)
             unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_to_withdraw)
@@ -657,9 +658,11 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
                     self.strategies[strategy].current_debt = new_debt
                     # Log the debt update
                     log DebtUpdated(strategy, current_debt, new_debt)
-    
+
+            # Adjust based on the max withdraw of the strategy
             assets_to_withdraw = min(assets_to_withdraw, max_withdraw)
 
+            # Can't withdraw 0.
             if assets_to_withdraw == 0:
                 continue
             
@@ -694,6 +697,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
             # NOTE: we update the previous_balance variable here to save gas in next iteration
             previous_balance = post_balance
 
+            # Reduce what we still need.
             assets_needed -= assets_to_withdraw
 
         # if we exhaust the queue and still have insufficient total idle, revert
@@ -712,7 +716,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
 ## STRATEGY MANAGEMENT ##
 @internal
 def _add_strategy(new_strategy: address):
-    assert new_strategy != empty(address), "strategy cannot be zero address"
+    assert new_strategy not in [self, empty(address)], "strategy cannot be zero address"
     assert IStrategy(new_strategy).asset() == ASSET.address, "invalid asset"
     assert self.strategies[new_strategy].activation == 0, "strategy already active"
 
@@ -820,14 +824,16 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
     else:
         # Revert if target_debt cannot be achieved due to configured max_debt for given strategy
         assert new_debt <= self.strategies[strategy].max_debt, "target debt higher than max debt"
+
         # Vault is increasing debt with the strategy by sending more funds
         max_deposit: uint256 = IStrategy(strategy).maxDeposit(self)
+        assert max_deposit != 0, "nothing to deposit"
 
         assets_to_deposit: uint256 = new_debt - current_debt
         if assets_to_deposit > max_deposit:
             assets_to_deposit = max_deposit
+        
         # take into consideration minimum_total_idle
-        # HACK: to save gas
         minimum_total_idle: uint256 = self.minimum_total_idle
         total_idle: uint256 = self.total_idle
 
@@ -845,7 +851,8 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
             post_balance: uint256 = ASSET.balanceOf(self)
             self.erc20_safe_approve(ASSET.address, strategy, 0)
 
-            # making sure we are changing according to the real result no matter what. This will spend more gas but makes it more robust
+            # making sure we are changing according to the real result no matter what. 
+            # This will spend more gas but makes it more robust
             assets_to_deposit = pre_balance - post_balance
 
             self.total_idle -= assets_to_deposit
@@ -1595,6 +1602,8 @@ def assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256)
     @param assets_needed The amount of assets needed to be withdrawn.
     @return The share of unrealised losses that the strategy has.
     """
+    assert self.strategies[strategy].current_debt >= assets_needed
+
     return self._assess_share_of_unrealised_losses(strategy, assets_needed)
 
 ## Profit locking getter functions ##
