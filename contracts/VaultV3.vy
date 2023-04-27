@@ -20,7 +20,6 @@ interface IAccountant:
 
 interface IQueueManager:
     def withdraw_queue(vault: address) -> (DynArray[address, 10]): nonpayable
-    def should_override(vault: address) -> (bool): nonpayable
     def new_strategy(strategy: address): nonpayable
     def remove_strategy(strategy: address): nonpayable
 
@@ -599,7 +598,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
 
         queue_manager: address = self.queue_manager
         if queue_manager != empty(address):
-            if len(_strategies) == 0 or IQueueManager(queue_manager).should_override(self):
+            if len(_strategies) == 0:
                 _strategies = IQueueManager(queue_manager).withdraw_queue(self)
 
         # load to memory to save gas
