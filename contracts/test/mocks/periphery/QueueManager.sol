@@ -7,7 +7,6 @@ contract QueueManager {
 
     mapping(address => address[]) internal strategies;
     mapping(address => address[]) public queue;
-    mapping(address => bool) internal force;
 
     string public name;
 
@@ -26,10 +25,6 @@ contract QueueManager {
         address vault
     ) external view returns (address[] memory) {
         return queue[vault];
-    }
-
-    function should_override(address vault) external view returns (bool) {
-        return force[vault];
     }
 
     function new_strategy(address strategy) external {
@@ -57,11 +52,6 @@ contract QueueManager {
                 break;
             }
         }
-    }
-
-    function setForce(address vault, bool _force) external {
-        require(msg.sender == governance);
-        force[vault] = _force;
     }
 
     function setQueue(address vault, address[] memory _queue) external {

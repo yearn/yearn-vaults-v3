@@ -28,11 +28,33 @@ def test_shutdown_gives_debt_manager_role(gov, panda, vault):
     assert ROLES.DEBT_MANAGER in ROLES(vault.roles(panda))
 
 
+def test_shutdown__increase_deposit_limit__reverts(
+    vault, gov, asset, mint_and_deposit_into_vault
+):
+    mint_and_deposit_into_vault(vault, gov)
+    vault.shutdown_vault(sender=gov)
+
+    assert vault.availableDepositLimit() == 0
+
+    vault.set_role(gov, ROLES.DEPOSIT_LIMIT_MANAGER, sender=gov)
+
+    assert ROLES.DEPOSIT_LIMIT_MANAGER in ROLES(vault.roles(gov))
+
+    limit = int(1e18)
+
+    with ape.reverts():
+        vault.set_deposit_limit(limit, sender=gov)
+
+    assert vault.availableDepositLimit() == 0
+
+
 def test_shutdown_cant_deposit_can_withdraw(
     vault, gov, asset, mint_and_deposit_into_vault
 ):
     mint_and_deposit_into_vault(vault, gov)
     vault.shutdown_vault(sender=gov)
+
+    assert vault.availableDepositLimit() == 0
     vault_balance_before = asset.balanceOf(vault)
 
     with ape.reverts():
@@ -57,6 +79,8 @@ def test_strategy_return_funds(
     assert asset.balanceOf(strategy) == vault_balance
     assert asset.balanceOf(vault) == 0
     vault.shutdown_vault(sender=gov)
+    assert vault.availableDepositLimit() == 0
+
     vault.update_debt(strategy.address, 0, sender=gov)
     assert asset.balanceOf(strategy) == 0
     assert asset.balanceOf(vault) == vault_balance
