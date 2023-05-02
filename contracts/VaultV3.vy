@@ -237,8 +237,8 @@ def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: a
     """
     ASSET = asset
     DECIMALS = convert(ERC20Detailed(asset.address).decimals(), uint256)
-    assert 10 ** (2 * DECIMALS) <= max_value(uint256) # dev: token decimals too high
-
+    assert DECIMALS < 256 # dev: see VVE-2020-0001
+    
     FACTORY = msg.sender
 
     # Must be > 0 so we can unlock shares
