@@ -1,5 +1,12 @@
 # @version 0.3.7
 
+"""
+@title Yearn Vault Factory
+@license GNU AGPLv3
+@author yearn.finance
+
+"""
+
 from vyper.interfaces import ERC20
 
 event NewVault:
