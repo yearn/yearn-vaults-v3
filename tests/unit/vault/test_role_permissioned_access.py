@@ -506,7 +506,13 @@ def test_buy_debt__set_debt_purchaser_role_open(
     asset.mint(bunny.address, amount, sender=bunny)
     asset.approve(vault.address, amount, sender=bunny)
 
-    vault.set_open_role(ROLES.DEBT_PURCHASER, sender=gov)
+    tx = vault.set_open_role(ROLES.DEBT_PURCHASER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleStatusChanged))
+    assert len(event) == 1
+    assert event[0].role == ROLES.DEBT_PURCHASER
+    assert event[0].status == RoleStatusChange.OPENED
+
     tx = vault.buy_debt(strategy.address, amount, sender=bunny)
     event = list(tx.decode_logs(vault.DebtBought))
 
@@ -515,7 +521,7 @@ def test_buy_debt__set_debt_purchaser_role_open(
     assert event[0].amount == amount
 
     event = list(tx.decode_logs(vault.DebtUpdated))
-    
+
     assert len(event) == 1
     assert event[0].strategy == strategy.address
     assert event[0].current_debt == amount
@@ -557,7 +563,12 @@ def test_buy_debt__set_debt_purchaser_role_open_then_close__reverts(
     assert event[0].new_debt == amount // 2
     # close role
 
-    vault.close_open_role(ROLES.DEBT_PURCHASER, sender=gov)
+    tx = vault.close_open_role(ROLES.DEBT_PURCHASER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleStatusChanged))
+    assert len(event) == 1
+    assert event[0].role == ROLES.DEBT_PURCHASER
+    assert event[0].status == RoleStatusChange.CLOSED
 
     with ape.reverts("not allowed"):
         vault.buy_debt(strategy.address, amount // 2, sender=bunny)

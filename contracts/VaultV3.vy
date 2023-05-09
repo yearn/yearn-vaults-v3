@@ -417,7 +417,7 @@ def _convert_to_shares(assets: uint256, rounding: Rounding) -> uint256:
 
 
 @internal
-def erc20_safe_approve(token: address, spender: address, amount: uint256):
+def _erc20_safe_approve(token: address, spender: address, amount: uint256):
     # Used only to send tokens that are not the type managed by this Vault.
     # HACK: Used to handle non-compliant tokens like USDT
     response: Bytes[32] = raw_call(
@@ -434,7 +434,7 @@ def erc20_safe_approve(token: address, spender: address, amount: uint256):
 
 
 @internal
-def erc20_safe_transfer_from(token: address, sender: address, receiver: address, amount: uint256):
+def _erc20_safe_transfer_from(token: address, sender: address, receiver: address, amount: uint256):
     # Used only to send tokens that are not the type managed by this Vault.
     # HACK: Used to handle non-compliant tokens like USDT
     response: Bytes[32] = raw_call(
@@ -451,7 +451,7 @@ def erc20_safe_transfer_from(token: address, sender: address, receiver: address,
         assert convert(response, bool), "Transfer failed!"
 
 @internal
-def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
+def _erc20_safe_transfer(token: address, receiver: address, amount: uint256):
     # Used only to send tokens that are not the type managed by this Vault.
     # HACK: Used to handle non-compliant tokens like USDT
     response: Bytes[32] = raw_call(
@@ -543,7 +543,7 @@ def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
 
     assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
  
-    self.erc20_safe_transfer_from(ASSET.address, msg.sender, self, assets)
+    self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, assets)
     self.total_idle += assets
    
     shares: uint256 = self._issue_shares_for_amount(assets, recipient)
@@ -704,7 +704,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
     self._burn_shares(shares, owner)
     # commit memory to storage
     self.total_idle = curr_total_idle - requested_assets
-    self.erc20_safe_transfer(ASSET.address, receiver, requested_assets)
+    self._erc20_safe_transfer(ASSET.address, receiver, requested_assets)
 
     log Withdraw(sender, receiver, owner, requested_assets, shares)
     return requested_assets
@@ -841,11 +841,11 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
             assets_to_deposit = available_idle
 
         if assets_to_deposit > 0:
-            self.erc20_safe_approve(ASSET.address, strategy, assets_to_deposit)
+            self._erc20_safe_approve(ASSET.address, strategy, assets_to_deposit)
             pre_balance: uint256 = ASSET.balanceOf(self)
             IStrategy(strategy).deposit(assets_to_deposit, self)
             post_balance: uint256 = ASSET.balanceOf(self)
-            self.erc20_safe_approve(ASSET.address, strategy, 0)
+            self._erc20_safe_approve(ASSET.address, strategy, 0)
 
             # making sure we are changing according to the real result no matter what. 
             # This will spend more gas but makes it more robust
@@ -1186,6 +1186,7 @@ def process_report(strategy: address) -> (uint256, uint256):
     return self._process_report(strategy)
 
 @external
+@nonreentrant("lock")
 def buy_debt(strategy: address, amount: uint256):
     """
     @notice Used for governance to buy bad debt from the vault.
@@ -1213,7 +1214,7 @@ def buy_debt(strategy: address, amount: uint256):
     assert shares <= IStrategy(strategy).balanceOf(self), "not enough shares"
 
     before_balance: uint256 = ASSET.balanceOf(self)
-    self.erc20_safe_transfer_from(ASSET.address, msg.sender, self, amount)
+    self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, amount)
     after_balance: uint256 = ASSET.balanceOf(self)
 
     assert after_balance - before_balance >= amount
@@ -1236,7 +1237,7 @@ def buy_debt(strategy: address, amount: uint256):
         self._revoke_strategy(strategy)
 
     # Transfer the strategies shares out.
-    self.erc20_safe_transfer(strategy, msg.sender, shares)
+    self._erc20_safe_transfer(strategy, msg.sender, shares)
     log DebtBought(strategy, bought)
 
 
