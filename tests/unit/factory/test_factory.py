@@ -1,4 +1,5 @@
 from ape import project, reverts
+from utils.constants import WEEK
 
 
 def test_new_vault_with_different_salt(gov, asset, bunny, fish, vault_factory):
@@ -9,7 +10,7 @@ def test_new_vault_with_different_salt(gov, asset, bunny, fish, vault_factory):
         "first_vault",
         "fv",
         bunny.address,
-        0,
+        WEEK,
         sender=gov,
     )
     event = list(tx.decode_logs(vault_factory.NewVault))
@@ -22,7 +23,7 @@ def test_new_vault_with_different_salt(gov, asset, bunny, fish, vault_factory):
         "second_vault",
         "sv",
         fish.address,
-        0,
+        WEEK,
         sender=gov,
     )
     event = list(tx.decode_logs(vault_factory.NewVault))
@@ -39,7 +40,7 @@ def test_new_vault_same_name_asset_and_symbol_different_sender(
         "first_vault",
         "fv",
         bunny.address,
-        0,
+        WEEK,
         sender=gov,
     )
     event = list(tx.decode_logs(vault_factory.NewVault))
@@ -52,7 +53,7 @@ def test_new_vault_same_name_asset_and_symbol_different_sender(
         "first_vault",
         "fv",
         bunny.address,
-        0,
+        WEEK,
         sender=bunny,
     )
     event = list(tx.decode_logs(vault_factory.NewVault))
@@ -69,7 +70,7 @@ def test_new_vault_same_sender_name_asset_and_symbol__reverts(
         "first_vault",
         "fv",
         bunny.address,
-        0,
+        WEEK,
         sender=gov,
     )
     event = list(tx.decode_logs(vault_factory.NewVault))
@@ -83,6 +84,6 @@ def test_new_vault_same_sender_name_asset_and_symbol__reverts(
             "first_vault",
             "fv",
             bunny.address,
-            0,
+            WEEK,
             sender=gov,
         )

@@ -21,7 +21,7 @@ def test_deposit_and_withdraw(asset, gov, fish, fish_amount, create_vault):
     vault.set_deposit_limit(half_amount, sender=gov)
 
     with ape.reverts("exceed deposit limit"):
-        vault.deposit(MAX_INT, fish.address, sender=fish)
+        vault.deposit(amount, fish.address, sender=fish)
 
     vault.deposit(quarter_amount, fish.address, sender=fish)
 
@@ -35,7 +35,7 @@ def test_deposit_and_withdraw(asset, gov, fish, fish_amount, create_vault):
     vault.set_deposit_limit(fish_amount, sender=gov)
 
     # deposit again to test behavior when vault has existing shares
-    vault.deposit(MAX_INT, fish.address, sender=fish)
+    vault.deposit(half_amount, fish.address, sender=fish)
 
     assert vault.totalSupply() == amount
     assert asset.balanceOf(vault) == amount
