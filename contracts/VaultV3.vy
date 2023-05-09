@@ -100,8 +100,8 @@ event UpdateProfitMaxUnlockTime:
 event Shutdown:
     pass
 
-event Sweep:
-    token: indexed(address)
+event DebtBought:
+    strategy: indexed(address)
     amount: uint256
 
 # STRUCTS #
@@ -133,7 +133,7 @@ enum Roles:
     DEPOSIT_LIMIT_MANAGER # sets deposit limit for the vault
     MINIMUM_IDLE_MANAGER # sets the minimun total idle the vault should keep
     PROFIT_UNLOCK_MANAGER # sets the profit_max_unlock_time
-    DEBT_PURCHSER # can sweep tokens from the vault
+    DEBT_PURCHASER # can purchase bad debt from the vault
     EMERGENCY_MANAGER # can shutdown vault in an emergency
 
 enum StrategyChangeType:
@@ -1130,20 +1130,26 @@ def buy_debt(strategy: address, amount: uint256):
     @notice Used for governance to buy bad debt from the vault.
     @dev This should only ever be used in an emergency in place
     of force revoking a strategy in order to not report a loss.
-    It allows the DEBT_PURCHSER role to buy the strategies debt
-    for an equal amount os `asset`. If the full amount of debt
+    It allows the DEBT_PURCHASER role to buy the strategies debt
+    for an equal amount of `asset`. If the full amount of debt
     is purchased revoke_strategy will be automatically called 
     to remove the strategy.
     @param strategy The strategy to buy the debt for
     @param amount The amount of debt to buy from the vault.
     """
-    self._enforce_role(msg.sender, Roles.DEBT_PURCHSER)
+    self._enforce_role(msg.sender, Roles.DEBT_PURCHASER)
     assert self.strategies[strategy].activation != 0, "not active"
-
+    
+    # cache the current debt
     current_debt: uint256 = self.strategies[strategy].current_debt
-
+    
     assert current_debt > 0, "nothing to buy"
     assert amount > 0, "nothing to buy with"
+
+    # Get the current shares value for the amount
+    shares: uint256 = IStrategy(strategy).convertToShares(amount)
+    assert shares > 0, "can't buy 0"
+    assert shares <= IStrategy(strategy).balanceOf(self), "not enough shares"
 
     before_balance: uint256 = ASSET.balanceOf(self)
     self.erc20_safe_transfer_from(ASSET.address, msg.sender, self, amount)
@@ -1151,9 +1157,7 @@ def buy_debt(strategy: address, amount: uint256):
 
     assert after_balance - before_balance >= amount
 
-    shares: uint256 = IStrategy(strategy).convertToShares(amount)
-    assert shares >= IStrategy(strategy).balanceOf(self), "not enough shares"
-
+    # Adjust if needed to not underflow on math
     bought: uint256 = min(current_debt, amount)
 
     # Lower strategy debt
@@ -1163,11 +1167,16 @@ def buy_debt(strategy: address, amount: uint256):
     # Increase total idle
     self.total_idle += bought
 
+    # log debt change
+    log DebtUpdated(strategy, current_debt, current_debt - bought)
+
+    # If all the debt was bought revoke the strategy
     if bought == current_debt:
         self._revoke_strategy(strategy)
 
     # Transfer the strategies shares out.
     self.erc20_safe_transfer(strategy, msg.sender, shares)
+    log DebtBought(strategy, bought)
 
 ## STRATEGY MANAGEMENT ##
 @external

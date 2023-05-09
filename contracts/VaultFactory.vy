@@ -29,9 +29,9 @@ struct PFConfig:
   fee_recipient: address
 
 MAX_FEE_BPS: constant(uint16) = 25 # max protocol management fee is 0.25% annual
+API_VERSION: constant(String[28]) = "3.1.0"
 
 VAULT_BLUEPRINT: immutable(address)
-API_VERSION: immutable(String[28])
 
 governance: public(address)
 pending_governance: public(address)
@@ -43,7 +43,6 @@ protocol_fee_config: public(PFConfig)
 def __init__(name: String[64], vault_blueprint: address):
     self.name = name
     VAULT_BLUEPRINT = vault_blueprint
-    API_VERSION = IVault(vault_blueprint).api_version()
     self.governance = msg.sender
 
 @external

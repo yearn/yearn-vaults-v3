@@ -325,38 +325,86 @@ def test_update_max_debt_for_strategy__set_max_debt_role_open_then_close__revert
         vault.update_max_debt_for_strategy(new_strategy, 420, sender=bunny)
 
 
-# SWEEPER
+# DEBT_PURCHASER
 
 
-def test_sweep__sweeper_role_closed__reverts(vault, mock_token, bunny):
+def test_buy_debt__debt_purchaser_role_closed__reverts(vault, strategy, bunny):
     with ape.reverts("not allowed"):
-        vault.sweep(mock_token, sender=bunny)
+        vault.buy_debt(strategy.address, 0, sender=bunny)
 
 
-def test_sweep__set_sweeper_role_open(vault, fish_amount, asset, bunny, gov):
-    asset.mint(vault, fish_amount, sender=gov)
-    vault.set_open_role(ROLES.SWEEPER, sender=gov)
-    tx = vault.sweep(asset, sender=bunny)
-    event = list(tx.decode_logs(vault.Sweep))
-    assert len(event) == 1
-    assert event[0].token == asset.address
-    assert asset.balanceOf(bunny) == fish_amount
-
-
-def test_sweep__set_sweeper_role_open_then_close__reverts(
-    vault, fish_amount, asset, bunny, gov
+def test_buy_debt__set_debt_purchaser_role_open(
+    vault,
+    strategy,
+    mint_and_deposit_into_vault,
+    add_debt_to_strategy,
+    fish_amount,
+    asset,
+    bunny,
+    gov,
 ):
-    asset.mint(vault, fish_amount, sender=gov)
-    vault.set_open_role(ROLES.SWEEPER, sender=gov)
-    tx = vault.sweep(asset, sender=bunny)
-    event = list(tx.decode_logs(vault.Sweep))
+    amount = fish_amount
+
+    mint_and_deposit_into_vault(vault, gov, amount)
+    add_debt_to_strategy(gov, strategy, vault, amount)
+
+    # Approve vault to pull funds.
+    asset.mint(bunny.address, amount, sender=bunny)
+    asset.approve(vault.address, amount, sender=bunny)
+
+    vault.set_open_role(ROLES.DEBT_PURCHASER, sender=gov)
+    tx = vault.buy_debt(strategy.address, amount, sender=bunny)
+    event = list(tx.decode_logs(vault.DebtBought))
+
     assert len(event) == 1
-    assert event[0].token == asset.address
-    assert asset.balanceOf(bunny) == fish_amount
+    assert event[0].strategy == strategy.address
+    assert event[0].amount == amount
+
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 1
+    assert event[0].strategy == strategy.address
+    assert event[0].current_debt == amount
+    assert event[0].new_debt == 0
+
+
+def test_buy_debt__set_debt_purchaser_role_open_then_close__reverts(
+    vault,
+    strategy,
+    mint_and_deposit_into_vault,
+    add_debt_to_strategy,
+    fish_amount,
+    asset,
+    bunny,
+    gov,
+):
+    amount = fish_amount
+
+    mint_and_deposit_into_vault(vault, gov, amount)
+    add_debt_to_strategy(gov, strategy, vault, amount)
+
+    # Approve vault to pull funds.
+    asset.mint(bunny.address, amount, sender=bunny)
+    asset.approve(vault.address, amount, sender=bunny)
+
+    vault.set_open_role(ROLES.DEBT_PURCHASER, sender=gov)
+    tx = vault.buy_debt(strategy.address, amount // 2, sender=bunny)
+    event = list(tx.decode_logs(vault.DebtBought))
+
+    assert len(event) == 1
+    assert event[0].strategy == strategy.address
+    assert event[0].amount == amount // 2
+
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 1
+    assert event[0].strategy == strategy.address
+    assert event[0].current_debt == amount
+    assert event[0].new_debt == amount // 2
     # close role
-    vault.close_open_role(ROLES.SWEEPER, sender=gov)
+    vault.close_open_role(ROLES.DEBT_PURCHASER, sender=gov)
     with ape.reverts("not allowed"):
-        vault.sweep(asset, sender=bunny)
+        vault.buy_debt(strategy.address, amount // 2, sender=bunny)
 
 
 # DEBT_MANAGER
