@@ -503,7 +503,7 @@ def test_buy_debt__set_debt_purchaser_role_open(
     add_debt_to_strategy(gov, strategy, vault, amount)
 
     # Approve vault to pull funds.
-    asset.mint(bunny.address, amount, sender=bunny)
+    asset.mint(bunny.address, amount, sender=gov)
     asset.approve(vault.address, amount, sender=bunny)
 
     tx = vault.set_open_role(ROLES.DEBT_PURCHASER, sender=gov)
@@ -544,7 +544,7 @@ def test_buy_debt__set_debt_purchaser_role_open_then_close__reverts(
     add_debt_to_strategy(gov, strategy, vault, amount)
 
     # Approve vault to pull funds.
-    asset.mint(bunny.address, amount, sender=bunny)
+    asset.mint(bunny.address, amount, sender=gov)
     asset.approve(vault.address, amount, sender=bunny)
 
     vault.set_open_role(ROLES.DEBT_PURCHASER, sender=gov)

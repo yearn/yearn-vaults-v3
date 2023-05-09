@@ -173,7 +173,7 @@ def test_buy_debt__debt_purchaser(
     add_debt_to_strategy(gov, strategy, vault, amount)
 
     # Approve vault to pull funds.
-    asset.mint(bunny.address, amount, sender=bunny)
+    asset.mint(bunny.address, amount, sender=gov)
     asset.approve(vault.address, amount, sender=bunny)
 
     tx = vault.buy_debt(strategy.address, amount, sender=bunny)
