@@ -75,28 +75,6 @@ def test_buy_debt__no_amount__reverts(
         vault.buy_debt(strategy, 0, sender=gov)
 
 
-"""
-def test_buy_debt__share_are_zero__reverts(gov, asset, vault, mint_and_deposit_into_vault, fish_amount, lossy_strategy, add_debt_to_strategy):
-    amount = fish_amount
-
-    mint_and_deposit_into_vault(vault, gov, amount)
-
-    add_debt_to_strategy(gov, lossy_strategy, vault, amount)
-
-    # simulate a full loss so convertToShares() returns 0
-    lossy_strategy.setLoss(gov, amount, sender=gov)
-
-    #assert lossy_strategy.convertToShares(amount) == 0
-
-    # Approve vault to pull funds.
-    asset.mint(gov.address, amount, sender=gov)
-    asset.approve(vault.address, amount, sender=gov)
-
-    with ape.reverts("can't buy 0"):
-        vault.buy_debt(lossy_strategy, amount, sender=gov)
-"""
-
-
 def test_buy_debt__to_many_shares__reverts(
     gov,
     asset,
