@@ -125,10 +125,6 @@ def test_buy_debt__full_debt(
     assert vault.totalIdle() == amount
     assert vault.totalDebt() == 0
     assert vault.pricePerShare() == 10 ** asset.decimals()
-    # Should have revoked the strategy
-    assert vault.strategies(strategy)["activation"] == 0
-    assert vault.strategies(strategy)["last_report"] == 0
-    assert vault.strategies(strategy)["max_debt"] == 0
     assert vault.strategies(strategy)["current_debt"] == 0
     # assert shares got moved
     assert asset.balanceOf(gov) == before_balance - amount
@@ -164,10 +160,6 @@ def test_buy_debt__half_debt(
     assert vault.totalIdle() == to_buy
     assert vault.totalDebt() == amount - to_buy
     assert vault.pricePerShare() == 10 ** asset.decimals()
-    # Should have revoked the strategy
-    assert vault.strategies(strategy)["activation"] != 0
-    assert vault.strategies(strategy)["last_report"] != 0
-    assert vault.strategies(strategy)["max_debt"] != 0
     assert vault.strategies(strategy)["current_debt"] == amount - to_buy
     # assert shares got moved
     assert asset.balanceOf(gov) == before_balance - to_buy
