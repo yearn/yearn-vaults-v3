@@ -989,9 +989,8 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     # Update unlocking rate and time to fully unlocked
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
-    _profit_max_unlock_time: uint256 = self.profit_max_unlock_time
     if total_locked_shares > 0:
-
+        _profit_max_unlock_time: uint256 = self.profit_max_unlock_time
         # Calculate how long until the full amount of shares is unlocked
         remaining_time: uint256 = 0
         _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
