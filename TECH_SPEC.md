@@ -116,7 +116,7 @@ These are:
 - DEPOSIT_LIMIT_MANAGER: role that sets deposit limit for the vault
 - MINIMUM_IDLE_MANAGER: role that sets the minimun total idle the vault should keep
 - PROFIT_UNLOCK_MANAGER: role that sets the profit_max_unlock_time
-- SWEEPER: role that can sweep tokens from the vault
+- DEBT_PURCHASER # can purchase bad debt from the vault
 - EMERGENCY_MANAGER: role that can shutdown vault in an emergency
 
 Every role can be filled by an EOA, multisig or other smart contracts. Each role can be filled by several accounts.
@@ -183,14 +183,13 @@ The PROFIT_UNLOCK_MANAGER is in charge of updating and setting the profit_max_un
 
 This can be customized based on the vault based on aspects such as number of strategies, TVL, expected returns etc.
 
-#### Sweeping funds
-The SWEEPER role can sweep funds out of the vault that are not part of the vaults total_assets
+#### Buying Debt
+The DEBT_PURCHASER role can buy debt from the vault in return for the equal amount of `asset`.
 
-The vault will not allow the sweeping of either its own token of the tokens of any of the active strategies
+This should only ever be used in the case where governance wants to purchase a set amount of bade debt from the vault in order to not report a loss.
 
-The vaults 'asset' can be swept but only the amount > total_idle to be able to sweep any airdropped 'asset'
+It still relies on convertToShares() so will only be viable if the conversion does not reflect and large negative realized loss from the strategy.
 
-This functionality should be reserved primarily for sweeping airdropped tokens of value. Due to the 4626 nature of strategies it is possible for the vault to deposit directly into 3rd party protocols that may issue rewards retroactively
 
 #### Shutting down the vault
 In an emergency the EMERGENCY_MANAGER can shutdown the vault

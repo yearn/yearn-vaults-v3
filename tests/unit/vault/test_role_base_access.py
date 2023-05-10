@@ -146,42 +146,49 @@ def test_set_deposit_limit__deposit_limit_manager(gov, vault, bunny):
     assert vault.deposit_limit() == deposit_limit
 
 
-# SWEEPER
+# DEBT_PURCHASER
 
 
-def test_sweep__no_sweeper__reverts(vault, strategy, bunny):
+def test_buy_debt__no_debt_purchaser__reverts(vault, strategy, bunny):
     with ape.reverts("not allowed"):
-        vault.process_report(strategy, sender=bunny)
+        vault.buy_debt(strategy, 0, sender=bunny)
 
 
-def test_sweep__sweeper(
+def test_buy_debt__debt_purchaser(
     gov,
     asset,
     vault,
     bunny,
-    airdrop_asset,
+    strategy,
+    fish_amount,
+    add_debt_to_strategy,
     mint_and_deposit_into_vault,
 ):
+    amount = fish_amount
     # We temporarily give bunny the role of ACCOUNTING_MANAGER
-    tx = vault.set_role(bunny.address, ROLES.SWEEPER, sender=gov)
 
-    event = list(tx.decode_logs(vault.RoleSet))
-    assert len(event) == 1
-    assert event[0].account == bunny.address
-    assert event[0].role == ROLES.SWEEPER
+    vault.set_role(bunny.address, ROLES.DEBT_PURCHASER, sender=gov)
 
-    vault_balance = 10**22
-    asset_airdrop = vault_balance // 10
-    mint_and_deposit_into_vault(vault, gov, vault_balance)
+    mint_and_deposit_into_vault(vault, gov, amount)
+    add_debt_to_strategy(gov, strategy, vault, amount)
 
-    airdrop_asset(gov, asset, vault, asset_airdrop)
+    # Approve vault to pull funds.
+    asset.mint(bunny.address, amount, sender=gov)
+    asset.approve(vault.address, amount, sender=bunny)
 
-    tx = vault.sweep(asset.address, sender=bunny)
-    event = list(tx.decode_logs(vault.Sweep))
+    tx = vault.buy_debt(strategy.address, amount, sender=bunny)
+    event = list(tx.decode_logs(vault.DebtPurchased))
 
     assert len(event) == 1
-    assert event[0].token == asset.address
-    assert event[0].amount == asset_airdrop
+    assert event[0].strategy == strategy.address
+    assert event[0].amount == amount
+
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 1
+    assert event[0].strategy == strategy.address
+    assert event[0].current_debt == amount
+    assert event[0].new_debt == 0
 
 
 # DEBT_MANAGER

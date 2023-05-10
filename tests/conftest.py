@@ -212,7 +212,7 @@ def create_vault(project, gov, vault_factory):
             | ROLES.DEPOSIT_LIMIT_MANAGER
             | ROLES.MINIMUM_IDLE_MANAGER
             | ROLES.PROFIT_UNLOCK_MANAGER
-            | ROLES.SWEEPER
+            | ROLES.DEBT_PURCHASER
             | ROLES.EMERGENCY_MANAGER,
             sender=gov,
         )

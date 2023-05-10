@@ -115,8 +115,8 @@ event UpdateProfitMaxUnlockTime:
 event Shutdown:
     pass
 
-event Sweep:
-    token: indexed(address)
+event DebtPurchased:
+    strategy: indexed(address)
     amount: uint256
 
 # STRUCTS #
@@ -148,7 +148,7 @@ enum Roles:
     DEPOSIT_LIMIT_MANAGER # sets deposit limit for the vault
     MINIMUM_IDLE_MANAGER # sets the minimun total idle the vault should keep
     PROFIT_UNLOCK_MANAGER # sets the profit_max_unlock_time
-    SWEEPER # can sweep tokens from the vault
+    DEBT_PURCHASER # can purchase bad debt from the vault
     EMERGENCY_MANAGER # can shutdown vault in an emergency
 
 enum StrategyChangeType:
@@ -424,7 +424,7 @@ def _convert_to_shares(assets: uint256, rounding: Rounding) -> uint256:
 
 
 @internal
-def erc20_safe_approve(token: address, spender: address, amount: uint256):
+def _erc20_safe_approve(token: address, spender: address, amount: uint256):
     # Used only to send tokens that are not the type managed by this Vault.
     # HACK: Used to handle non-compliant tokens like USDT
     response: Bytes[32] = raw_call(
@@ -441,7 +441,7 @@ def erc20_safe_approve(token: address, spender: address, amount: uint256):
 
 
 @internal
-def erc20_safe_transfer_from(token: address, sender: address, receiver: address, amount: uint256):
+def _erc20_safe_transfer_from(token: address, sender: address, receiver: address, amount: uint256):
     # Used only to send tokens that are not the type managed by this Vault.
     # HACK: Used to handle non-compliant tokens like USDT
     response: Bytes[32] = raw_call(
@@ -458,7 +458,7 @@ def erc20_safe_transfer_from(token: address, sender: address, receiver: address,
         assert convert(response, bool), "Transfer failed!"
 
 @internal
-def erc20_safe_transfer(token: address, receiver: address, amount: uint256):
+def _erc20_safe_transfer(token: address, receiver: address, amount: uint256):
     # Used only to send tokens that are not the type managed by this Vault.
     # HACK: Used to handle non-compliant tokens like USDT
     response: Bytes[32] = raw_call(
@@ -550,7 +550,7 @@ def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
 
     assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
  
-    self.erc20_safe_transfer_from(ASSET.address, msg.sender, self, assets)
+    self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, assets)
     self.total_idle += assets
    
     shares: uint256 = self._issue_shares_for_amount(assets, recipient)
@@ -711,7 +711,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
     self._burn_shares(shares, owner)
     # commit memory to storage
     self.total_idle = curr_total_idle - requested_assets
-    self.erc20_safe_transfer(ASSET.address, receiver, requested_assets)
+    self._erc20_safe_transfer(ASSET.address, receiver, requested_assets)
 
     log Withdraw(sender, receiver, owner, requested_assets, shares)
     return requested_assets
@@ -848,11 +848,11 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
             assets_to_deposit = available_idle
 
         if assets_to_deposit > 0:
-            self.erc20_safe_approve(ASSET.address, strategy, assets_to_deposit)
+            self._erc20_safe_approve(ASSET.address, strategy, assets_to_deposit)
             pre_balance: uint256 = ASSET.balanceOf(self)
             IStrategy(strategy).deposit(assets_to_deposit, self)
             post_balance: uint256 = ASSET.balanceOf(self)
-            self.erc20_safe_approve(ASSET.address, strategy, 0)
+            self._erc20_safe_approve(ASSET.address, strategy, 0)
 
             # making sure we are changing according to the real result no matter what. 
             # This will spend more gas but makes it more robust
@@ -996,9 +996,8 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     # Update unlocking rate and time to fully unlocked
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
-    _profit_max_unlock_time: uint256 = self.profit_max_unlock_time
     if total_locked_shares > 0:
-
+        _profit_max_unlock_time: uint256 = self.profit_max_unlock_time
         # Calculate how long until the full amount of shares is unlocked
         remaining_time: uint256 = 0
         _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
@@ -1194,24 +1193,55 @@ def process_report(strategy: address) -> (uint256, uint256):
 
 @external
 @nonreentrant("lock")
-def sweep(token: address) -> (uint256):
+def buy_debt(strategy: address, amount: uint256):
     """
-    @notice Sweep the token from airdop or sent by mistake.
-    @param token The token to sweep.
-    @return The amount of dust swept.
+    @notice Used for governance to buy bad debt from the vault.
+    @dev This should only ever be used in an emergency in place
+    of force revoking a strategy in order to not report a loss.
+    It allows the DEBT_PURCHASER role to buy the strategies debt
+    for an equal amount of `asset`. It's important to note that 
+    this does rely on the strategies `convertToShares` function to
+    determine the amount of shares to buy.
+    @param strategy The strategy to buy the debt for
+    @param amount The amount of debt to buy from the vault.
     """
-    self._enforce_role(msg.sender, Roles.SWEEPER)
-    assert token != self, "can't sweep self"
-    assert self.strategies[token].activation == 0, "can't sweep strategy"
-    amount: uint256 = 0
-    if token == ASSET.address:
-        amount = ASSET.balanceOf(self) - self.total_idle
-    else:
-        amount = ERC20(token).balanceOf(self)
-    assert amount != 0, "no dust"
-    self.erc20_safe_transfer(token, msg.sender, amount)
-    log Sweep(token, amount)
-    return amount
+    self._enforce_role(msg.sender, Roles.DEBT_PURCHASER)
+    assert self.strategies[strategy].activation != 0, "not active"
+    
+    # cache the current debt
+    current_debt: uint256 = self.strategies[strategy].current_debt
+    
+    assert current_debt > 0, "nothing to buy"
+    assert amount > 0, "nothing to buy with"
+
+    # Get the current shares value for the amount
+    shares: uint256 = IStrategy(strategy).convertToShares(amount)
+    assert shares > 0, "can't buy 0"
+    assert shares <= IStrategy(strategy).balanceOf(self), "not enough shares"
+
+    before_balance: uint256 = ASSET.balanceOf(self)
+    self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, amount)
+    after_balance: uint256 = ASSET.balanceOf(self)
+
+    assert after_balance - before_balance >= amount
+
+    # Adjust if needed to not underflow on math
+    bought: uint256 = min(current_debt, amount)
+
+    # Lower strategy debt
+    self.strategies[strategy].current_debt -= bought
+    # lower total debt
+    self.total_debt -= bought
+    # Increase total idle
+    self.total_idle += bought
+
+    # log debt change
+    log DebtUpdated(strategy, current_debt, current_debt - bought)
+
+    # Transfer the strategies shares out.
+    self._erc20_safe_transfer(strategy, msg.sender, shares)
+    log DebtPurchased(strategy, bought)
+
 
 ## STRATEGY MANAGEMENT ##
 @external
