@@ -108,7 +108,7 @@ event UpdateProfitMaxUnlockTime:
 event Shutdown:
     pass
 
-event DebtBought:
+event DebtPurchased:
     strategy: indexed(address)
     amount: uint256
 
@@ -1193,9 +1193,9 @@ def buy_debt(strategy: address, amount: uint256):
     @dev This should only ever be used in an emergency in place
     of force revoking a strategy in order to not report a loss.
     It allows the DEBT_PURCHASER role to buy the strategies debt
-    for an equal amount of `asset`. If the full amount of debt
-    is purchased revoke_strategy will be automatically called 
-    to remove the strategy.
+    for an equal amount of `asset`. It's important to note that 
+    this does rely on the strategies `convertToShares` function to
+    determine the amount of shares to buy.
     @param strategy The strategy to buy the debt for
     @param amount The amount of debt to buy from the vault.
     """
@@ -1232,13 +1232,9 @@ def buy_debt(strategy: address, amount: uint256):
     # log debt change
     log DebtUpdated(strategy, current_debt, current_debt - bought)
 
-    # If all the debt was bought revoke the strategy
-    if bought == current_debt:
-        self._revoke_strategy(strategy)
-
     # Transfer the strategies shares out.
     self._erc20_safe_transfer(strategy, msg.sender, shares)
-    log DebtBought(strategy, bought)
+    log DebtPurchased(strategy, bought)
 
 
 ## STRATEGY MANAGEMENT ##

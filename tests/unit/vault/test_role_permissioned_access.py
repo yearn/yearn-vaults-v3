@@ -514,7 +514,7 @@ def test_buy_debt__set_debt_purchaser_role_open(
     assert event[0].status == RoleStatusChange.OPENED
 
     tx = vault.buy_debt(strategy.address, amount, sender=bunny)
-    event = list(tx.decode_logs(vault.DebtBought))
+    event = list(tx.decode_logs(vault.DebtPurchased))
 
     assert len(event) == 1
     assert event[0].strategy == strategy.address
@@ -549,7 +549,7 @@ def test_buy_debt__set_debt_purchaser_role_open_then_close__reverts(
 
     vault.set_open_role(ROLES.DEBT_PURCHASER, sender=gov)
     tx = vault.buy_debt(strategy.address, amount // 2, sender=bunny)
-    event = list(tx.decode_logs(vault.DebtBought))
+    event = list(tx.decode_logs(vault.DebtPurchased))
 
     assert len(event) == 1
     assert event[0].strategy == strategy.address

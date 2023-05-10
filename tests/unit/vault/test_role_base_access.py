@@ -177,7 +177,7 @@ def test_buy_debt__debt_purchaser(
     asset.approve(vault.address, amount, sender=bunny)
 
     tx = vault.buy_debt(strategy.address, amount, sender=bunny)
-    event = list(tx.decode_logs(vault.DebtBought))
+    event = list(tx.decode_logs(vault.DebtPurchased))
 
     assert len(event) == 1
     assert event[0].strategy == strategy.address
