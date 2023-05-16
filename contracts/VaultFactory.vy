@@ -4,7 +4,6 @@
 @title Yearn Vault Factory
 @license GNU AGPLv3
 @author yearn.finance
-
 """
 
 from vyper.interfaces import ERC20
@@ -116,12 +115,12 @@ def protocol_fee_config() -> PFConfig:
     to receive the fees.
     @return The protocol fee config for the msg sender
     """
-    # If there is a custom protocol fee set we return that.
-    if self.custom_protocol_fee_config[msg.sender].fee_last_change != 0:
-        return self.custom_protocol_fee_config[msg.sender]
-    else:
-        # Otherwise just use the default.
+    # If there is no custom protocol fee set we return the default.
+    if self.custom_protocol_fee_config[msg.sender].fee_last_change == 0:
         return self.default_protocol_fee_config
+    else:
+        # Otherwise return the custom config.
+        return self.custom_protocol_fee_config[msg.sender]
 
 @external
 def set_protocol_fee_bps(new_protocol_fee_bps: uint16):
@@ -149,22 +148,22 @@ def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
 
 @external
 def set_custom_protocol_fee_bps(vault: address, custom_protocol_fee: uint16):
-        """
-        @notice Allows Governance to set custom protocol fees
-        for a specific vault or strategy.
-        @param vault The address of the vault or strategy to customize.
-        @param custom_protocol_fee The custom protocol fee in BPS.
-        """
-        assert msg.sender == self.governance, "not governance"
-        assert custom_protocol_fee <= MAX_FEE_BPS, "fee too high"
+    """
+    @notice Allows Governance to set custom protocol fees
+    for a specific vault or strategy.
+    @param vault The address of the vault or strategy to customize.
+    @param custom_protocol_fee The custom protocol fee in BPS.
+    """
+    assert msg.sender == self.governance, "not governance"
+    assert custom_protocol_fee <= MAX_FEE_BPS, "fee too high"
 
-        self.custom_protocol_fee_config[vault] = PFConfig({
-            fee_bps: custom_protocol_fee,
-            fee_last_change: convert(block.timestamp, uint32),
-            fee_recipient: self.default_protocol_fee_config.fee_recipient
-        })
+    self.custom_protocol_fee_config[vault] = PFConfig({
+        fee_bps: custom_protocol_fee,
+        fee_last_change: convert(block.timestamp, uint32),
+        fee_recipient: self.default_protocol_fee_config.fee_recipient
+    })
 
-        log UpdateCustomProtocolFee(vault, custom_protocol_fee)
+    log UpdateCustomProtocolFee(vault, custom_protocol_fee)
 
 @external 
 def remove_custom_protocol_fee(vault: address):
