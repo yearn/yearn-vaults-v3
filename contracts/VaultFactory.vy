@@ -21,6 +21,13 @@ event UpdateProtocolFeeRecipient:
     old_fee_recipient: indexed(address)
     new_fee_recipient: indexed(address)
 
+event UpdateCustomProtocolFee:
+    vault: indexed(address)
+    new_custom_protocol_fee: uint16
+
+event RemovedCustomProtocolFee:
+    vault: indexed(address)
+
 event UpdateGovernance:
     governance: indexed(address)
 
@@ -35,13 +42,21 @@ struct PFConfig:
 MAX_FEE_BPS: constant(uint16) = 25 # max protocol management fee is 0.25% annual
 API_VERSION: constant(String[28]) = "3.0.1-beta"
 
+# The address that all newly deployed vaults are based from.
 VAULT_BLUEPRINT: immutable(address)
 
+# Address that can set or change the fee configs.
 governance: public(address)
+# Pending governance waiting to be accepted.
 pending_governance: public(address)
 
+# Name for identification.
 name: public(String[64])
-protocol_fee_config: public(PFConfig)
+
+# The default config for assessing protocol fees.
+default_protocol_fee_config: public(PFConfig)
+# Can be used to customize the fee for specific vaults.
+custom_protocol_fee_config: public(HashMap[address, PFConfig])
 
 @external
 def __init__(name: String[64], vault_blueprint: address):
@@ -92,6 +107,22 @@ def api_version() -> String[28]:
     """
     return API_VERSION
 
+@view
+@external
+def protocol_fee_config() -> PFConfig:
+    """
+    @notice Called during vault and strategy reports 
+    to retreive the protocol fee to charge and address
+    to receive the fees.
+    @return The protocol fee config for the msg sender
+    """
+    # If there is a custom protocol fee set we return that.
+    if self.custom_protocol_fee_config[msg.sender].fee_last_change != 0:
+        return self.custom_protocol_fee_config[msg.sender]
+    else:
+        # Otherwise just use the default.
+        return self.default_protocol_fee_config
+
 @external
 def set_protocol_fee_bps(new_protocol_fee_bps: uint16):
     """
@@ -101,10 +132,10 @@ def set_protocol_fee_bps(new_protocol_fee_bps: uint16):
     assert msg.sender == self.governance, "not governance"
     assert new_protocol_fee_bps <= MAX_FEE_BPS, "fee too high"
 
-    log UpdateProtocolFeeBps(self.protocol_fee_config.fee_bps, new_protocol_fee_bps)
+    log UpdateProtocolFeeBps(self.default_protocol_fee_config.fee_bps, new_protocol_fee_bps)
 
-    self.protocol_fee_config.fee_bps = new_protocol_fee_bps
-    self.protocol_fee_config.fee_last_change = convert(block.timestamp, uint32)  
+    self.default_protocol_fee_config.fee_bps = new_protocol_fee_bps
+    self.default_protocol_fee_config.fee_last_change = convert(block.timestamp, uint32)  
 
 @external
 def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
@@ -113,8 +144,47 @@ def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
     @param new_protocol_fee_recipient The new protocol fee recipient
     """
     assert msg.sender == self.governance, "not governance"
-    log UpdateProtocolFeeRecipient(self.protocol_fee_config.fee_recipient, new_protocol_fee_recipient)
-    self.protocol_fee_config.fee_recipient = new_protocol_fee_recipient
+    log UpdateProtocolFeeRecipient(self.default_protocol_fee_config.fee_recipient, new_protocol_fee_recipient)
+    self.default_protocol_fee_config.fee_recipient = new_protocol_fee_recipient
+
+@external
+def set_custom_protocol_fee_bps(vault: address, custom_protocol_fee: uint16):
+        """
+        @notice Allows Governance to set custom protocol fees
+        for a specific vault or strategy.
+        @param vault The address of the vault or strategy to customize.
+        @param custom_protocol_fee The custom protocol fee in BPS.
+        """
+        assert msg.sender == self.governance, "not governance"
+        assert custom_protocol_fee <= MAX_FEE_BPS, "fee too high"
+
+        self.custom_protocol_fee_config[vault] = PFConfig({
+            fee_bps: custom_protocol_fee,
+            fee_last_change: convert(block.timestamp, uint32),
+            fee_recipient: self.default_protocol_fee_config.fee_recipient
+        })
+
+        log UpdateCustomProtocolFee(vault, custom_protocol_fee)
+
+@external 
+def remove_custom_protocol_fee(vault: address):
+    """
+    @notice Allows governance to remove a previously set
+    custom protocol fee.
+    @param vault The address of the vault or strategy to
+    remove the custom fee for.
+    """
+    assert msg.sender == self.governance, "not governance"
+
+    # Reset all of the custom config. Setting fee_last_change
+    # 0 will stop it from being used in futre reports.
+    self.custom_protocol_fee_config[vault] = PFConfig({
+        fee_bps: 0,
+        fee_last_change: 0,
+        fee_recipient: empty(address)
+    })
+
+    log RemovedCustomProtocolFee(vault)
 
 @external
 def set_governance(new_governance: address):
@@ -134,5 +204,5 @@ def accept_governance():
     assert msg.sender == self.pending_governance, "not pending governance"
     self.governance = msg.sender
     log UpdateGovernance(msg.sender)
-    self.pending_governance = ZERO_ADDRESS
+    self.pending_governance = empty(address)
 
