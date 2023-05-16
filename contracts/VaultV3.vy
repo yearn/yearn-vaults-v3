@@ -130,7 +130,7 @@ struct StrategyParams:
 MAX_BPS: constant(uint256) = 10_000
 MAX_BPS_EXTENDED: constant(uint256) = 1_000_000_000_000
 PROTOCOL_FEE_ASSESSMENT_PERIOD: constant(uint256) = 24 * 3600 # assess once a day
-API_VERSION: constant(String[28]) = "3.1.0"
+API_VERSION: constant(String[28]) = "3.0.0-beta"
 
 # ENUMS #
 # Each permissioned function has its own Role.

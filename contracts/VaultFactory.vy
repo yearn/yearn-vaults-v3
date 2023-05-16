@@ -9,9 +9,6 @@
 
 from vyper.interfaces import ERC20
 
-interface IVault:
-    def api_version() -> String[28]: view
-
 event NewVault:
     vault_address: indexed(address)
     asset: indexed(address)
@@ -36,7 +33,7 @@ struct PFConfig:
   fee_recipient: address
 
 MAX_FEE_BPS: constant(uint16) = 25 # max protocol management fee is 0.25% annual
-API_VERSION: constant(String[28]) = "3.1.0"
+API_VERSION: constant(String[28]) = "3.0.1-beta"
 
 VAULT_BLUEPRINT: immutable(address)
 
