@@ -196,7 +196,7 @@ def test_buy_debt__debt_purchaser(
 
 def test_update_debt__no_debt_manager__reverts(vault, gov, strategy, bunny):
     with ape.reverts("not allowed"):
-        vault.update_debt(strategy, 10 ** 18, sender=bunny)
+        vault.update_debt(strategy, 10**18, sender=bunny)
 
 
 def test_update_debt__debt_manager(
@@ -211,7 +211,7 @@ def test_update_debt__debt_manager(
     assert event[0].role == ROLES.DEBT_MANAGER
 
     # Provide vault with funds
-    mint_and_deposit_into_vault(vault, gov, 10 ** 18, 10 ** 18 // 2)
+    mint_and_deposit_into_vault(vault, gov, 10**18, 10**18 // 2)
 
     max_debt_for_strategy = 1
     vault.update_max_debt_for_strategy(strategy, max_debt_for_strategy, sender=gov)
@@ -280,7 +280,7 @@ def test_process_report__reporting_manager(
     assert event[0].role == ROLES.REPORTING_MANAGER
 
     # Provide liquidity into vault
-    mint_and_deposit_into_vault(vault, gov, 10 ** 18, 10 ** 18 // 2)
+    mint_and_deposit_into_vault(vault, gov, 10**18, 10**18 // 2)
     # add debt to strategy
     add_debt_to_strategy(gov, strategy, vault, 2)
     # airdrop gain to strategy

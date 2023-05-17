@@ -124,7 +124,7 @@ def mock_token(create_token):
 def mock_real_token(project, gov):
     def mock_real_token(name):
         if name == "usdt":
-            return gov.deploy(project.TetherToken, 10 ** 18, name, "USDT", 6)
+            return gov.deploy(project.TetherToken, 10**18, name, "USDT", 6)
 
     yield mock_real_token
 
@@ -350,7 +350,7 @@ def deploy_generic_queue_manager(project, gov):
 @pytest.fixture(scope="session")
 def mint_and_deposit_into_strategy(gov, asset):
     def mint_and_deposit_into_strategy(
-        strategy, account=gov, amount_to_mint=10 ** 18, amount_to_deposit=None
+        strategy, account=gov, amount_to_mint=10**18, amount_to_deposit=None
     ):
         if amount_to_deposit == None:
             amount_to_deposit = amount_to_mint
@@ -366,7 +366,7 @@ def mint_and_deposit_into_strategy(gov, asset):
 @pytest.fixture(scope="session")
 def mint_and_deposit_into_vault(gov, asset):
     def mint_and_deposit_into_vault(
-        vault, account=gov, amount_to_mint=10 ** 18, amount_to_deposit=None
+        vault, account=gov, amount_to_mint=10**18, amount_to_deposit=None
     ):
         if amount_to_deposit == None:
             amount_to_deposit = amount_to_mint

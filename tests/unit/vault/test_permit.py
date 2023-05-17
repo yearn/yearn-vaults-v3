@@ -3,7 +3,7 @@ from ape import chain
 from eth_account import Account
 from utils.constants import MAX_INT, ZERO_ADDRESS
 
-AMOUNT = 10 ** 18
+AMOUNT = 10**18
 
 
 def test_permit(bunny, asset, create_vault, sign_vault_permit):

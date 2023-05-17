@@ -40,7 +40,7 @@ struct PFConfig:
 
 # The max amount the protocol fee can be set to.
 MAX_FEE_BPS: constant(uint16) = 25 # max protocol management fee is 0.25% annual
-# Identifier for this version of vault.
+# Identifier for this version of the vault.
 API_VERSION: constant(String[28]) = "3.0.1-beta"
 
 # The address that all newly deployed vaults are based from.

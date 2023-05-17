@@ -6,7 +6,7 @@ def test_liquid_strategy__with_fee(
     gov, asset, vault, create_strategy, mint_and_deposit_into_strategy
 ):
     strategy = create_strategy(vault)
-    amount = 10 ** 18
+    amount = 10**18
 
     mint_and_deposit_into_strategy(strategy, vault, amount)
 
@@ -18,8 +18,8 @@ def test_locked_strategy__with_locked_asset(
     gov, asset, chain, vault, create_locked_strategy, mint_and_deposit_into_strategy
 ):
     strategy = create_locked_strategy(vault)
-    amount = 10 * 10 ** 18
-    locked_amount = 10 ** 18
+    amount = 10 * 10**18
+    locked_amount = 10**18
 
     mint_and_deposit_into_strategy(strategy, vault, amount)
     assert asset.balanceOf(strategy) == amount
@@ -50,8 +50,8 @@ def test_lossy_strategy__with_multiple_losses(
     gov, fish, asset, vault, create_lossy_strategy, mint_and_deposit_into_strategy
 ):
     strategy = create_lossy_strategy(vault)
-    amount = 10 * 10 ** 18
-    loss = 10 ** 18
+    amount = 10 * 10**18
+    loss = 10**18
 
     mint_and_deposit_into_strategy(strategy, vault, amount)
     assert asset.balanceOf(strategy) == amount

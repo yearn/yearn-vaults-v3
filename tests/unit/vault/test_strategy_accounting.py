@@ -6,7 +6,7 @@ from utils.utils import days_to_secs
 
 @pytest.fixture(autouse=True)
 def seed_vault_with_funds(mint_and_deposit_into_vault, vault, gov):
-    mint_and_deposit_into_vault(vault, gov, 10 ** 18, 10 ** 18 // 2)
+    mint_and_deposit_into_vault(vault, gov, 10**18, 10**18 // 2)
 
 
 @pytest.fixture(autouse=True)

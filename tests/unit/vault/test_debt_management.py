@@ -5,10 +5,10 @@ from utils.constants import DAY
 
 @pytest.fixture(autouse=True)
 def seed_vault_with_funds(mint_and_deposit_into_vault, vault, gov):
-    mint_and_deposit_into_vault(vault, gov, 10 ** 18, 10 ** 18 // 2)
+    mint_and_deposit_into_vault(vault, gov, 10**18, 10**18 // 2)
 
 
-@pytest.mark.parametrize("max_debt", [0, 10 ** 22])
+@pytest.mark.parametrize("max_debt", [0, 10**22])
 def test_update_max_debt__with_debt_value(gov, vault, strategy, max_debt):
     vault.update_max_debt_for_strategy(strategy.address, max_debt, sender=gov)
 
@@ -17,7 +17,7 @@ def test_update_max_debt__with_debt_value(gov, vault, strategy, max_debt):
 
 def test_update_max_debt__with_inactive_strategy(gov, vault, create_strategy):
     strategy = create_strategy(vault)
-    max_debt = 10 ** 18
+    max_debt = 10**18
 
     with ape.reverts("inactive strategy"):
         vault.update_max_debt_for_strategy(strategy.address, max_debt, sender=gov)
@@ -227,7 +227,7 @@ def test_update_debt__with_new_debt_greater_than_max_desired_debt(
 #
 
 
-@pytest.mark.parametrize("minimum_total_idle", [0, 10 ** 21])
+@pytest.mark.parametrize("minimum_total_idle", [0, 10**21])
 def test_set_minimum_total_idle__with_minimum_total_idle(
     gov, vault, minimum_total_idle
 ):
@@ -240,7 +240,7 @@ def test_set_minimum_total_idle__with_minimum_total_idle(
     assert event[0].minimum_total_idle == minimum_total_idle
 
 
-@pytest.mark.parametrize("minimum_total_idle", [10 ** 21])
+@pytest.mark.parametrize("minimum_total_idle", [10**21])
 def test_set_minimum_total_idle__without_permission__reverts(
     accounts, vault, minimum_total_idle
 ):

@@ -4,7 +4,6 @@
 @title Yearn V3 Vault
 @license GNU AGPLv3
 @author yearn.finance
-
 """
 
 from vyper.interfaces import ERC20
