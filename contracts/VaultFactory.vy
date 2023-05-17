@@ -34,11 +34,13 @@ event NewPendingGovernance:
     pending_governance: indexed(address)
 
 struct PFConfig:
-  fee_bps: uint16
-  fee_last_change: uint32
-  fee_recipient: address
+  fee_bps: uint16 # Annual fee to charge in Basis Points.
+  fee_last_change: uint32 # Timestamp of the Last time the fee was updated.
+  fee_recipient: address # Address for protocol fees to get paid to.
 
+# The max amount the protocol fee can be set to.
 MAX_FEE_BPS: constant(uint16) = 25 # max protocol management fee is 0.25% annual
+# Identifier for this version of vault.
 API_VERSION: constant(String[28]) = "3.0.1-beta"
 
 # The address that all newly deployed vaults are based from.
