@@ -863,20 +863,6 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
     log DebtUpdated(strategy, current_debt, new_debt)
     return new_debt
 
-@internal
-def _assess_protocol_fees(accountant_fees: uint256) -> (uint256, address):
-    protocol_fees: uint256 = 0
-    protocol_fee_recipient: address = empty(address)
-    protocol_fee_bps: uint16 = 0
-
-    protocol_fee_bps, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
-
-    if(protocol_fee_bps > 0):
-        # Protocol fees are a percent of the fees the accountant is charging.
-        protocol_fees = accountant_fees * convert(protocol_fee_bps, uint256) / MAX_BPS
-        
-    return (protocol_fees, protocol_fee_recipient)
-
 ## ACCOUNTING MANAGEMENT ##
 @internal
 def _process_report(strategy: address) -> (uint256, uint256):
@@ -923,8 +909,13 @@ def _process_report(strategy: address) -> (uint256, uint256):
     protocol_fee_recipient: address = empty(address)
     # Protocol fees will be 0 if accountant fees are 0.
     if total_fees > 0:
-        protocol_fees, protocol_fee_recipient = self._assess_protocol_fees(total_fees)
-        total_fees += protocol_fees
+        protocol_fee_bps: uint16 = 0
+        protocol_fee_bps, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
+
+        if(protocol_fee_bps > 0):
+            # Protocol fees are a percent of the fees the accountant is charging.
+            protocol_fees = total_fees * convert(protocol_fee_bps, uint256) / MAX_BPS
+            total_fees += protocol_fees
 
     # We calculate the amount of shares that could be insta unlocked to avoid pps changes
     # NOTE: this needs to be done before any pps changes
