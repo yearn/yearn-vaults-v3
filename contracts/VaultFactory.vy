@@ -161,7 +161,7 @@ def set_custom_protocol_fee_bps(vault: address, new_custom_protocol_fee: uint16)
     @notice Allows Governance to set custom protocol fees
     for a specific vault or strategy.
     @param vault The address of the vault or strategy to customize.
-    @param custom_protocol_fee The custom protocol fee in BPS.
+    @param new_custom_protocol_fee The custom protocol fee in BPS.
     """
     assert msg.sender == self.governance, "not governance"
     assert new_custom_protocol_fee <= MAX_FEE_BPS, "fee too high"
