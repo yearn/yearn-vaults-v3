@@ -34,8 +34,10 @@ event NewPendingGovernance:
     pending_governance: indexed(address)
 
 struct PFConfig:
-  fee_bps: uint16 # Percent of fees charged Yearn makes in Basis Points.
-  fee_recipient: address # Address for protocol fees to get paid to.
+    # Percent of fees charged Yearn makes in Basis Points.
+    fee_bps: uint16
+    # Address for protocol fees to get paid to.
+    fee_recipient: address
 
 # The max amount the protocol fee can be set to.
 MAX_FEE_BPS: constant(uint16) = 10_000 # max protocol fee.
@@ -67,7 +69,13 @@ def __init__(name: String[64], vault_blueprint: address):
     self.governance = msg.sender
 
 @external
-def deploy_new_vault(asset: ERC20, name: String[64], symbol: String[32], role_manager: address, profit_max_unlock_time: uint256) -> address:
+def deploy_new_vault(
+    asset: ERC20, 
+    name: String[64], 
+    symbol: String[32], 
+    role_manager: address, 
+    profit_max_unlock_time: uint256
+) -> address:
     """
     @notice Deploy a new vault
     @param asset The asset to be used for the vault
@@ -139,7 +147,10 @@ def set_protocol_fee_bps(new_protocol_fee_bps: uint16):
     assert new_protocol_fee_bps <= MAX_FEE_BPS, "fee too high"
     assert self.default_protocol_fee_config.fee_recipient != empty(address), "no recipient"
 
-    log UpdateProtocolFeeBps(self.default_protocol_fee_config.fee_bps, new_protocol_fee_bps)
+    log UpdateProtocolFeeBps(
+        self.default_protocol_fee_config.fee_bps, 
+        new_protocol_fee_bps
+    )
 
     self.default_protocol_fee_config.fee_bps = new_protocol_fee_bps
 
@@ -151,7 +162,10 @@ def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
     """
     assert msg.sender == self.governance, "not governance"
 
-    log UpdateProtocolFeeRecipient(self.default_protocol_fee_config.fee_recipient, new_protocol_fee_recipient)
+    log UpdateProtocolFeeRecipient(
+        self.default_protocol_fee_config.fee_recipient,
+        new_protocol_fee_recipient
+    )
     
     self.default_protocol_fee_config.fee_recipient = new_protocol_fee_recipient
 
