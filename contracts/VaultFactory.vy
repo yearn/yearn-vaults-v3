@@ -34,12 +34,11 @@ event NewPendingGovernance:
     pending_governance: indexed(address)
 
 struct PFConfig:
-  fee_bps: uint16 # Annual fee to charge in Basis Points.
-  fee_last_change: uint32 # Timestamp of the Last time the fee was updated.
+  fee_bps: uint16 # Percent of fees charged Yearn makes in Basis Points.
   fee_recipient: address # Address for protocol fees to get paid to.
 
 # The max amount the protocol fee can be set to.
-MAX_FEE_BPS: constant(uint16) = 25 # max protocol management fee is 0.25% annual
+MAX_FEE_BPS: constant(uint16) = 10_000 # max protocol fee.
 # Identifier for this version of the vault.
 API_VERSION: constant(String[28]) = "3.0.1-beta"
 
@@ -58,6 +57,8 @@ name: public(String[64])
 default_protocol_fee_config: public(PFConfig)
 # Can be used to customize the fee for specific vaults.
 custom_protocol_fee_config: public(HashMap[address, PFConfig])
+# TODO: Dont need a custom config just the fee now. 
+custom_protocol_fee: public(HashMap[address, bool])
 
 @external
 def __init__(name: String[64], vault_blueprint: address):
@@ -117,12 +118,12 @@ def protocol_fee_config() -> PFConfig:
     to receive the fees.
     @return The protocol fee config for the msg sender
     """
-    # If there is no custom protocol fee set we return the default.
-    if self.custom_protocol_fee_config[msg.sender].fee_last_change == 0:
-        return self.default_protocol_fee_config
-    else:
-        # Otherwise return the custom config.
+    # If there is a custom protocol fee set we return it.
+    if self.custom_protocol_fee[msg.sender]:
         return self.custom_protocol_fee_config[msg.sender]
+    else:
+        # Otherwise return the default config.
+        return self.default_protocol_fee_config
 
 @external
 def set_protocol_fee_bps(new_protocol_fee_bps: uint16):
@@ -132,11 +133,11 @@ def set_protocol_fee_bps(new_protocol_fee_bps: uint16):
     """
     assert msg.sender == self.governance, "not governance"
     assert new_protocol_fee_bps <= MAX_FEE_BPS, "fee too high"
+    assert self.default_protocol_fee_config.fee_recipient != empty(address), "no recipient"
 
     log UpdateProtocolFeeBps(self.default_protocol_fee_config.fee_bps, new_protocol_fee_bps)
 
     self.default_protocol_fee_config.fee_bps = new_protocol_fee_bps
-    self.default_protocol_fee_config.fee_last_change = convert(block.timestamp, uint32)  
 
 @external
 def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
@@ -145,7 +146,9 @@ def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
     @param new_protocol_fee_recipient The new protocol fee recipient
     """
     assert msg.sender == self.governance, "not governance"
+
     log UpdateProtocolFeeRecipient(self.default_protocol_fee_config.fee_recipient, new_protocol_fee_recipient)
+    
     self.default_protocol_fee_config.fee_recipient = new_protocol_fee_recipient
 
 @external
@@ -158,12 +161,15 @@ def set_custom_protocol_fee_bps(vault: address, custom_protocol_fee: uint16):
     """
     assert msg.sender == self.governance, "not governance"
     assert custom_protocol_fee <= MAX_FEE_BPS, "fee too high"
+    assert self.default_protocol_fee_config.fee_recipient != empty(address), "no recipient"
 
     self.custom_protocol_fee_config[vault] = PFConfig({
         fee_bps: custom_protocol_fee,
-        fee_last_change: convert(block.timestamp, uint32),
         fee_recipient: self.default_protocol_fee_config.fee_recipient
     })
+
+    if not self.custom_protocol_fee[vault]:
+        self.custom_protocol_fee[vault] = True
 
     log UpdateCustomProtocolFee(vault, custom_protocol_fee)
 
@@ -181,9 +187,11 @@ def remove_custom_protocol_fee(vault: address):
     # 0 will stop it from being used in futre reports.
     self.custom_protocol_fee_config[vault] = PFConfig({
         fee_bps: 0,
-        fee_last_change: 0,
         fee_recipient: empty(address)
     })
+
+    # Set custom Fee bool back to false.
+    self.custom_protocol_fee[vault] = False
 
     log RemovedCustomProtocolFee(vault)
 

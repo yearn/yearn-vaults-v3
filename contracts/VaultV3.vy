@@ -30,7 +30,7 @@ interface IQueueManager:
     def remove_strategy(strategy: address): nonpayable
 
 interface IFactory:
-    def protocol_fee_config() -> (uint16, uint32, address): view
+    def protocol_fee_config() -> (uint16, address): view
 
 # EVENTS #
 # ERC4626 EVENTS
@@ -128,7 +128,6 @@ struct StrategyParams:
 # CONSTANTS #
 MAX_BPS: constant(uint256) = 10_000
 MAX_BPS_EXTENDED: constant(uint256) = 1_000_000_000_000
-PROTOCOL_FEE_ASSESSMENT_PERIOD: constant(uint256) = 24 * 3600 # assess once a day
 API_VERSION: constant(String[28]) = "3.0.1-beta"
 
 # ENUMS #
@@ -216,9 +215,6 @@ profit_unlocking_rate: uint256
 # Last timestamp of the most recent _report() call
 last_profit_update: uint256
 
-# Last protocol fees were charged
-last_report: uint256
-
 # `nonces` track `permit` approvals with signature.
 nonces: public(HashMap[address, uint256])
 DOMAIN_TYPE_HASH: constant(bytes32) = keccak256('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)')
@@ -255,7 +251,6 @@ def __init__(asset: ERC20, name: String[64], symbol: String[32], role_manager: a
 
     self.name = name
     self.symbol = symbol
-    self.last_report = block.timestamp
     self.role_manager = role_manager
     self.shutdown = False
 
@@ -869,24 +864,17 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
     return new_debt
 
 @internal
-def _assess_protocol_fees() -> (uint256, address):
+def _assess_protocol_fees(accountant_fees: uint256) -> (uint256, address):
     protocol_fees: uint256 = 0
     protocol_fee_recipient: address = empty(address)
-    seconds_since_last_report: uint256 = block.timestamp - self.last_report
-    # to avoid wasting gas for minimal fees vault will only assess once every PROTOCOL_FEE_ASSESSMENT_PERIOD seconds
-    if(seconds_since_last_report >= PROTOCOL_FEE_ASSESSMENT_PERIOD):
-        protocol_fee_bps: uint16 = 0
-        protocol_fee_last_change: uint32 = 0
+    protocol_fee_bps: uint16 = 0
 
-        protocol_fee_bps, protocol_fee_last_change, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
+    protocol_fee_bps, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
 
-        if(protocol_fee_bps > 0):
-            # NOTE: charge fees since last report OR last fee change (this will mean less fees are charged after a change in protocol_fees, but fees should not change frequently)
-            seconds_since_last_report = min(seconds_since_last_report, block.timestamp - convert(protocol_fee_last_change, uint256))
-            # fees = total_assets * protocol fees bpbs * time elapsed / seconds per year / max bps
-            protocol_fees = self._total_assets() * convert(protocol_fee_bps, uint256) * seconds_since_last_report / 31_556_952 / MAX_BPS
-            self.last_report = block.timestamp
-
+    if(protocol_fee_bps > 0):
+        # Protocol fees are a percent of the fees the accountant is charging.
+        protocol_fees = accountant_fees * convert(protocol_fee_bps, uint256) / MAX_BPS
+        
     return (protocol_fees, protocol_fee_recipient)
 
 ## ACCOUNTING MANAGEMENT ##
@@ -933,8 +921,10 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Protocol fee assessment
     protocol_fees: uint256 = 0
     protocol_fee_recipient: address = empty(address)
-    protocol_fees, protocol_fee_recipient = self._assess_protocol_fees()
-    total_fees += protocol_fees
+    # Protocol fees will be 0 if accountant fees are 0.
+    if total_fees > 0:
+        protocol_fees, protocol_fee_recipient = self._assess_protocol_fees(total_fees)
+        total_fees += protocol_fees
 
     # We calculate the amount of shares that could be insta unlocked to avoid pps changes
     # NOTE: this needs to be done before any pps changes
@@ -1668,6 +1658,7 @@ def profitUnlockingRate() -> uint256:
     """
     return self.profit_unlocking_rate
 
+
 @view
 @external
 def lastReport() -> uint256:
@@ -1675,7 +1666,7 @@ def lastReport() -> uint256:
     @notice The timestamp of the last time protocol fees were charged.
     @return The last report.
     """
-    return self.last_report
+    return self.last_profit_update
 
 # eip-1344
 @view
