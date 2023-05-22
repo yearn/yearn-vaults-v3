@@ -13,7 +13,7 @@
 # VaultV3 Specification
 The Vault code has been designed as an unopinionated system to distribute funds of depositors into different opportunities (aka Strategies) and manage accounting in a robust way. That's all.
 
-The depositors receive shares of the different investments that can then be redeemed or used as yield-bearing tokens.
+The depositors receive shares of the the vaults token repersentative to their deposit that can then be redeemed or used as yield-bearing tokens.
 
 The Vault does not have a preference on any of the dimensions that should be considered when operating a vault:
 - *Decentralization*: roles can be filled by EOA, smart contract like multisig or governance module
