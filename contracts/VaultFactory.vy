@@ -40,7 +40,7 @@ struct PFConfig:
     fee_recipient: address
 
 # The max amount the protocol fee can be set to.
-MAX_FEE_BPS: constant(uint16) = 10_000 # max protocol fee.
+MAX_FEE_BPS: constant(uint16) = 5_000 # max protocol fee.
 # Identifier for this version of the vault.
 API_VERSION: constant(String[28]) = "3.0.1-beta"
 

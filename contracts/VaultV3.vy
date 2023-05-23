@@ -915,7 +915,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
         if(protocol_fee_bps > 0):
             # Protocol fees are a percent of the fees the accountant is charging.
             protocol_fees = total_fees * convert(protocol_fee_bps, uint256) / MAX_BPS
-            total_fees += protocol_fees
 
     # We calculate the amount of shares that could be insta unlocked to avoid pps changes
     # NOTE: this needs to be done before any pps changes
