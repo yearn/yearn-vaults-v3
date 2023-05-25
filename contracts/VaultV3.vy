@@ -25,11 +25,6 @@ interface IStrategy:
 interface IAccountant:
     def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
 
-interface IQueueManager:
-    def withdraw_queue(vault: address) -> (DynArray[address, 10]): nonpayable
-    def new_strategy(strategy: address): nonpayable
-    def remove_strategy(strategy: address): nonpayable
-
 interface IFactory:
     def protocol_fee_config() -> (uint16, uint32, address): view
 
@@ -95,8 +90,8 @@ event UpdateRoleManager:
 event UpdateAccountant:
     accountant: indexed(address)
 
-event UpdateQueueManager:
-    queue_manager: indexed(address)
+event UpdateDefaultQueue:
+    new_default_queue: DynArray[address, 10]
 
 event UpdatedMaxDebtForStrategy:
     sender: indexed(address)
@@ -169,8 +164,10 @@ DECIMALS: immutable(uint256)
 FACTORY: public(immutable(address))
 
 # STORAGE #
-# HashMap that records all the strategies that are allowed to receive assets from the vault
+# HashMap that records all the strategies that are allowed to receive assets from the vault.
 strategies: public(HashMap[address, StrategyParams])
+# The current default withdrawal queue.
+default_queue: public(DynArray[address, 10])
 
 # ERC20 - amount of shares per account
 balance_of: HashMap[address, uint256]
@@ -603,10 +600,10 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
 
         _strategies: DynArray[address, 10] = strategies
 
-        queue_manager: address = self.queue_manager
-        if queue_manager != empty(address):
-            if len(_strategies) == 0:
-                _strategies = IQueueManager(queue_manager).withdraw_queue(self)
+        # If no queue was passed.
+        if len(_strategies) == 0:
+                # Use the default queue.
+                _strategies = self.default_queue
 
         # load to memory to save gas
         curr_total_debt: uint256 = self.total_debt
@@ -730,12 +727,11 @@ def _add_strategy(new_strategy: address):
         max_debt: 0
     })
 
-    # we cache queue_manager since expected behavior is it being set
-    queue_manager: address = self.queue_manager
-    if queue_manager != empty(address):        
-        # tell the queue_manager we have a new strategy
-        IQueueManager(queue_manager).new_strategy(new_strategy)
-
+    # If the default queue has space, add the strategy.
+    length: uint256 = len(self.default_queue)
+    if length < 10:
+        self.default_queue.append(new_strategy)        
+        
     log StrategyChanged(new_strategy, StrategyChangeType.ADDED)
 
 @internal
@@ -757,11 +753,35 @@ def _revoke_strategy(strategy: address, force: bool=False):
       max_debt: 0
     })
 
-    # we cache queue_manager since expected behavior is it being set
-    queue_manager: address = self.queue_manager
-    if queue_manager != empty(address):
-        # tell the queue_manager we removed a strategy
-        IQueueManager(queue_manager).remove_strategy(strategy)
+    # Check if the strategy is in the default queue.
+    current_queue: DynArray[address, 10] = self.default_queue
+    offset: bool = False
+    for i in range(10):
+        _strategy: address =  current_queue[i]
+
+        # Break if zero address.
+        if strategy == empty(address):
+            break
+
+        # Remove the strategy if its in the queue.
+        if _strategy == strategy:
+            # If we are already the last idx just remove it.
+            if i == len(current_queue) - 1:
+                current_queue[i] = empty(address)
+                break
+            else:
+                # Move every strategy up one index.
+                offset = True
+                
+        elif offset:
+            # Move the strategy up one index.
+            current_queue[i - 1] = _strategy
+            if i == len(current_queue) - 1:
+                # Set this index to 0 if its the last one.
+                current_queue[i] = empty(address)
+
+    # Set the default queue to our updated queue
+    self.default_queue = current_queue
 
     log StrategyChanged(strategy, StrategyChangeType.REVOKED)
 
@@ -1041,14 +1061,20 @@ def set_accountant(new_accountant: address):
     log UpdateAccountant(new_accountant)
 
 @external
-def set_queue_manager(new_queue_manager: address):
+def set_default_queue(new_default_queue: DynArray[address, 10]):
     """
-    @notice Set the new queue manager address.
-    @param new_queue_manager The new queue manager address.
+    @notice Set the new default queue array.
+    @param new_default_queue The new default queue array.
     """
     self._enforce_role(msg.sender, Roles.QUEUE_MANAGER)
-    self.queue_manager = new_queue_manager
-    log UpdateQueueManager(new_queue_manager)
+
+    # Make sure every strategy in the new queue is active.
+    for strategy in new_default_queue:
+        assert self.strategies[strategy].activation != 0, "!inactive"
+
+    self.default_queue = new_default_queue
+
+    log UpdateDefaultQueue(new_default_queue)
 
 @external
 def set_deposit_limit(deposit_limit: uint256):
