@@ -33,6 +33,8 @@ def test_withdraw__no_queue__with_insufficient_funds_in_vault__reverts(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, amount)
 
+    vault.set_default_queue(strategies, sender=gov)
+
     with ape.reverts("insufficient assets in vault"):
         vault.withdraw(
             shares,
@@ -52,11 +54,9 @@ def test_withdraw__queue__with_insufficient_funds_in_vault__withdraws(
     user_deposit,
     add_strategy_to_vault,
     add_debt_to_strategy,
-    deploy_generic_queue_manager,
 ):
-    queue_manager = deploy_generic_queue_manager()
     vault = create_vault(asset)
-    vault.set_queue_manager(queue_manager, sender=gov)
+
     amount = fish_amount
     shares = amount
     strategy = create_strategy(vault)
@@ -74,7 +74,7 @@ def test_withdraw__queue__with_insufficient_funds_in_vault__withdraws(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, amount)
 
-    queue_manager.setQueue(vault, strategies, sender=gov)
+    vault.set_default_queue(strategies, sender=gov)
 
     tx = vault.withdraw(
         shares,
@@ -108,11 +108,9 @@ def test_withdraw__queue__with_inactive_strategy__reverts(
     user_deposit,
     add_strategy_to_vault,
     add_debt_to_strategy,
-    deploy_generic_queue_manager,
 ):
-    queue_manager = deploy_generic_queue_manager()
     vault = create_vault(asset)
-    vault.set_queue_manager(queue_manager, sender=gov)
+
     amount = fish_amount
     shares = amount
     strategy = create_strategy(vault)
@@ -131,7 +129,7 @@ def test_withdraw__queue__with_inactive_strategy__reverts(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, amount)
 
-    queue_manager.setQueue(vault, strategies, sender=gov)
+    vault.set_default_queue(strategies, sender=gov)
 
     with ape.reverts("inactive strategy"):
         vault.withdraw(
@@ -152,11 +150,9 @@ def test_withdraw__queue__with_liquid_strategy__withdraws(
     user_deposit,
     add_strategy_to_vault,
     add_debt_to_strategy,
-    deploy_generic_queue_manager,
 ):
-    queue_manager = deploy_generic_queue_manager()
     vault = create_vault(asset)
-    vault.set_queue_manager(queue_manager, sender=gov)
+
     amount = fish_amount
     shares = amount
     strategy = create_strategy(vault)
@@ -173,7 +169,8 @@ def test_withdraw__queue__with_liquid_strategy__withdraws(
     user_deposit(fish, vault, asset, amount)
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, amount)
-    queue_manager.setQueue(vault, strategies, sender=gov)
+
+    vault.set_default_queue(strategies, sender=gov)
 
     tx = vault.withdraw(shares, fish.address, fish.address, sender=fish)
     event = list(tx.decode_logs(vault.Withdraw))
@@ -202,11 +199,9 @@ def test_withdraw__queue__with_inactive_strategy__reverts(
     user_deposit,
     add_strategy_to_vault,
     add_debt_to_strategy,
-    deploy_generic_queue_manager,
 ):
-    queue_manager = deploy_generic_queue_manager()
     vault = create_vault(asset)
-    vault.set_queue_manager(queue_manager, sender=gov)
+
     amount = fish_amount
     shares = amount
     strategy = create_strategy(vault)
@@ -225,9 +220,6 @@ def test_withdraw__queue__with_inactive_strategy__reverts(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, amount)
 
-    # add correct strategy and should be overridden
-    queue_manager.setQueue(vault, [strategy], sender=gov)
-
     with ape.reverts("inactive strategy"):
         vault.withdraw(
             shares,
@@ -238,76 +230,4 @@ def test_withdraw__queue__with_inactive_strategy__reverts(
         )
 
 
-# max withdraw and maxRedeem tests
-
-
-def test_max_withdraw___with_queue__with_balance_greater_than_total_idle__returns_balance(
-    gov,
-    fish,
-    fish_amount,
-    asset,
-    create_vault,
-    create_strategy,
-    add_debt_to_strategy,
-    add_strategy_to_vault,
-    user_deposit,
-    deploy_generic_queue_manager,
-):
-    queue_manager = deploy_generic_queue_manager()
-    vault = create_vault(asset)
-    vault.set_queue_manager(queue_manager, sender=gov)
-    assets = fish_amount
-    strategy = create_strategy(vault)
-    strategy_deposit = assets // 2
-    total_idle = assets - strategy_deposit
-
-    vault.set_role(
-        gov.address,
-        ROLES.ADD_STRATEGY_MANAGER
-        | ROLES.DEBT_MANAGER
-        | ROLES.MAX_DEBT_MANAGER
-        | ROLES.QUEUE_MANAGER,
-        sender=gov,
-    )
-    user_deposit(fish, vault, asset, assets)
-    add_strategy_to_vault(gov, strategy, vault)
-    add_debt_to_strategy(gov, strategy, vault, strategy_deposit)
-    queue_manager.setQueue(vault, [strategy], sender=gov)
-
-    assert vault.maxWithdraw(fish.address) == assets
-
-
-def test_max_redeem__with_queue__with_balance_greater_than_total_idle__returns_balance(
-    asset,
-    fish,
-    fish_amount,
-    gov,
-    create_vault,
-    create_strategy,
-    add_debt_to_strategy,
-    add_strategy_to_vault,
-    user_deposit,
-    deploy_generic_queue_manager,
-):
-    queue_manager = deploy_generic_queue_manager()
-    vault = create_vault(asset)
-    vault.set_queue_manager(queue_manager, sender=gov)
-    shares = fish_amount
-    assets = shares
-    strategy = create_strategy(vault)
-    strategy_deposit = assets // 2
-    total_idle = assets - strategy_deposit
-
-    vault.set_role(
-        gov.address,
-        ROLES.ADD_STRATEGY_MANAGER
-        | ROLES.DEBT_MANAGER
-        | ROLES.MAX_DEBT_MANAGER
-        | ROLES.QUEUE_MANAGER,
-        sender=gov,
-    )
-    user_deposit(fish, vault, asset, assets)
-    add_strategy_to_vault(gov, strategy, vault)
-    add_debt_to_strategy(gov, strategy, vault, strategy_deposit)
-
-    assert vault.maxRedeem(fish.address) == assets
+# TODO: Add test to check romval and adding strategies works.

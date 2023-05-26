@@ -187,8 +187,6 @@ minimum_total_idle: public(uint256)
 deposit_limit: public(uint256)
 # Contract that charges fees and can give refunds
 accountant: public(address)
-# Contract that will supply a optimal withdrawal queue of strategies
-queue_manager: public(address)
 # HashMap mapping addresses to their roles
 roles: public(HashMap[address, Roles])
 # HashMap mapping roles to their permissioned state. If false, the role is not open to the public
@@ -521,24 +519,12 @@ def _max_deposit(receiver: address) -> uint256:
 @view
 @internal
 def _max_redeem(owner: address) -> uint256:
-    if self.queue_manager != empty(address):
-        # if a queue_manager is set we assume full redeems are possible
-        return self.balance_of[owner]
-    else:
-        # NOTE: this will return the max amount that is available to redeem using ERC4626 
-        # (which can only withdraw from the vault contract)
-        return min(self.balance_of[owner], self._convert_to_shares(self.total_idle, Rounding.ROUND_DOWN))
+    return self.balance_of[owner]
 
 @view
 @internal
 def _max_withdraw(owner: address) -> uint256:
-    if self.queue_manager != empty(address):
-        # if a queue_manager is set we assume full withdraws are possible
-        return self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN)
-    else:
-        # NOTE: this will return the max amount that is available to withdraw using ERC4626 
-        # (which can only withdraw from the vault contract)
-        return min(self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN), self.total_idle)
+    return self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN)
 
 @internal
 def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
@@ -1194,7 +1180,6 @@ def pricePerShare() -> uint256:
     """
     return self._convert_to_assets(10 ** DECIMALS, Rounding.ROUND_DOWN)
 
-
 @view
 @external
 def availableDepositLimit() -> uint256:
@@ -1205,6 +1190,11 @@ def availableDepositLimit() -> uint256:
     if self.deposit_limit > self._total_assets():
         return self.deposit_limit - self._total_assets()
     return 0
+
+@view
+@external
+def get_default_queue() -> DynArray[address, 10]:
+    return self.default_queue
 
 ## REPORTING MANAGEMENT ##
 @external
@@ -1607,8 +1597,6 @@ def maxWithdraw(owner: address) -> uint256:
     @param owner The address that owns the shares.
     @return The maximum amount of assets that can be withdrawn.
     """
-    # NOTE: if a queue_manager is not set a withdraw function that complies with ERC4626 won't withdraw from strategies, 
-    #       so this will just uses liquidity available in the vault contract
     return self._max_withdraw(owner)
 
 @view
@@ -1619,8 +1607,6 @@ def maxRedeem(owner: address) -> uint256:
     @param owner The address that owns the shares.
     @return The maximum amount of shares that can be redeemed.
     """
-    # NOTE: if a queue_manager is not set a redeem function that complies with ERC4626 won't withdraw from strategies, 
-    #       so this will just uses liquidity available in the vault contract
     return self._max_redeem(owner)
 
 @view
