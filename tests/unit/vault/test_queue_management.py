@@ -230,4 +230,120 @@ def test_withdraw__queue__with_inactive_strategy__reverts(
         )
 
 
-# TODO: Add test to check romval and adding strategies works.
+# TODO: Add test to check removal and adding strategies works.
+def test__add_strategy__adds_to_queue(create_vault, asset, gov, create_strategy):
+    vault = create_vault(asset)
+
+    assert vault.get_default_queue() == []
+
+    strategy_one = create_strategy(vault)
+    vault.add_strategy(strategy_one.address, sender=gov)
+
+    assert vault.get_default_queue() == [strategy_one.address]
+
+    strategy_two = create_strategy(vault)
+    vault.add_strategy(strategy_two.address, sender=gov)
+
+    assert vault.get_default_queue() == [strategy_one.address, strategy_two.address]
+
+
+def test__add_eleven_strategies__adds_ten_to_queue(
+    create_vault, asset, gov, create_strategy
+):
+    vault = create_vault(asset)
+
+    assert vault.get_default_queue() == []
+
+    for i in range(10):
+        strategy = create_strategy(vault)
+        vault.add_strategy(strategy.address, sender=gov)
+
+        assert len(vault.get_default_queue()) == i + 1
+
+    default_queue = vault.get_default_queue()
+    assert len(default_queue) == 10
+
+    # Make sure we can still add a strategy, but doesnt change the queue
+    strategy = create_strategy(vault)
+    vault.add_strategy(strategy.address, sender=gov)
+
+    assert vault.strategies(strategy.address)["activation"] != 0
+
+    new_queue = vault.get_default_queue()
+    assert default_queue == new_queue
+    assert len(new_queue) == 10
+
+    for _strategy in new_queue:
+        assert _strategy != strategy.address
+
+
+def test__revoke_strategy__removes_strategy_from_queue(
+    create_vault, asset, gov, create_strategy
+):
+    vault = create_vault(asset)
+
+    assert vault.get_default_queue() == []
+
+    strategy_one = create_strategy(vault)
+    vault.add_strategy(strategy_one.address, sender=gov)
+
+    assert vault.get_default_queue() == [strategy_one.address]
+
+    vault.revoke_strategy(strategy_one.address, sender=gov)
+
+    assert vault.strategies(strategy_one.address)["activation"] == 0
+    assert vault.get_default_queue() == []
+
+
+def test__revoke_strategy__mulitple_strategies__removes_strategy_from_queue(
+    create_vault, asset, gov, create_strategy
+):
+    vault = create_vault(asset)
+
+    assert vault.get_default_queue() == []
+
+    strategy_one = create_strategy(vault)
+    vault.add_strategy(strategy_one.address, sender=gov)
+
+    assert vault.get_default_queue() == [strategy_one.address]
+
+    strategy_two = create_strategy(vault)
+    vault.add_strategy(strategy_two.address, sender=gov)
+
+    assert vault.get_default_queue() == [strategy_one.address, strategy_two.address]
+
+    vault.revoke_strategy(strategy_one.address, sender=gov)
+
+    assert vault.strategies(strategy_one.address)["activation"] == 0
+    assert vault.get_default_queue() == [strategy_two.address]
+
+
+def test__reomve_eleventh_strategy__doesnt_change_queue(
+    create_vault, asset, gov, create_strategy
+):
+    vault = create_vault(asset)
+
+    assert vault.get_default_queue() == []
+
+    for i in range(10):
+        strategy = create_strategy(vault)
+        vault.add_strategy(strategy.address, sender=gov)
+
+        assert len(vault.get_default_queue()) == i + 1
+
+    default_queue = vault.get_default_queue()
+    assert len(default_queue) == 10
+
+    # Make sure we can still add a strategy, but doesnt change the queue
+    strategy = create_strategy(vault)
+    vault.add_strategy(strategy.address, sender=gov)
+
+    assert vault.strategies(strategy.address)["activation"] != 0
+
+    vault.revoke_strategy(strategy.address, sender=gov)
+
+    assert vault.strategies(strategy.address)["activation"] == 0
+
+    new_queue = vault.get_default_queue()
+    assert default_queue == new_queue
+    assert len(new_queue) == 10

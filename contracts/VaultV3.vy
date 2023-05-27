@@ -739,35 +739,17 @@ def _revoke_strategy(strategy: address, force: bool=False):
       max_debt: 0
     })
 
-    # Check if the strategy is in the default queue.
+    # Remove strategy if it is in the default queue.
     current_queue: DynArray[address, 10] = self.default_queue
-    offset: bool = False
-    for i in range(10):
-        _strategy: address =  current_queue[i]
-
-        # Break if zero address.
-        if strategy == empty(address):
-            break
-
-        # Remove the strategy if its in the queue.
+    new_queue: DynArray[address, 10] = []
+    for _strategy in current_queue:
         if _strategy == strategy:
-            # If we are already the last idx just remove it.
-            if i == len(current_queue) - 1:
-                current_queue[i] = empty(address)
-                break
-            else:
-                # Move every strategy up one index.
-                offset = True
-                
-        elif offset:
-            # Move the strategy up one index.
-            current_queue[i - 1] = _strategy
-            if i == len(current_queue) - 1:
-                # Set this index to 0 if its the last one.
-                current_queue[i] = empty(address)
-
+            continue
+        
+        new_queue.append(_strategy)
+        
     # Set the default queue to our updated queue
-    self.default_queue = current_queue
+    self.default_queue = new_queue
 
     log StrategyChanged(strategy, StrategyChangeType.REVOKED)
 

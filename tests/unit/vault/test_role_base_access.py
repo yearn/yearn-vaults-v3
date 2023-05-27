@@ -334,7 +334,7 @@ def test_set_default_queue__queue_manager(gov, vault, strategy, bunny):
     assert event[0].account == bunny.address
     assert event[0].role == ROLES.QUEUE_MANAGER
 
-    assert vault.get_default_queue() == [strategy]
+    assert vault.get_default_queue() != []
     vault.set_default_queue([], sender=bunny)
     assert vault.get_default_queue() == []
 

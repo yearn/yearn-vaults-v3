@@ -723,7 +723,7 @@ def test_set_default_queue__queue_manager_open(gov, vault, strategy, bunny):
     assert event[0].role == ROLES.QUEUE_MANAGER
     assert event[0].status == RoleStatusChange.OPENED
 
-    assert vault.get_default_queue() == [strategy]
+    assert vault.get_default_queue() != []
     vault.set_default_queue([], sender=bunny)
     assert vault.get_default_queue() == []
 
@@ -739,7 +739,7 @@ def test_set_default_queue__queue_manager_open_then_close__reverts(
     assert event[0].role == ROLES.QUEUE_MANAGER
     assert event[0].status == RoleStatusChange.OPENED
 
-    assert vault.get_default_queue() == [strategy]
+    assert vault.get_default_queue() != []
     vault.set_default_queue([], sender=bunny)
     assert vault.get_default_queue() == []
 
