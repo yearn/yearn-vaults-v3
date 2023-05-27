@@ -663,8 +663,6 @@ def _redeem(
 
     # load to memory to save gas
     curr_total_idle: uint256 = self.total_idle
-    # Expected behavior is to use asset multiple times.
-    asset: ERC20 = ASSET
     
     # If there are not enough assets in the Vault contract, we try to free 
     # funds from strategies specified in the input,
@@ -689,7 +687,7 @@ def _redeem(
         assets_to_withdraw: uint256 = 0
 
         # To compare against real withdrawals from strategies
-        previous_balance: uint256 = asset.balanceOf(self)
+        previous_balance: uint256 = ASSET.balanceOf(self)
 
         for strategy in _strategies:
             assert self.strategies[strategy].activation != 0, "inactive strategy"
@@ -749,7 +747,7 @@ def _redeem(
             
             # WITHDRAW FROM STRATEGY
             IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
-            post_balance: uint256 = asset.balanceOf(self)
+            post_balance: uint256 = ASSET.balanceOf(self)
             
             loss: uint256 = 0
             # If we have not received what we expected, we consider the difference a loss.
@@ -790,7 +788,7 @@ def _redeem(
     # Commit memory to storage.
     self.total_idle = curr_total_idle - requested_assets
     # Transfer the requested amount to the receiver.
-    self._erc20_safe_transfer(asset.address, receiver, requested_assets)
+    self._erc20_safe_transfer(ASSET.address, receiver, requested_assets)
 
     log Withdraw(sender, receiver, owner, requested_assets, shares)
     return requested_assets
@@ -873,9 +871,6 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
 
     assert new_debt != current_debt, "new debt equals current debt"
 
-    # We always use `ASSET` at least twice so we cache it.
-    asset: ERC20 = ASSET
-
     if current_debt > new_debt:
         # Reduce debt.
         assets_to_withdraw: uint256 = current_debt - new_debt
@@ -904,9 +899,9 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         assert unrealised_losses_share == 0, "strategy has unrealised losses"
         
         # Always check the actual amount withdrawn.
-        pre_balance: uint256 = asset.balanceOf(self)
+        pre_balance: uint256 = ASSET.balanceOf(self)
         IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
-        post_balance: uint256 = asset.balanceOf(self)
+        post_balance: uint256 = ASSET.balanceOf(self)
         
         # making sure we are changing according to the real result no matter what. 
         # This will spend more gas but makes it more robust. Also prevents issues
@@ -948,15 +943,15 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         # Can't Deposit 0.
         if assets_to_deposit > 0:
             # Approve the strategy to pull only what we are giving it.
-            self._erc20_safe_approve(asset.address, strategy, assets_to_deposit)
+            self._erc20_safe_approve(ASSET.address, strategy, assets_to_deposit)
 
             # Always update based on actual amounts deposited.
-            pre_balance: uint256 = asset.balanceOf(self)
+            pre_balance: uint256 = ASSET.balanceOf(self)
             IStrategy(strategy).deposit(assets_to_deposit, self)
-            post_balance: uint256 = asset.balanceOf(self)
+            post_balance: uint256 = ASSET.balanceOf(self)
 
             # Make sure our approval is always back to 0.
-            self._erc20_safe_approve(asset.address, strategy, 0)
+            self._erc20_safe_approve(ASSET.address, strategy, 0)
 
             # Making sure we are changing according to the real result no 
             # matter what. This will spend more gas but makes it more robust.
@@ -1371,11 +1366,9 @@ def buy_debt(strategy: address, amount: uint256):
     assert shares > 0, "can't buy 0"
     assert shares <= IStrategy(strategy).balanceOf(self), "not enough shares"
 
-    asset: ERC20 = ASSET
-
-    before_balance: uint256 = asset.balanceOf(self)
-    self._erc20_safe_transfer_from(asset.address, msg.sender, self, amount)
-    after_balance: uint256 = asset.balanceOf(self)
+    before_balance: uint256 = ASSET.balanceOf(self)
+    self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, amount)
+    after_balance: uint256 = ASSET.balanceOf(self)
 
     assert after_balance - before_balance >= amount
 
