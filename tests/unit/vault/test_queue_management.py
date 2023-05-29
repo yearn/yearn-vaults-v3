@@ -1,5 +1,6 @@
 import ape
 import pytest
+from web3 import Web3
 from utils import checks
 from utils.constants import DAY, ROLES
 
@@ -129,13 +130,12 @@ def test_withdraw__queue__with_inactive_strategy__reverts(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, amount)
 
-    vault.set_default_queue(strategies, sender=gov)
-
     with ape.reverts("inactive strategy"):
         vault.withdraw(
             shares,
             fish.address,
             fish.address,
+            strategies,
             sender=fish,
         )
 
@@ -170,9 +170,7 @@ def test_withdraw__queue__with_liquid_strategy__withdraws(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, amount)
 
-    vault.set_default_queue(strategies, sender=gov)
-
-    tx = vault.withdraw(shares, fish.address, fish.address, sender=fish)
+    tx = vault.withdraw(shares, fish.address, fish.address, strategies, sender=fish)
     event = list(tx.decode_logs(vault.Withdraw))
 
     assert len(event) >= 1
@@ -347,3 +345,69 @@ def test__reomve_eleventh_strategy__doesnt_change_queue(
     new_queue = vault.get_default_queue()
     assert default_queue == new_queue
     assert len(new_queue) == 10
+
+
+def test__set_default_queue(create_vault, asset, gov, create_strategy):
+    vault = create_vault(asset)
+
+    assert vault.get_default_queue() == []
+
+    strategy_one = create_strategy(vault)
+    vault.add_strategy(strategy_one.address, sender=gov)
+
+    strategy_two = create_strategy(vault)
+    vault.add_strategy(strategy_two.address, sender=gov)
+
+    assert vault.get_default_queue() == [strategy_one.address, strategy_two.address]
+
+    new_queue = [strategy_two.address, strategy_one.address]
+
+    tx = vault.set_default_queue(new_queue, sender=gov)
+
+    event = list(tx.decode_logs(vault.UpdateDefaultQueue))
+
+    assert len(event) == 1
+    event_queue = list(event[0].new_default_queue)
+    # Need to checksum each address to compare it correctly.
+    for i in range(len(new_queue)):
+        assert Web3.toChecksumAddress(event_queue[i]) == new_queue[i]
+
+
+def test__set_default_queue__inactive_strategy__reverts(
+    create_vault, asset, gov, create_strategy
+):
+    vault = create_vault(asset)
+
+    assert vault.get_default_queue() == []
+
+    strategy_one = create_strategy(vault)
+    vault.add_strategy(strategy_one.address, sender=gov)
+
+    # Create second strategy without adding it to the vault.
+    strategy_two = create_strategy(vault)
+
+    assert vault.get_default_queue() == [strategy_one.address]
+
+    new_queue = [strategy_two.address, strategy_one.address]
+
+    with ape.reverts("!inactive"):
+        vault.set_default_queue(new_queue, sender=gov)
+
+
+def test__set_default_queue__queue_to_long__reverts(
+    create_vault, asset, gov, create_strategy
+):
+    vault = create_vault(asset)
+
+    assert vault.get_default_queue() == []
+
+    strategy_one = create_strategy(vault)
+    vault.add_strategy(strategy_one.address, sender=gov)
+
+    assert vault.get_default_queue() == [strategy_one.address]
+
+    # Create a mock queue longer than 10.
+    new_queue = [strategy_one.address for i in range(11)]
+
+    with ape.reverts():
+        vault.set_default_queue(new_queue, sender=gov)

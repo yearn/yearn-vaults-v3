@@ -136,7 +136,7 @@ enum Roles:
     REVOKE_STRATEGY_MANAGER # can remove strategies from the vault
     FORCE_REVOKE_MANAGER # can force remove a strategy causing a loss
     ACCOUNTANT_MANAGER # can set the accountant that assesss fees
-    QUEUE_MANAGER # can set the queue_manager
+    QUEUE_MANAGER # can set the default withdrawal queue.
     REPORTING_MANAGER # calls report for strategies
     DEBT_MANAGER # adds and removes debt from strategies
     MAX_DEBT_MANAGER # can set the max debt for a strategy
@@ -1040,6 +1040,7 @@ def set_default_queue(new_default_queue: DynArray[address, 10]):
     for strategy in new_default_queue:
         assert self.strategies[strategy].activation != 0, "!inactive"
 
+    # Save the new queue.
     self.default_queue = new_default_queue
 
     log UpdateDefaultQueue(new_default_queue)
@@ -1176,6 +1177,10 @@ def availableDepositLimit() -> uint256:
 @view
 @external
 def get_default_queue() -> DynArray[address, 10]:
+    """
+    @notice Get the full default queue currently set.
+    @return The current default withdrawal queue.
+    """
     return self.default_queue
 
 ## REPORTING MANAGEMENT ##
