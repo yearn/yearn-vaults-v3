@@ -13,6 +13,11 @@ def test__set_protocol_fee_recipient(gov, vault_factory):
     assert vault_factory.protocol_fee_config().fee_recipient == gov.address
 
 
+def test__set_protocol_fee_recipient__zero_address__reverts(gov, vault_factory):
+    with ape.reverts("zero address"):
+        vault_factory.set_protocol_fee_recipient(ZERO_ADDRESS, sender=gov)
+
+
 def test__set_protocol_fees(gov, vault_factory):
     assert vault_factory.protocol_fee_config().fee_bps == 0
 

@@ -34,13 +34,13 @@ event NewPendingGovernance:
     pending_governance: indexed(address)
 
 struct PFConfig:
-    # Percent of fees charged Yearn makes in Basis Points.
+    # Percent of fees payed to Yearn in Basis Points.
     fee_bps: uint16
     # Address for protocol fees to get paid to.
     fee_recipient: address
 
 # The max amount the protocol fee can be set to.
-MAX_FEE_BPS: constant(uint16) = 5_000 # max protocol fee.
+MAX_FEE_BPS: constant(uint16) = 5_000
 # Identifier for this version of the vault.
 API_VERSION: constant(String[28]) = "3.0.1-beta"
 
@@ -77,7 +77,7 @@ def deploy_new_vault(
     profit_max_unlock_time: uint256
 ) -> address:
     """
-    @notice Deploy a new vault
+    @notice Deploys a new vault
     @param asset The asset to be used for the vault
     @param name The name of the vault
     @param symbol The symbol of the vault
@@ -161,6 +161,7 @@ def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
     @param new_protocol_fee_recipient The new protocol fee recipient
     """
     assert msg.sender == self.governance, "not governance"
+    assert new_protocol_fee_recipient != empty(address), "zero address"
 
     log UpdateProtocolFeeRecipient(
         self.default_protocol_fee_config.fee_recipient,
@@ -213,8 +214,9 @@ def set_governance(new_governance: address):
     @param new_governance The new governance address
     """
     assert msg.sender == self.governance, "not governance"
-    log NewPendingGovernance(new_governance)
     self.pending_governance = new_governance
+
+    log NewPendingGovernance(new_governance)
 
 @external
 def accept_governance():
@@ -223,6 +225,7 @@ def accept_governance():
     """
     assert msg.sender == self.pending_governance, "not pending governance"
     self.governance = msg.sender
-    log UpdateGovernance(msg.sender)
     self.pending_governance = empty(address)
+
+    log UpdateGovernance(msg.sender)
 
