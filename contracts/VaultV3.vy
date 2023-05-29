@@ -91,7 +91,7 @@ event UpdateAccountant:
     accountant: indexed(address)
 
 event UpdateDefaultQueue:
-    new_default_queue: DynArray[address, 10]
+    new_default_queue: DynArray[address, MAX_QUEUE]
 
 event UpdatedMaxDebtForStrategy:
     sender: indexed(address)
@@ -124,6 +124,7 @@ struct StrategyParams:
 # CONSTANTS #
 MAX_BPS: constant(uint256) = 10_000
 MAX_BPS_EXTENDED: constant(uint256) = 1_000_000_000_000
+MAX_QUEUE: constant(uint256) = 10
 PROTOCOL_FEE_ASSESSMENT_PERIOD: constant(uint256) = 24 * 3600 # assess once a day
 API_VERSION: constant(String[28]) = "3.1.0"
 
@@ -167,7 +168,7 @@ FACTORY: public(immutable(address))
 # HashMap that records all the strategies that are allowed to receive assets from the vault.
 strategies: public(HashMap[address, StrategyParams])
 # The current default withdrawal queue.
-default_queue: public(DynArray[address, 10])
+default_queue: public(DynArray[address, MAX_QUEUE])
 
 # ERC20 - amount of shares per account
 balance_of: HashMap[address, uint256]
@@ -584,7 +585,7 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
     # If there are not enough assets in the Vault contract, we try to free funds from strategies specified in the input
     if requested_assets > curr_total_idle:
 
-        _strategies: DynArray[address, 10] = strategies
+        _strategies: DynArray[address, MAX_QUEUE] = strategies
 
         # If no queue was passed.
         if len(_strategies) == 0:
@@ -715,7 +716,7 @@ def _add_strategy(new_strategy: address):
 
     # If the default queue has space, add the strategy.
     length: uint256 = len(self.default_queue)
-    if length < 10:
+    if length < MAX_QUEUE:
         self.default_queue.append(new_strategy)        
         
     log StrategyChanged(new_strategy, StrategyChangeType.ADDED)
@@ -740,8 +741,8 @@ def _revoke_strategy(strategy: address, force: bool=False):
     })
 
     # Remove strategy if it is in the default queue.
-    current_queue: DynArray[address, 10] = self.default_queue
-    new_queue: DynArray[address, 10] = []
+    current_queue: DynArray[address, MAX_QUEUE] = self.default_queue
+    new_queue: DynArray[address, MAX_QUEUE] = []
     for _strategy in current_queue:
         if _strategy == strategy:
             continue
@@ -1029,7 +1030,7 @@ def set_accountant(new_accountant: address):
     log UpdateAccountant(new_accountant)
 
 @external
-def set_default_queue(new_default_queue: DynArray[address, 10]):
+def set_default_queue(new_default_queue: DynArray[address, MAX_QUEUE]):
     """
     @notice Set the new default queue array.
     @param new_default_queue The new default queue array.
@@ -1351,7 +1352,7 @@ def mint(shares: uint256, receiver: address) -> uint256:
 
 @external
 @nonreentrant("lock")
-def withdraw(assets: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
+def withdraw(assets: uint256, receiver: address, owner: address, strategies: DynArray[address, MAX_QUEUE] = []) -> uint256:
     """
     @notice Withdraw an amount of asset to `receiver` burning `owner`s shares.
     @param assets The amount of asset to withdraw.
@@ -1366,7 +1367,7 @@ def withdraw(assets: uint256, receiver: address, owner: address, strategies: Dyn
 
 @external
 @nonreentrant("lock")
-def redeem(shares: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
+def redeem(shares: uint256, receiver: address, owner: address, strategies: DynArray[address, MAX_QUEUE] = []) -> uint256:
     """
     @notice Redeems an amount of shares of `owners` shares sending funds to `receiver`.
     @param shares The amount of shares to burn.
