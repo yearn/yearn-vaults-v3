@@ -122,9 +122,9 @@ struct StrategyParams:
     max_debt: uint256
 
 # CONSTANTS #
+MAX_QUEUE: constant(uint256) = 10
 MAX_BPS: constant(uint256) = 10_000
 MAX_BPS_EXTENDED: constant(uint256) = 1_000_000_000_000
-MAX_QUEUE: constant(uint256) = 10
 PROTOCOL_FEE_ASSESSMENT_PERIOD: constant(uint256) = 24 * 3600 # assess once a day
 API_VERSION: constant(String[28]) = "3.1.0"
 
@@ -567,7 +567,7 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
     return losses_user_share
 
 @internal
-def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: uint256, strategies: DynArray[address, 10]) -> uint256:
+def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: uint256, strategies: DynArray[address, MAX_QUEUE]) -> uint256:
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
 
@@ -715,8 +715,7 @@ def _add_strategy(new_strategy: address):
     })
 
     # If the default queue has space, add the strategy.
-    length: uint256 = len(self.default_queue)
-    if length < MAX_QUEUE:
+    if len(self.default_queue) < MAX_QUEUE:
         self.default_queue.append(new_strategy)        
         
     log StrategyChanged(new_strategy, StrategyChangeType.ADDED)
@@ -741,9 +740,8 @@ def _revoke_strategy(strategy: address, force: bool=False):
     })
 
     # Remove strategy if it is in the default queue.
-    current_queue: DynArray[address, MAX_QUEUE] = self.default_queue
     new_queue: DynArray[address, MAX_QUEUE] = []
-    for _strategy in current_queue:
+    for _strategy in self.default_queue:
         if _strategy == strategy:
             continue
         
@@ -1033,6 +1031,7 @@ def set_accountant(new_accountant: address):
 def set_default_queue(new_default_queue: DynArray[address, MAX_QUEUE]):
     """
     @notice Set the new default queue array.
+    @dev Will check each strategy to make sure it is active.
     @param new_default_queue The new default queue array.
     """
     self._enforce_role(msg.sender, Roles.QUEUE_MANAGER)
