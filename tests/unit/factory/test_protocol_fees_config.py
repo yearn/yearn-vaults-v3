@@ -154,7 +154,7 @@ def test__set__custom_protocol_fees_too_high__reverts(
 def test__remove_custom_protocol_fee_by_bunny__reverts(
     bunny, vault_factory, create_vault, asset
 ):
-    vault = create_vault(asset)
+    vault = create_vault(asset, vault_name="new vault")
     with ape.reverts("not governance"):
         vault_factory.remove_custom_protocol_fee(vault, sender=bunny)
 

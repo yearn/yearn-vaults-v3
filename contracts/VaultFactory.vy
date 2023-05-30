@@ -141,6 +141,8 @@ def protocol_fee_config() -> PFConfig:
 def set_protocol_fee_bps(new_protocol_fee_bps: uint16):
     """
     @notice Set the protocol fee in basis points
+    @dev Must be below the max allowed fee, and a default
+    fee_recipient must be set so we don't issue fees to the 0 addresss.
     @param new_protocol_fee_bps The new protocol fee in basis points
     """
     assert msg.sender == self.governance, "not governance"
@@ -175,6 +177,8 @@ def set_custom_protocol_fee_bps(vault: address, new_custom_protocol_fee: uint16)
     """
     @notice Allows Governance to set custom protocol fees
     for a specific vault or strategy.
+    @dev Must be below the max allowed fee, and a default
+    fee_recipient must be set so we don't issue fees to the 0 addresss.
     @param vault The address of the vault or strategy to customize.
     @param new_custom_protocol_fee The custom protocol fee in BPS.
     """
@@ -184,6 +188,8 @@ def set_custom_protocol_fee_bps(vault: address, new_custom_protocol_fee: uint16)
 
     self.custom_protocol_fee[vault] = new_custom_protocol_fee
 
+    # If this is the first time a custom fee is set for this vault
+    # set the bool indicator so it returns the correct fee.
     if not self.use_custom_protocol_fee[vault]:
         self.use_custom_protocol_fee[vault] = True
 
