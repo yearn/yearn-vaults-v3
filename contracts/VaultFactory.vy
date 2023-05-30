@@ -27,6 +27,9 @@ event UpdateCustomProtocolFee:
 event RemovedCustomProtocolFee:
     vault: indexed(address)
 
+event FactoryShutdown():
+    pass
+
 event UpdateGovernance:
     governance: indexed(address)
 
@@ -46,6 +49,9 @@ API_VERSION: constant(String[28]) = "3.0.1-beta"
 
 # The address that all newly deployed vaults are based from.
 VAULT_BLUEPRINT: immutable(address)
+
+# State of the Factory. If True no new vaults can be deployed.
+shutdown: public(bool)
 
 # Address that can set or change the fee configs.
 governance: public(address)
@@ -85,6 +91,8 @@ def deploy_new_vault(
     @param profit_max_unlock_time The maximum time that the profit can be locked for
     @return The address of the new vault
     """
+    assert not self.shutdown, "shutdown"
+
     vault_address: address = create_from_blueprint(
             VAULT_BLUEPRINT, 
             asset, 
@@ -212,6 +220,22 @@ def remove_custom_protocol_fee(vault: address):
     self.use_custom_protocol_fee[vault] = False
 
     log RemovedCustomProtocolFee(vault)
+
+@external
+def shutdown_factory():
+    """
+    @notice To stop new deployments through this factory.
+    @dev A one time switch available for governance to stop
+    new vaults from being deployed through the factory.
+    NOTE: This will have no effect on any previously deployed
+    vaults that deployed from this factory.
+    """
+    assert msg.sender == self.governance, "not governance"
+    assert self.shutdown == False, "shutdown"
+
+    self.shutdown = True
+    
+    log FactoryShutdown()
 
 @external
 def set_governance(new_governance: address):
