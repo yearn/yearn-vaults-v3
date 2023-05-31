@@ -409,9 +409,7 @@ def test_process_report__with_loss_and_refunds(
 
     accountant = deploy_accountant(vault)
     # set up accountant
-    asset.mint(gov, loss, sender=gov)
-    asset.approve(vault, loss, sender=gov)
-    vault.deposit(loss, accountant, sender=gov)
+    asset.mint(accountant, loss, sender=gov)
 
     set_fees_for_strategy(
         gov, lossy_strategy, accountant, management_fee, performance_fee, refund_ratio
@@ -440,9 +438,10 @@ def test_process_report__with_loss_and_refunds(
 
     # Due to refunds, pps should be the same as before the loss
     assert vault.pricePerShare() == pps_before_loss
-    assert vault.totalAssets() < assets_before_loss
-    assert vault.totalSupply() < supply_before_loss
+    assert vault.totalAssets() == assets_before_loss
+    assert vault.totalSupply() == supply_before_loss
     assert vault.totalDebt() == new_debt - loss
+    assert vault.totalIdle() == loss
 
 
 def test_process_report__with_loss_management_fees_and_refunds(
@@ -468,9 +467,7 @@ def test_process_report__with_loss_management_fees_and_refunds(
     lossy_strategy.setMaxDebt(MAX_INT, sender=gov)
     accountant = deploy_accountant(vault)
     # set up accountant
-    asset.mint(gov, loss, sender=gov)
-    asset.approve(vault, loss, sender=gov)
-    vault.deposit(loss, accountant, sender=gov)
+    asset.mint(accountant, loss, sender=gov)
 
     set_fees_for_strategy(
         gov, lossy_strategy, accountant, management_fee, performance_fee, refund_ratio

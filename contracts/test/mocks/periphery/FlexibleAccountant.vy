@@ -110,7 +110,6 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
     # WARNING: do not use this in production
     if total_refunds > 0:
       self.erc20_safe_approve(IVault(self.asset).asset(), msg.sender, total_refunds)
-      IVault(msg.sender).deposit(total_refunds, self) 
 
     return (total_fees, total_refunds)
 
