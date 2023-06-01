@@ -1366,11 +1366,7 @@ def buy_debt(strategy: address, amount: uint256):
     assert shares > 0, "can't buy 0"
     assert shares <= IStrategy(strategy).balanceOf(self), "not enough shares"
 
-    before_balance: uint256 = ASSET.balanceOf(self)
     self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, amount)
-    after_balance: uint256 = ASSET.balanceOf(self)
-
-    assert after_balance - before_balance >= amount
 
     # Adjust if needed to not underflow on math
     bought: uint256 = min(current_debt, amount)
