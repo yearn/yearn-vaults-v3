@@ -128,10 +128,10 @@ event DebtPurchased:
 
 # STRUCTS #
 struct StrategyParams:
-    activation: uint256
-    last_report: uint256
-    current_debt: uint256
-    max_debt: uint256
+    activation: uint256 # Timestamp when the strategy was added.
+    last_report: uint256 # Timestamp of the strategies last report.
+    current_debt: uint256 # The current assets the strategy holds.
+    max_debt: uint256 # The max assets the strategy can hold.
 
 # CONSTANTS #
 MAX_BPS: constant(uint256) = 10_000
@@ -144,19 +144,19 @@ API_VERSION: constant(String[28]) = "3.1.0"
 # Roles can be combined in any combination or all kept seperate.
 # Follows python Enum patterns so the first Enum == 1 and doubles each time.
 enum Roles:
-    ADD_STRATEGY_MANAGER # can add strategies to the vault
-    REVOKE_STRATEGY_MANAGER # can remove strategies from the vault
-    FORCE_REVOKE_MANAGER # can force remove a strategy causing a loss
-    ACCOUNTANT_MANAGER # can set the accountant that assesss fees
-    QUEUE_MANAGER # can set the queue_manager
-    REPORTING_MANAGER # calls report for strategies
-    DEBT_MANAGER # adds and removes debt from strategies
-    MAX_DEBT_MANAGER # can set the max debt for a strategy
-    DEPOSIT_LIMIT_MANAGER # sets deposit limit for the vault
-    MINIMUM_IDLE_MANAGER # sets the minimun total idle the vault should keep
-    PROFIT_UNLOCK_MANAGER # sets the profit_max_unlock_time
-    DEBT_PURCHASER # can purchase bad debt from the vault
-    EMERGENCY_MANAGER # can shutdown vault in an emergency
+    ADD_STRATEGY_MANAGER # Can add strategies to the vault
+    REVOKE_STRATEGY_MANAGER # Can remove strategies from the vault
+    FORCE_REVOKE_MANAGER # Can force remove a strategy causing a loss
+    ACCOUNTANT_MANAGER # Can set the accountant that assesss fees
+    QUEUE_MANAGER # Can set the queue_manager
+    REPORTING_MANAGER # Calls report for strategies
+    DEBT_MANAGER # Adds and removes debt from strategies
+    MAX_DEBT_MANAGER # Can set the max debt for a strategy
+    DEPOSIT_LIMIT_MANAGER # Sets deposit limit for the vault
+    MINIMUM_IDLE_MANAGER # Sets the minimun total idle the vault should keep
+    PROFIT_UNLOCK_MANAGER # Sets the profit_max_unlock_time
+    DEBT_PURCHASER # Can purchase bad debt from the vault
+    EMERGENCY_MANAGER # Can shutdown vault in an emergency
 
 enum StrategyChangeType:
     ADDED
@@ -171,8 +171,11 @@ enum RoleStatusChange:
     CLOSED
 
 # IMMUTABLE #
+# Underlying token used by the vault.
 ASSET: immutable(ERC20)
+# Based off the `asset` decimals.
 DECIMALS: immutable(uint256)
+# Deployer contract used to retreive protocol fee config.
 FACTORY: public(immutable(address))
 
 # STORAGE #
@@ -183,45 +186,45 @@ strategies: public(HashMap[address, StrategyParams])
 balance_of: HashMap[address, uint256]
 # ERC20 - owner -> (spender -> amount)
 allowance: public(HashMap[address, HashMap[address, uint256]])
-# Total amount of shares that are currently minted
+# Total amount of shares that are currently minted including those locked.
 # To get the ERC20 compliant version user totalSupply().
 total_supply: public(uint256)
 
-# Total amount of assets that has been deposited in strategies
+# Total amount of assets that has been deposited in strategies.
 total_debt: uint256
-# Current assets held in the vault contract. Replacing balanceOf(this) to avoid price_per_share manipulation
+# Current assets held in the vault contract. Replacing balanceOf(this) to avoid price_per_share manipulation.
 total_idle: uint256
-# Minimum amount of assets that should be kept in the vault contract to allow for fast, cheap redeems
+# Minimum amount of assets that should be kept in the vault contract to allow for fast, cheap redeems.
 minimum_total_idle: public(uint256)
-# Maximum amount of tokens that the vault can accept. If totalAssets > deposit_limit, deposits will revert
+# Maximum amount of tokens that the vault can accept. If totalAssets > deposit_limit, deposits will revert.
 deposit_limit: public(uint256)
-# Contract that charges fees and can give refunds
+# Contract that charges fees and can give refunds.
 accountant: public(address)
-# Contract that will supply a optimal withdrawal queue of strategies
+# Contract that will supply a optimal withdrawal queue of strategies.
 queue_manager: public(address)
-# HashMap mapping addresses to their roles
+# HashMap mapping addresses to their roles.
 roles: public(HashMap[address, Roles])
-# HashMap mapping roles to their permissioned state. If false, the role is not open to the public
+# HashMap mapping roles to their permissioned state. If false, the role is not open to the public.
 open_roles: public(HashMap[Roles, bool])
-# Address that can add and remove addresses to roles 
+# Address that can add and remove roles to addresses.
 role_manager: public(address)
-# Temporary variable to store the address of the next role_manager until the role is accepted
+# Temporary variable to store the address of the next role_manager until the role is accepted.
 future_role_manager: public(address)
-# State of the vault - if set to true, only withdrawals will be available. It can't be reverted
+# State of the vault - if set to true, only withdrawals will be available. It can't be reverted.
 shutdown: public(bool)
 
-# ERC20 - name of the token
+# ERC20 - name of the vaults token.
 name: public(String[64])
-# ERC20 - symbol of the token
+# ERC20 - symbol of the vaults token.
 symbol: public(String[32])
 
-# The amount of time profits will unlock over
+# The amount of time profits will unlock over.
 profit_max_unlock_time: uint256
-# The timestamp of when the current unlocking period ends
+# The timestamp of when the current unlocking period ends.
 full_profit_unlock_date: uint256
-# The per second rate at which profit will unlcok
+# The per second rate at which profit will unlcok.
 profit_unlocking_rate: uint256
-# Last timestamp of the most recent _report() call
+# Last timestamp of the most recent profitable report.
 last_profit_update: uint256
 
 # Last protocol fees were charged
