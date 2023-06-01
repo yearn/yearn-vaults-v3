@@ -206,13 +206,13 @@ name: public(String[64])
 # ERC20 - symbol of the token
 symbol: public(String[32])
 
-# The amount of time profits will unlock over
+# The amount of time profits will unlock over.
 profit_max_unlock_time: uint256
-# The timestamp of when the current unlocking period ends
+# The timestamp of when the current unlocking period ends.
 full_profit_unlock_date: uint256
-# The per second rate at which profit will unlcok
+# The per second rate at which profit will unlock.
 profit_unlocking_rate: uint256
-# Last timestamp of the most recent _report() call
+# Last timestamp of the most recent profitable report.
 last_profit_update: uint256
 
 # `nonces` track `permit` approvals with signature.
@@ -991,8 +991,8 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self.last_profit_update = block.timestamp
 
     else:
-        # NOTE: only setting this to 0 will turn in the desired effect, no need to update last_profit_update or full_profit_unlock_date
-        self.profit_unlocking_rate = 0
+        # NOTE: only setting this to 0 will turn in the desired effect, no need to update last_profit_update or profit_unlocking_rate
+        self.full_profit_unlock_date = 0
 
     self.strategies[strategy].last_report = block.timestamp
 

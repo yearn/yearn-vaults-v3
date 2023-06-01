@@ -37,7 +37,7 @@ event NewPendingGovernance:
     pending_governance: indexed(address)
 
 struct PFConfig:
-    # Percent of fees payed to Yearn in Basis Points.
+    # Percent of protocol's split of fees in Basis Points.
     fee_bps: uint16
     # Address for protocol fees to get paid to.
     fee_recipient: address
