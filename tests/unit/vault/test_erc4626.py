@@ -116,7 +116,7 @@ def test_preview_withdraw(asset, fish, fish_amount, create_vault, user_deposit):
     assert vault.previewWithdraw(assets) == shares
 
 
-def test_max_withdraw__with_balance_greater_than_total_idle__returns_total_idle(
+def test_max_withdraw__with_balance_greater_than_total_idle__returns_balance(
     gov,
     fish,
     fish_amount,
@@ -142,7 +142,7 @@ def test_max_withdraw__with_balance_greater_than_total_idle__returns_total_idle(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, strategy_deposit)
 
-    assert vault.maxWithdraw(fish.address) == total_idle
+    assert vault.maxWithdraw(fish.address) == assets
 
 
 def test_max_withdraw__with_balance_less_than_or_equal_to_total_idle__returns_balance(
@@ -166,7 +166,7 @@ def test_preview_redeem(asset, fish, fish_amount, create_vault, user_deposit):
     assert vault.previewRedeem(shares) == assets
 
 
-def test_max_redeem__with_balance_greater_than_total_idle__returns_total_idle(
+def test_max_redeem__with_balance_greater_than_total_idle__returns_balance(
     asset,
     fish,
     fish_amount,
@@ -193,7 +193,7 @@ def test_max_redeem__with_balance_greater_than_total_idle__returns_total_idle(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, strategy_deposit)
 
-    assert vault.maxWithdraw(fish.address) == total_idle
+    assert vault.maxWithdraw(fish.address) == assets
 
 
 def test_max_redeem__with_balance_less_than_or_equal_to_total_idle__returns_balance(

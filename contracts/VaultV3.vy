@@ -25,11 +25,6 @@ interface IStrategy:
 interface IAccountant:
     def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
 
-interface IQueueManager:
-    def withdraw_queue(vault: address) -> (DynArray[address, 10]): nonpayable
-    def new_strategy(strategy: address): nonpayable
-    def remove_strategy(strategy: address): nonpayable
-
 interface IFactory:
     def protocol_fee_config() -> (uint16, uint32, address): view
 
@@ -95,8 +90,8 @@ event UpdateRoleManager:
 event UpdateAccountant:
     accountant: indexed(address)
 
-event UpdateQueueManager:
-    queue_manager: indexed(address)
+event UpdateDefaultQueue:
+    new_default_queue: DynArray[address, MAX_QUEUE]
 
 event UpdatedMaxDebtForStrategy:
     sender: indexed(address)
@@ -127,6 +122,7 @@ struct StrategyParams:
     max_debt: uint256
 
 # CONSTANTS #
+MAX_QUEUE: constant(uint256) = 10
 MAX_BPS: constant(uint256) = 10_000
 MAX_BPS_EXTENDED: constant(uint256) = 1_000_000_000_000
 PROTOCOL_FEE_ASSESSMENT_PERIOD: constant(uint256) = 24 * 3600 # assess once a day
@@ -141,7 +137,7 @@ enum Roles:
     REVOKE_STRATEGY_MANAGER # can remove strategies from the vault
     FORCE_REVOKE_MANAGER # can force remove a strategy causing a loss
     ACCOUNTANT_MANAGER # can set the accountant that assesss fees
-    QUEUE_MANAGER # can set the queue_manager
+    QUEUE_MANAGER # can set the default withdrawal queue.
     REPORTING_MANAGER # calls report for strategies
     DEBT_MANAGER # adds and removes debt from strategies
     MAX_DEBT_MANAGER # can set the max debt for a strategy
@@ -169,8 +165,10 @@ DECIMALS: immutable(uint256)
 FACTORY: public(immutable(address))
 
 # STORAGE #
-# HashMap that records all the strategies that are allowed to receive assets from the vault
+# HashMap that records all the strategies that are allowed to receive assets from the vault.
 strategies: public(HashMap[address, StrategyParams])
+# The current default withdrawal queue.
+default_queue: public(DynArray[address, MAX_QUEUE])
 
 # ERC20 - amount of shares per account
 balance_of: HashMap[address, uint256]
@@ -190,8 +188,6 @@ minimum_total_idle: public(uint256)
 deposit_limit: public(uint256)
 # Contract that charges fees and can give refunds
 accountant: public(address)
-# Contract that will supply a optimal withdrawal queue of strategies
-queue_manager: public(address)
 # HashMap mapping addresses to their roles
 roles: public(HashMap[address, Roles])
 # HashMap mapping roles to their permissioned state. If false, the role is not open to the public
@@ -524,24 +520,12 @@ def _max_deposit(receiver: address) -> uint256:
 @view
 @internal
 def _max_redeem(owner: address) -> uint256:
-    if self.queue_manager != empty(address):
-        # if a queue_manager is set we assume full redeems are possible
-        return self.balance_of[owner]
-    else:
-        # NOTE: this will return the max amount that is available to redeem using ERC4626 
-        # (which can only withdraw from the vault contract)
-        return min(self.balance_of[owner], self._convert_to_shares(self.total_idle, Rounding.ROUND_DOWN))
+    return self.balance_of[owner]
 
 @view
 @internal
 def _max_withdraw(owner: address) -> uint256:
-    if self.queue_manager != empty(address):
-        # if a queue_manager is set we assume full withdraws are possible
-        return self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN)
-    else:
-        # NOTE: this will return the max amount that is available to withdraw using ERC4626 
-        # (which can only withdraw from the vault contract)
-        return min(self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN), self.total_idle)
+    return self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN)
 
 @internal
 def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
@@ -583,7 +567,7 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
     return losses_user_share
 
 @internal
-def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: uint256, strategies: DynArray[address, 10]) -> uint256:
+def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: uint256, strategies: DynArray[address, MAX_QUEUE]) -> uint256:
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
 
@@ -601,12 +585,12 @@ def _redeem(sender: address, receiver: address, owner: address, shares_to_burn: 
     # If there are not enough assets in the Vault contract, we try to free funds from strategies specified in the input
     if requested_assets > curr_total_idle:
 
-        _strategies: DynArray[address, 10] = strategies
+        _strategies: DynArray[address, MAX_QUEUE] = strategies
 
-        queue_manager: address = self.queue_manager
-        if queue_manager != empty(address):
-            if len(_strategies) == 0:
-                _strategies = IQueueManager(queue_manager).withdraw_queue(self)
+        # If no queue was passed.
+        if len(_strategies) == 0:
+                # Use the default queue.
+                _strategies = self.default_queue
 
         # load to memory to save gas
         curr_total_debt: uint256 = self.total_debt
@@ -730,12 +714,10 @@ def _add_strategy(new_strategy: address):
         max_debt: 0
     })
 
-    # we cache queue_manager since expected behavior is it being set
-    queue_manager: address = self.queue_manager
-    if queue_manager != empty(address):        
-        # tell the queue_manager we have a new strategy
-        IQueueManager(queue_manager).new_strategy(new_strategy)
-
+    # If the default queue has space, add the strategy.
+    if len(self.default_queue) < MAX_QUEUE:
+        self.default_queue.append(new_strategy)        
+        
     log StrategyChanged(new_strategy, StrategyChangeType.ADDED)
 
 @internal
@@ -757,11 +739,16 @@ def _revoke_strategy(strategy: address, force: bool=False):
       max_debt: 0
     })
 
-    # we cache queue_manager since expected behavior is it being set
-    queue_manager: address = self.queue_manager
-    if queue_manager != empty(address):
-        # tell the queue_manager we removed a strategy
-        IQueueManager(queue_manager).remove_strategy(strategy)
+    # Remove strategy if it is in the default queue.
+    new_queue: DynArray[address, MAX_QUEUE] = []
+    for _strategy in self.default_queue:
+        if _strategy == strategy:
+            continue
+        
+        new_queue.append(_strategy)
+        
+    # Set the default queue to our updated queue
+    self.default_queue = new_queue
 
     log StrategyChanged(strategy, StrategyChangeType.REVOKED)
 
@@ -1041,14 +1028,22 @@ def set_accountant(new_accountant: address):
     log UpdateAccountant(new_accountant)
 
 @external
-def set_queue_manager(new_queue_manager: address):
+def set_default_queue(new_default_queue: DynArray[address, MAX_QUEUE]):
     """
-    @notice Set the new queue manager address.
-    @param new_queue_manager The new queue manager address.
+    @notice Set the new default queue array.
+    @dev Will check each strategy to make sure it is active.
+    @param new_default_queue The new default queue array.
     """
     self._enforce_role(msg.sender, Roles.QUEUE_MANAGER)
-    self.queue_manager = new_queue_manager
-    log UpdateQueueManager(new_queue_manager)
+
+    # Make sure every strategy in the new queue is active.
+    for strategy in new_default_queue:
+        assert self.strategies[strategy].activation != 0, "!inactive"
+
+    # Save the new queue.
+    self.default_queue = new_default_queue
+
+    log UpdateDefaultQueue(new_default_queue)
 
 @external
 def set_deposit_limit(deposit_limit: uint256):
@@ -1168,7 +1163,6 @@ def pricePerShare() -> uint256:
     """
     return self._convert_to_assets(10 ** DECIMALS, Rounding.ROUND_DOWN)
 
-
 @view
 @external
 def availableDepositLimit() -> uint256:
@@ -1179,6 +1173,15 @@ def availableDepositLimit() -> uint256:
     if self.deposit_limit > self._total_assets():
         return self.deposit_limit - self._total_assets()
     return 0
+
+@view
+@external
+def get_default_queue() -> DynArray[address, 10]:
+    """
+    @notice Get the full default queue currently set.
+    @return The current default withdrawal queue.
+    """
+    return self.default_queue
 
 ## REPORTING MANAGEMENT ##
 @external
@@ -1348,7 +1351,7 @@ def mint(shares: uint256, receiver: address) -> uint256:
 
 @external
 @nonreentrant("lock")
-def withdraw(assets: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
+def withdraw(assets: uint256, receiver: address, owner: address, strategies: DynArray[address, MAX_QUEUE] = []) -> uint256:
     """
     @notice Withdraw an amount of asset to `receiver` burning `owner`s shares.
     @param assets The amount of asset to withdraw.
@@ -1363,7 +1366,7 @@ def withdraw(assets: uint256, receiver: address, owner: address, strategies: Dyn
 
 @external
 @nonreentrant("lock")
-def redeem(shares: uint256, receiver: address, owner: address, strategies: DynArray[address, 10] = []) -> uint256:
+def redeem(shares: uint256, receiver: address, owner: address, strategies: DynArray[address, MAX_QUEUE] = []) -> uint256:
     """
     @notice Redeems an amount of shares of `owners` shares sending funds to `receiver`.
     @param shares The amount of shares to burn.
@@ -1581,8 +1584,6 @@ def maxWithdraw(owner: address) -> uint256:
     @param owner The address that owns the shares.
     @return The maximum amount of assets that can be withdrawn.
     """
-    # NOTE: if a queue_manager is not set a withdraw function that complies with ERC4626 won't withdraw from strategies, 
-    #       so this will just uses liquidity available in the vault contract
     return self._max_withdraw(owner)
 
 @view
@@ -1593,8 +1594,6 @@ def maxRedeem(owner: address) -> uint256:
     @param owner The address that owns the shares.
     @return The maximum amount of shares that can be redeemed.
     """
-    # NOTE: if a queue_manager is not set a redeem function that complies with ERC4626 won't withdraw from strategies, 
-    #       so this will just uses liquidity available in the vault contract
     return self._max_redeem(owner)
 
 @view

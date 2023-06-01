@@ -144,14 +144,6 @@ def test_profitable_strategy_flow(
         - user_1_withdraw
     )
 
-    with ape.reverts("insufficient assets in vault"):
-        vault.withdraw(
-            vault.convertToAssets(vault.balanceOf(user_1)) - 1,
-            user_1,
-            user_1,
-            sender=user_1,
-        )
-
     # we need to use strategies param to take assets from strategies
     vault.redeem(
         vault.balanceOf(user_1),

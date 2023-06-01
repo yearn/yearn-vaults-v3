@@ -41,42 +41,6 @@ def test_withdraw__with_inactive_strategy__reverts(
         )
 
 
-def test_withdraw__with_insufficient_funds_in_strategies__reverts(
-    gov,
-    fish,
-    fish_amount,
-    asset,
-    create_vault,
-    create_strategy,
-    user_deposit,
-    add_strategy_to_vault,
-    add_debt_to_strategy,
-):
-    vault = create_vault(asset)
-    amount = fish_amount
-    shares = amount
-    strategy = create_strategy(vault)
-    strategies = []  # do not pass in any strategies
-
-    vault.set_role(
-        gov.address,
-        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
-        sender=gov,
-    )
-    user_deposit(fish, vault, asset, amount)
-    add_strategy_to_vault(gov, strategy, vault)
-    add_debt_to_strategy(gov, strategy, vault, amount)
-
-    with ape.reverts("insufficient assets in vault"):
-        vault.withdraw(
-            shares,
-            fish.address,
-            fish.address,
-            [s.address for s in strategies],
-            sender=fish,
-        )
-
-
 def test_withdraw__with_liquid_strategy__withdraws(
     gov,
     fish,

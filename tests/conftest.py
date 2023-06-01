@@ -338,16 +338,6 @@ def deploy_flexible_accountant(project, gov):
 
 
 @pytest.fixture(scope="session")
-def deploy_generic_queue_manager(project, gov):
-    def deploy_generic_queue_manager():
-        queue_manager = gov.deploy(project.QueueManager)
-
-        return queue_manager
-
-    yield deploy_generic_queue_manager
-
-
-@pytest.fixture(scope="session")
 def mint_and_deposit_into_strategy(gov, asset):
     def mint_and_deposit_into_strategy(
         strategy, account=gov, amount_to_mint=10**18, amount_to_deposit=None
