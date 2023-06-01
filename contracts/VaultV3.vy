@@ -952,11 +952,11 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     newly_locked_shares: uint256 = 0
     if total_refunds > 0:
-        # Transfer the amount of asset to the vault.
+        # Transfer the refunded amount of asset to the vault.
         self._erc20_safe_transfer_from(ASSET.address, accountant, self, total_refunds)
         # Update storage to increase total assets.
         self.total_idle += total_refunds
-        # Mint new shares corresponding to the vault to self.
+        # Mint new shares corresponding to the refunded assets to self.
         newly_locked_shares += self._issue_shares_for_amount(total_refunds, self)
 
     if gain > 0:
