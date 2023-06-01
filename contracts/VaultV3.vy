@@ -977,22 +977,26 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Update unlocking rate and time to fully unlocked
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
     if total_locked_shares > 0:
-        _profit_max_unlock_time: uint256 = self.profit_max_unlock_time
-        # Calculate how long until the full amount of shares is unlocked
-        remaining_time: uint256 = 0
+        previously_locked_time: uint256 = 0
         _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
+        # Check if we need to account for shares still unlocking.
         if _full_profit_unlock_date > block.timestamp: 
-            remaining_time = _full_profit_unlock_date - block.timestamp
+            # There will only be previously locked shares if time remains.
+            # We calculate this here since it will not occur every time we lock shares.
+            previously_locked_time = previously_locked_shares * (_full_profit_unlock_date - block.timestamp)
 
         # new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the profit_max_unlock_time
-        new_profit_locking_period: uint256 = (previously_locked_shares * remaining_time + newly_locked_shares * _profit_max_unlock_time) / total_locked_shares
+        new_profit_locking_period: uint256 = (previously_locked_time + newly_locked_shares * self.profit_max_unlock_time) / total_locked_shares
+        # Calculate how many shares unlock per second.
         self.profit_unlocking_rate = total_locked_shares * MAX_BPS_EXTENDED / new_profit_locking_period
+        # Calculate how long until the full amount of shares is unlocked.
         self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
+        # Update the last profitable report timestamp.
         self.last_profit_update = block.timestamp
 
     else:
-        # NOTE: only setting this to 0 will turn in the desired effect, no need to update last_profit_update or profit_unlocking_rate
-        self.full_profit_unlock_date = 0
+        # NOTE: only setting this to 0 will turn in the desired effect, no need to update last_profit_update or full_profit_unlock_date
+        self.profit_unlocking_rate = 0
 
     self.strategies[strategy].last_report = block.timestamp
 
