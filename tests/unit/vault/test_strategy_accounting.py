@@ -519,6 +519,119 @@ def test_process_report__with_loss_management_fees_and_refunds(
     )
 
 
+def test_process_report__with_loss_and_refunds__not_enough_asset(
+    chain,
+    gov,
+    asset,
+    vault,
+    lossy_strategy,
+    add_debt_to_strategy,
+    set_fees_for_strategy,
+    deploy_accountant,
+):
+    vault_balance = asset.balanceOf(vault)
+    new_debt = vault_balance
+    loss = new_debt // 2
+    management_fee = 0
+    performance_fee = 0
+    refund_ratio = 10_000
+
+    accountant = deploy_accountant(vault)
+    # set up accountant with not enough funds
+    actual_refund = loss // 2
+    asset.mint(accountant, actual_refund, sender=gov)
+
+    set_fees_for_strategy(
+        gov, lossy_strategy, accountant, management_fee, performance_fee, refund_ratio
+    )
+
+    # add debt to strategy and incur loss
+    add_debt_to_strategy(gov, lossy_strategy, vault, new_debt)
+    lossy_strategy.setLoss(gov.address, loss, sender=gov)
+
+    strategy_params = vault.strategies(lossy_strategy.address)
+    initial_debt = strategy_params.current_debt
+
+    pps_before_loss = vault.pricePerShare()
+    assets_before_loss = vault.totalAssets()
+    supply_before_loss = vault.totalSupply()
+    tx = vault.process_report(lossy_strategy.address, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyReported))
+
+    assert len(event) == 1
+    assert event[0].strategy == lossy_strategy.address
+    assert event[0].gain == 0
+    assert event[0].loss == loss
+    assert event[0].current_debt == initial_debt - loss
+    assert event[0].total_fees == 0
+    assert event[0].total_refunds == actual_refund
+
+    # Due to refunds, pps should be the same as before the loss
+    assert vault.pricePerShare() < pps_before_loss
+    assert vault.totalAssets() == assets_before_loss - (loss - actual_refund)
+    assert vault.totalSupply() == supply_before_loss
+    assert vault.totalDebt() == new_debt - loss
+    assert vault.totalIdle() == actual_refund
+
+
+def test_process_report__with_loss_and_refunds__not_enough_allowance(
+    chain,
+    gov,
+    asset,
+    vault,
+    lossy_strategy,
+    add_debt_to_strategy,
+    set_fees_for_strategy,
+    deploy_faulty_accountant,
+):
+    vault_balance = asset.balanceOf(vault)
+    new_debt = vault_balance
+    loss = new_debt // 2
+    management_fee = 0
+    performance_fee = 0
+    refund_ratio = 10_000
+
+    accountant = deploy_faulty_accountant(vault)
+    # set up accountant with not enough funds
+    actual_refund = loss // 2
+    asset.mint(accountant, loss, sender=gov)
+
+    set_fees_for_strategy(
+        gov, lossy_strategy, accountant, management_fee, performance_fee, refund_ratio
+    )
+
+    # add debt to strategy and incur loss
+    add_debt_to_strategy(gov, lossy_strategy, vault, new_debt)
+    lossy_strategy.setLoss(gov.address, loss, sender=gov)
+
+    strategy_params = vault.strategies(lossy_strategy.address)
+    initial_debt = strategy_params.current_debt
+
+    # Set approval below the intended refunds
+    asset.approve(vault.address, actual_refund, sender=accountant)
+
+    pps_before_loss = vault.pricePerShare()
+    assets_before_loss = vault.totalAssets()
+    supply_before_loss = vault.totalSupply()
+    tx = vault.process_report(lossy_strategy.address, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyReported))
+
+    assert len(event) == 1
+    assert event[0].strategy == lossy_strategy.address
+    assert event[0].gain == 0
+    assert event[0].loss == loss
+    assert event[0].current_debt == initial_debt - loss
+    assert event[0].total_fees == 0
+    assert event[0].total_refunds == actual_refund
+
+    # Due to refunds, pps should be the same as before the loss
+    assert vault.pricePerShare() < pps_before_loss
+    assert vault.totalAssets() == assets_before_loss - (loss - actual_refund)
+    assert vault.totalSupply() == supply_before_loss
+    assert vault.totalDebt() == new_debt - loss
+    assert vault.totalIdle() == actual_refund
+
+
 def test_set_accountant__with_accountant(gov, vault, deploy_accountant):
     accountant = deploy_accountant(vault)
     tx = vault.set_accountant(accountant.address, sender=gov)

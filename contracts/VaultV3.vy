@@ -952,6 +952,8 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     newly_locked_shares: uint256 = 0
     if total_refunds > 0:
+        # Make sure we have enough approval and enough asset to pull.
+        total_refunds = min(total_refunds, min(ASSET.balanceOf(accountant), ASSET.allowance(accountant, self)))
         # Transfer the refunded amount of asset to the vault.
         self._erc20_safe_transfer_from(ASSET.address, accountant, self, total_refunds)
         # Update storage to increase total assets.

@@ -338,6 +338,17 @@ def deploy_flexible_accountant(project, gov):
 
 
 @pytest.fixture(scope="session")
+def deploy_faulty_accountant(project, gov):
+    def deploy_faulty_accountant(vault):
+        faulty_accountant = gov.deploy(project.FaultyAccountant, vault)
+        # set up fee manager
+        vault.set_accountant(faulty_accountant.address, sender=gov)
+        return faulty_accountant
+
+    yield deploy_faulty_accountant
+
+
+@pytest.fixture(scope="session")
 def deploy_generic_queue_manager(project, gov):
     def deploy_generic_queue_manager():
         queue_manager = gov.deploy(project.QueueManager)
