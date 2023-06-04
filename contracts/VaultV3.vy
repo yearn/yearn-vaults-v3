@@ -32,13 +32,8 @@ interface IStrategy:
 interface IAccountant:
     def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
 
-interface IQueueManager:
-    def withdraw_queue(vault: address) -> (DynArray[address, 10]): nonpayable
-    def new_strategy(strategy: address): nonpayable
-    def remove_strategy(strategy: address): nonpayable
-
 interface IFactory:
-    def protocol_fee_config() -> (uint16, uint32, address): view
+    def protocol_fee_config() -> (uint16, address): view
 
 # EVENTS #
 # ERC4626 EVENTS
@@ -102,8 +97,8 @@ event UpdateRoleManager:
 event UpdateAccountant:
     accountant: indexed(address)
 
-event UpdateQueueManager:
-    queue_manager: indexed(address)
+event UpdateDefaultQueue:
+    new_default_queue: DynArray[address, MAX_QUEUE]
 
 event UpdatedMaxDebtForStrategy:
     sender: indexed(address)
@@ -134,29 +129,29 @@ struct StrategyParams:
     max_debt: uint256 # The max assets the strategy can hold.
 
 # CONSTANTS #
+MAX_QUEUE: constant(uint256) = 10
 MAX_BPS: constant(uint256) = 10_000
 MAX_BPS_EXTENDED: constant(uint256) = 1_000_000_000_000
-PROTOCOL_FEE_ASSESSMENT_PERIOD: constant(uint256) = 24 * 3600 # assess once a day
-API_VERSION: constant(String[28]) = "3.1.0"
+API_VERSION: constant(String[28]) = "3.0.1-beta"
 
 # ENUMS #
 # Each permissioned function has its own Role.
 # Roles can be combined in any combination or all kept seperate.
 # Follows python Enum patterns so the first Enum == 1 and doubles each time.
 enum Roles:
-    ADD_STRATEGY_MANAGER # Can add strategies to the vault
-    REVOKE_STRATEGY_MANAGER # Can remove strategies from the vault
-    FORCE_REVOKE_MANAGER # Can force remove a strategy causing a loss
-    ACCOUNTANT_MANAGER # Can set the accountant that assesss fees
-    QUEUE_MANAGER # Can set the queue_manager
-    REPORTING_MANAGER # Calls report for strategies
-    DEBT_MANAGER # Adds and removes debt from strategies
-    MAX_DEBT_MANAGER # Can set the max debt for a strategy
-    DEPOSIT_LIMIT_MANAGER # Sets deposit limit for the vault
-    MINIMUM_IDLE_MANAGER # Sets the minimun total idle the vault should keep
-    PROFIT_UNLOCK_MANAGER # Sets the profit_max_unlock_time
-    DEBT_PURCHASER # Can purchase bad debt from the vault
-    EMERGENCY_MANAGER # Can shutdown vault in an emergency
+    ADD_STRATEGY_MANAGER # can add strategies to the vault
+    REVOKE_STRATEGY_MANAGER # can remove strategies from the vault
+    FORCE_REVOKE_MANAGER # can force remove a strategy causing a loss
+    ACCOUNTANT_MANAGER # can set the accountant that assesss fees
+    QUEUE_MANAGER # can set the default withdrawal queue.
+    REPORTING_MANAGER # calls report for strategies
+    DEBT_MANAGER # adds and removes debt from strategies
+    MAX_DEBT_MANAGER # can set the max debt for a strategy
+    DEPOSIT_LIMIT_MANAGER # sets deposit limit for the vault
+    MINIMUM_IDLE_MANAGER # sets the minimun total idle the vault should keep
+    PROFIT_UNLOCK_MANAGER # sets the profit_max_unlock_time
+    DEBT_PURCHASER # can purchase bad debt from the vault
+    EMERGENCY_MANAGER # can shutdown vault in an emergency
 
 enum StrategyChangeType:
     ADDED
@@ -179,8 +174,10 @@ DECIMALS: immutable(uint256)
 FACTORY: public(immutable(address))
 
 # STORAGE #
-# HashMap that records all the strategies that are allowed to receive assets from the vault
+# HashMap that records all the strategies that are allowed to receive assets from the vault.
 strategies: public(HashMap[address, StrategyParams])
+# The current default withdrawal queue.
+default_queue: public(DynArray[address, MAX_QUEUE])
 
 # ERC20 - amount of shares per account
 balance_of: HashMap[address, uint256]
@@ -200,9 +197,7 @@ minimum_total_idle: public(uint256)
 deposit_limit: public(uint256)
 # Contract that charges fees and can give refunds.
 accountant: public(address)
-# Contract that will supply a optimal withdrawal queue of strategies.
-queue_manager: public(address)
-# HashMap mapping addresses to their roles.
+# HashMap mapping addresses to their roles
 roles: public(HashMap[address, Roles])
 # HashMap mapping roles to their permissioned state. If false, the role is not open to the public.
 open_roles: public(HashMap[Roles, bool])
@@ -222,13 +217,10 @@ symbol: public(String[32])
 profit_max_unlock_time: uint256
 # The timestamp of when the current unlocking period ends.
 full_profit_unlock_date: uint256
-# The per second rate at which profit will unlcok.
+# The per second rate at which profit will unlock.
 profit_unlocking_rate: uint256
 # Last timestamp of the most recent profitable report.
 last_profit_update: uint256
-
-# Last protocol fees were charged
-last_report: uint256
 
 # `nonces` track `permit` approvals with signature.
 nonces: public(HashMap[address, uint256])
@@ -272,7 +264,6 @@ def __init__(
 
     self.name = name
     self.symbol = symbol
-    self.last_report = block.timestamp
     self.role_manager = role_manager
     self.shutdown = False
 
@@ -563,30 +554,12 @@ def _max_deposit(receiver: address) -> uint256:
 @view
 @internal
 def _max_redeem(owner: address) -> uint256:
-    if self.queue_manager != empty(address):
-        # if a queue_manager is set we assume full redeems are possible
-        return self.balance_of[owner]
-    else:
-        # NOTE: this will return the max amount that is available to redeem 
-        # using ERC4626 (which can only withdraw from the vault contract)
-        return min(
-            self.balance_of[owner], 
-            self._convert_to_shares(self.total_idle, Rounding.ROUND_DOWN)
-        )
+    return self.balance_of[owner]
 
 @view
 @internal
 def _max_withdraw(owner: address) -> uint256:
-    if self.queue_manager != empty(address):
-        # if a queue_manager is set we assume full withdraws are possible
-        return self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN)
-    else:
-        # NOTE: this will return the max amount that is available to withdraw 
-        # using ERC4626 (which can only withdraw from the vault contract)
-        return min(
-            self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN), 
-            self.total_idle
-        )
+    return self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN)
 
 @internal
 def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
@@ -637,7 +610,7 @@ def _redeem(
     receiver: address, 
     owner: address, 
     shares_to_burn: uint256, 
-    strategies: DynArray[address, 10]
+    strategies: DynArray[address, MAX_QUEUE]
 ) -> uint256:
     """
     This will attempt to free up the full amount of assets equivalant to
@@ -671,14 +644,12 @@ def _redeem(
     # funds from strategies specified in the input,
     if requested_assets > curr_total_idle:
 
-        _strategies: DynArray[address, 10] = strategies
-        # If no withdraw queue was specified AND there is a queue_manager
-        # set, set the strategies array using the queue_manager.
+        _strategies: DynArray[address, MAX_QUEUE] = strategies
+
+        # If no queue was passed.
         if len(_strategies) == 0:
-            # Cache since expected behavior is to use it twice.
-            queue_manager: address = self.queue_manager
-            if queue_manager != empty(address):
-                _strategies = IQueueManager(queue_manager).withdraw_queue(self)
+                # Use the default queue.
+                _strategies = self.default_queue
 
         # load to memory to save gas
         curr_total_debt: uint256 = self.total_debt
@@ -811,12 +782,10 @@ def _add_strategy(new_strategy: address):
         max_debt: 0
     })
 
-    # We cache queue_manager since expected behavior is it being set.
-    queue_manager: address = self.queue_manager
-    if queue_manager != empty(address):        
-        # Tell the queue_manager we have a new strategy.
-        IQueueManager(queue_manager).new_strategy(new_strategy)
-
+    # If the default queue has space, add the strategy.
+    if len(self.default_queue) < MAX_QUEUE:
+        self.default_queue.append(new_strategy)        
+        
     log StrategyChanged(new_strategy, StrategyChangeType.ADDED)
 
 @internal
@@ -843,11 +812,16 @@ def _revoke_strategy(strategy: address, force: bool=False):
       max_debt: 0
     })
 
-    # We cache queue_manager since expected behavior is it being set.
-    queue_manager: address = self.queue_manager
-    if queue_manager != empty(address):
-        # Tell the queue_manager we removed a strategy.
-        IQueueManager(queue_manager).remove_strategy(strategy)
+    # Remove strategy if it is in the default queue.
+    new_queue: DynArray[address, MAX_QUEUE] = []
+    for _strategy in self.default_queue:
+        if _strategy == strategy:
+            continue
+        
+        new_queue.append(_strategy)
+        
+    # Set the default queue to our updated queue
+    self.default_queue = new_queue
 
     log StrategyChanged(strategy, StrategyChangeType.REVOKED)
 
@@ -972,28 +946,6 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
     log DebtUpdated(strategy, current_debt, new_debt)
     return new_debt
 
-@internal
-def _assess_protocol_fees() -> (uint256, address):
-    protocol_fees: uint256 = 0
-    protocol_fee_recipient: address = empty(address)
-    seconds_since_last_report: uint256 = block.timestamp - self.last_report
-    # to avoid wasting gas for minimal fees vault will only assess once every PROTOCOL_FEE_ASSESSMENT_PERIOD seconds
-    if(seconds_since_last_report >= PROTOCOL_FEE_ASSESSMENT_PERIOD):
-        protocol_fee_bps: uint16 = 0
-        protocol_fee_last_change: uint32 = 0
-
-        protocol_fee_bps, protocol_fee_last_change, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
-
-        if(protocol_fee_bps > 0):
-            # NOTE: charge fees since last report OR last fee change (this will mean less fees are charged after a 
-            # change in protocol_fees, but fees should not change frequently).
-            seconds_since_last_report = min(seconds_since_last_report, block.timestamp - convert(protocol_fee_last_change, uint256))
-            # fees = total_assets * protocol fees bpbs * time elapsed / seconds per year / max bps
-            protocol_fees = self._total_assets() * convert(protocol_fee_bps, uint256) * seconds_since_last_report / 31_556_952 / MAX_BPS
-            self.last_report = block.timestamp
-
-    return (protocol_fees, protocol_fee_recipient)
-
 ## ACCOUNTING MANAGEMENT ##
 @internal
 def _process_report(strategy: address) -> (uint256, uint256):
@@ -1036,22 +988,26 @@ def _process_report(strategy: address) -> (uint256, uint256):
         # We have a loss.
         loss = current_debt - total_assets
 
-    # First get the fees and refunds amounts from the accountant
+    # For Accountant fee assessment.
     total_fees: uint256 = 0
     total_refunds: uint256 = 0
+    # For Protocol fee assessment.
+    protocol_fees: uint256 = 0
+    protocol_fee_recipient: address = empty(address)
 
     accountant: address = self.accountant
     # If accountant is not set, fees and refunds remain unchanged.
     if accountant != empty(address):
         total_fees, total_refunds = IAccountant(accountant).report(strategy, gain, loss)
 
-    # Protocol fee assessment
-    protocol_fees: uint256 = 0
-    protocol_fee_recipient: address = empty(address)
-    protocol_fees, protocol_fee_recipient = self._assess_protocol_fees()
+        # Protocol fees will be 0 if accountant fees are 0.
+        if total_fees > 0:
+            protocol_fee_bps: uint16 = 0
+            protocol_fee_bps, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
 
-    # Add protocol fees to the total amount to be charged.
-    total_fees += protocol_fees
+            if(protocol_fee_bps > 0):
+                # Protocol fees are a percent of the fees the accountant is charging.
+                protocol_fees = total_fees * convert(protocol_fee_bps, uint256) / MAX_BPS
 
     # `shares_to_burn` is derived from amounts that would reduce the vaullts PPS.
     # NOTE: this needs to be done before any pps changes
@@ -1073,15 +1029,14 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Shares to lock is any amounts that would otherwise increase the vaults PPS.
     newly_locked_shares: uint256 = 0
     if total_refunds > 0:
-        # If refunds are non-zero, transfer shares worth of assets.
-        total_refunds_shares: uint256 = min(
-            self._convert_to_shares(total_refunds, Rounding.ROUND_UP), 
-            self.balance_of[accountant]
-        )
-
-        # Shares received as a refund are locked to avoid sudden pps change (like profits)
-        self._transfer(accountant, self, total_refunds_shares)
-        newly_locked_shares += total_refunds_shares
+        # Make sure we have enough approval and enough asset to pull.
+        total_refunds = min(total_refunds, min(ASSET.balanceOf(accountant), ASSET.allowance(accountant, self)))
+        # Transfer the refunded amount of asset to the vault.
+        self._erc20_safe_transfer_from(ASSET.address, accountant, self, total_refunds)
+        # Update storage to increase total assets.
+        self.total_idle += total_refunds
+        # Mint new shares corresponding to the refunded assets to self.
+        newly_locked_shares += self._issue_shares_for_amount(total_refunds, self)
 
     # Record any reported gains.
     if gain > 0:
@@ -1126,23 +1081,21 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Update unlocking rate and time to fully unlocked.
     total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
     if total_locked_shares > 0:
-        _profit_max_unlock_time: uint256 = self.profit_max_unlock_time
-
-        # Calculate how long until the full amount of shares is unlocked from the last report.
-        remaining_time: uint256 = 0
+        previously_locked_time: uint256 = 0
         _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
+        # Check if we need to account for shares still unlocking.
         if _full_profit_unlock_date > block.timestamp: 
-            remaining_time = _full_profit_unlock_date - block.timestamp
+            # There will only be previously locked shares if time remains.
+            # We calculate this here since it will not occur every time we lock shares.
+            previously_locked_time = previously_locked_shares * (_full_profit_unlock_date - block.timestamp)
 
-        # new_profit_locking_period is a weighted average between the remaining time of 
-        # the previously locked shares and the profit_max_unlock_time
-        new_profit_locking_period: uint256 = (
-            previously_locked_shares * remaining_time + newly_locked_shares * _profit_max_unlock_time
-            ) / total_locked_shares
-        
-        # Update storage with the calculated amounts.
+        # new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the profit_max_unlock_time
+        new_profit_locking_period: uint256 = (previously_locked_time + newly_locked_shares * self.profit_max_unlock_time) / total_locked_shares
+        # Calculate how many shares unlock per second.
         self.profit_unlocking_rate = total_locked_shares * MAX_BPS_EXTENDED / new_profit_locking_period
+        # Calculate how long until the full amount of shares is unlocked.
         self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
+        # Update the last profitable report timestamp.
         self.last_profit_update = block.timestamp
 
     else:
@@ -1179,15 +1132,22 @@ def set_accountant(new_accountant: address):
     log UpdateAccountant(new_accountant)
 
 @external
-def set_queue_manager(new_queue_manager: address):
+def set_default_queue(new_default_queue: DynArray[address, MAX_QUEUE]):
     """
-    @notice Set the new queue manager address.
-    @param new_queue_manager The new queue manager address.
+    @notice Set the new default queue array.
+    @dev Will check each strategy to make sure it is active.
+    @param new_default_queue The new default queue array.
     """
     self._enforce_role(msg.sender, Roles.QUEUE_MANAGER)
-    self.queue_manager = new_queue_manager
 
-    log UpdateQueueManager(new_queue_manager)
+    # Make sure every strategy in the new queue is active.
+    for strategy in new_default_queue:
+        assert self.strategies[strategy].activation != 0, "!inactive"
+
+    # Save the new queue.
+    self.default_queue = new_default_queue
+
+    log UpdateDefaultQueue(new_default_queue)
 
 @external
 def set_deposit_limit(deposit_limit: uint256):
@@ -1318,7 +1278,6 @@ def pricePerShare() -> uint256:
     """
     return self._convert_to_assets(10 ** DECIMALS, Rounding.ROUND_DOWN)
 
-
 @view
 @external
 def availableDepositLimit() -> uint256:
@@ -1330,8 +1289,18 @@ def availableDepositLimit() -> uint256:
         return self.deposit_limit - self._total_assets()
     return 0
 
+@view
+@external
+def get_default_queue() -> DynArray[address, 10]:
+    """
+    @notice Get the full default queue currently set.
+    @return The current default withdrawal queue.
+    """
+    return self.default_queue
+
 ## REPORTING MANAGEMENT ##
 @external
+@nonreentrant("lock")
 def process_report(strategy: address) -> (uint256, uint256):
     """
     @notice Process the report of a strategy.
@@ -1500,7 +1469,7 @@ def withdraw(
     assets: uint256, 
     receiver: address, 
     owner: address, 
-    strategies: DynArray[address, 10] = []
+    strategies: DynArray[address, MAX_QUEUE] = []
 ) -> uint256:
     """
     @notice Withdraw an amount of asset to `receiver` burning `owner`s shares.
@@ -1520,7 +1489,7 @@ def redeem(
     shares: uint256, 
     receiver: address, 
     owner: address, 
-    strategies: DynArray[address, 10] = []
+    strategies: DynArray[address, MAX_QUEUE] = []
 ) -> uint256:
     """
     @notice Redeems an amount of shares of `owners` shares sending funds to `receiver`.
@@ -1749,9 +1718,6 @@ def maxWithdraw(owner: address) -> uint256:
     @param owner The address that owns the shares.
     @return The maximum amount of assets that can be withdrawn.
     """
-    # NOTE: if a queue_manager is not set a withdraw function that 
-    #       complies with ERC4626 won't withdraw from strategies, 
-    #       so this will just use liquidity available in the vault contract
     return self._max_withdraw(owner)
 
 @view
@@ -1762,9 +1728,6 @@ def maxRedeem(owner: address) -> uint256:
     @param owner The address that owns the shares.
     @return The maximum amount of shares that can be redeemed.
     """
-    # NOTE: if a queue_manager is not set a redeem function that 
-    #       complies with ERC4626 won't withdraw from strategies, 
-    #       so this will just use liquidity available in the vault contract
     return self._max_redeem(owner)
 
 @view
@@ -1839,6 +1802,7 @@ def profitUnlockingRate() -> uint256:
     """
     return self.profit_unlocking_rate
 
+
 @view
 @external
 def lastReport() -> uint256:
@@ -1846,7 +1810,7 @@ def lastReport() -> uint256:
     @notice The timestamp of the last time protocol fees were charged.
     @return The last report.
     """
-    return self.last_report
+    return self.last_profit_update
 
 # eip-1344
 @view

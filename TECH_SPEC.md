@@ -29,7 +29,7 @@ This allows different players to deploy their own version and implement their ow
 Example periphery contracts: 
 - Emergency module: it receives deposits of Vault Shares and allows the contract to call the shutdown function after a certain % of total Vault Shares have been deposited
 - Debt Allocator: a smart contract that incentivises APY / debt allocation optimisation by rewarding the best debt allocation (see [yStarkDebtAllocator](https://github.com/jmonteer/ystarkdebtallocator))
-- Strategy Staking Module: a smart contract that allows players to sponsor specific strategies (so that they are added to the vault) by staking their YFI, making money if they do well and lossing money if they don't
+- Strategy Staking Module: a smart contract that allows players to sponsor specific strategies (so that they are added to the vault) by staking their YFI, making money if they do well and losing money if they don't
 - ...
 ```
 ## Deployment
@@ -76,7 +76,7 @@ If totalAssets > currentDebt: the vault will record a profit
 Both loss and profit will impact strategy's debt, increasing the debt (current debt + profit) if there are profits, decreasing its debt (current debt - loss) if there are losses.
 
 #### Fees
-Fee assessment and distribution is handled by the Accountant module. 
+Fee assessment and distribution are handled by the Accountant module. 
 
 It will report the amount of fees that need to be charged and the vault will issue shares for that amount of fees.
 
@@ -97,9 +97,9 @@ Issue of new shares due to fees will also unlock profit so that pps does not go 
 Both of this offsets will prevent frontrunning (as the profit was already earned and was not distributed yet)
 
 ## Vault Management
-Vault management is split into function specific roles. Each permissioned function has its owne corresponding Role.
+Vault management is split into function specific roles. Each permissioned function has its own corresponding Role.
 
-This means roles can be combined all to one address, each distributed to seperate addresses or any combination in between
+This means roles can be combined all to one address, each distributed to separate addresses or any combination in between
 
 ## Roles
 Vault functions that are permissioned will be callable by accounts that hold specific roles. 
@@ -108,13 +108,13 @@ These are:
 - ADD_STRATEGY_MANAGER: role than can add strategies to the vault
 - REVOKE_STRATEGY_MANAGER: role that can remove strategies from the vault
 - FORCE_REVOKE_MANAGER: role that can force remove a strategy causing a loss
-- ACCOUNTANT_MANAGER: role that can set the accountant that assesss fees
+- ACCOUNTANT_MANAGER: role that can set the accountant that assesses fees
 - QUEUE_MANAGER: role that can set the queue_manager
 - REPORTING_MANAGER: role that calls report for strategies
 - DEBT_MANAGER: role that adds and removes debt from strategies
 - MAX_DEBT_MANAGER: role that can set the max debt for a strategy
 - DEPOSIT_LIMIT_MANAGER: role that sets deposit limit for the vault
-- MINIMUM_IDLE_MANAGER: role that sets the minimun total idle the vault should keep
+- MINIMUM_IDLE_MANAGER: role that sets the minimum total idle the vault should keep
 - PROFIT_UNLOCK_MANAGER: role that sets the profit_max_unlock_time
 - DEBT_PURCHASER # can purchase bad debt from the vault
 - EMERGENCY_MANAGER: role that can shutdown vault in an emergency
@@ -142,9 +142,9 @@ The accountant and the queue_manager contracts can each be set by the ACCOUNTANT
 The contracts are not needed for the vault to function but are recommended for optimal use
 
 #### Reporting profits
-The REPORTING_MANAGER is in charge of calling process_report() for each strategy in the vault according to its own time line
+The REPORTING_MANAGER is in charge of calling process_report() for each strategy in the vault according to its own timeline
 
-This call will do the neccesary accounting and profit locking for the individual strategy as well as charging fees
+This call will do the necessary accounting and profit locking for the individual strategy as well as charging fees
 
 ### Debt Management
 This responsibility is taken by callers with DEBT_MANAGER role
@@ -169,7 +169,7 @@ When a debt rebalance is triggered, the Vault will cap the new target debt to th
 #### Setting the deposit limit
 The DEPOSIT_LIMIT_MANAGER is in charge of setting the deposit_limit for the vault
 
-On deployment deposit_limit defaults to 0 and will need to be increase to make the vault functional
+On deployment deposit_limit defaults to 0 and will need to be increased to make the vault functional
 
 #### Setting minimum idle funds
 The MINIMUM_IDLE_MANAGER can specify how many funds the vault should try to have reserved to serve withdrawal requests
@@ -240,7 +240,7 @@ _Light emergency_: Setting minimumTotalIdle to MAX_UINT256 will result in the va
 _Shutdown mode_: All strategies' maxDebt is set to 0. Strategies will return funds as soon as they can.
 
 ### Relevant emergency
-In the case the current roles stop fulfilling their responsibilities or something else's happen, the EMERGENCY_MANAGER can shutdown the vault. 
+In the case the current roles stop fulfilling their responsibilities or something else's happens, the EMERGENCY_MANAGER can shutdown the vault. 
 
 The shutdown mode should be the last option in an emergency as it is irreversible. 
 

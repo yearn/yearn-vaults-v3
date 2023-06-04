@@ -709,12 +709,12 @@ def test_shutdown_vault__set_emergency_role_open(vault, bunny, gov):
 # QUEUE MANAGER
 
 
-def test_set_queue_manager__queue_manager_closed__reverts(bunny, vault):
+def test_set_default_queue__queue_manager_closed__reverts(bunny, vault):
     with ape.reverts("not allowed"):
-        vault.set_queue_manager(bunny, sender=bunny)
+        vault.set_default_queue([], sender=bunny)
 
 
-def test_set_queue_manager__queue_manager_open(gov, vault, bunny):
+def test_set_default_queue__queue_manager_open(gov, vault, strategy, bunny):
     # We temporarily give bunny the role of DEBT_MANAGER
     tx = vault.set_open_role(ROLES.QUEUE_MANAGER, sender=gov)
 
@@ -723,13 +723,13 @@ def test_set_queue_manager__queue_manager_open(gov, vault, bunny):
     assert event[0].role == ROLES.QUEUE_MANAGER
     assert event[0].status == RoleStatusChange.OPENED
 
-    assert vault.queue_manager() != bunny
-    vault.set_queue_manager(bunny, sender=bunny)
-    assert vault.queue_manager() == bunny
+    assert vault.get_default_queue() != []
+    vault.set_default_queue([], sender=bunny)
+    assert vault.get_default_queue() == []
 
 
-def test_set_queue_manager__queue_manager_open_then_close__reverts(
-    gov, vault, bunny, fish
+def test_set_default_queue__queue_manager_open_then_close__reverts(
+    gov, vault, strategy, bunny, fish
 ):
     # We temporarily give bunny the role of DEBT_MANAGER
     tx = vault.set_open_role(ROLES.QUEUE_MANAGER, sender=gov)
@@ -739,9 +739,9 @@ def test_set_queue_manager__queue_manager_open_then_close__reverts(
     assert event[0].role == ROLES.QUEUE_MANAGER
     assert event[0].status == RoleStatusChange.OPENED
 
-    assert vault.queue_manager() != bunny
-    vault.set_queue_manager(bunny, sender=bunny)
-    assert vault.queue_manager() == bunny
+    assert vault.get_default_queue() != []
+    vault.set_default_queue([], sender=bunny)
+    assert vault.get_default_queue() == []
 
     tx = vault.close_open_role(ROLES.QUEUE_MANAGER, sender=gov)
 
@@ -751,4 +751,4 @@ def test_set_queue_manager__queue_manager_open_then_close__reverts(
     assert event[0].status == RoleStatusChange.CLOSED
 
     with ape.reverts("not allowed"):
-        vault.set_queue_manager(fish, sender=fish)
+        vault.set_default_queue([], sender=fish)
