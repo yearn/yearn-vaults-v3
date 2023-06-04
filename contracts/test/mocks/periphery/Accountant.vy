@@ -1,4 +1,4 @@
-# @version 0.3.4
+# @version 0.3.7
 
 from vyper.interfaces import ERC20
 
@@ -11,6 +11,7 @@ struct StrategyParams:
 
 interface IVault:
     def strategies(strategy: address) -> StrategyParams: view
+    def asset() -> address: view
 
 interface IStrategy:
     def delegatedAssets() -> uint256: view
@@ -100,7 +101,7 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
         total_refunds = loss * refund_ratio / MAX_BPS
         if total_refunds > 0:
             # TODO: permissions implications. msg.sender should only be vault
-            self.erc20_safe_approve(self.asset, msg.sender, total_refunds)
+            self.erc20_safe_approve(IVault(self.asset).asset(), msg.sender, total_refunds)
         
     return (total_fees, total_refunds)
 

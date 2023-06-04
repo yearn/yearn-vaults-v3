@@ -105,11 +105,6 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
     else:
         # Now taking loss from its own funds. In the future versions could be from different mecanisms
         total_refunds = min(asset_balance, loss * refund_ratio / MAX_BPS)
-        
-    # accountant will deposit whatever it needs to avoid complex math in tests
-    # WARNING: do not use this in production
-    if total_refunds > 0:
-      self.erc20_safe_approve(IVault(self.asset).asset(), msg.sender, total_refunds)
 
     return (total_fees, total_refunds)
 
