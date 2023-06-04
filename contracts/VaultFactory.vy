@@ -110,18 +110,18 @@ def deploy_new_vault(
     profit_max_unlock_time: uint256
 ) -> address:
     """
-    @notice Deploys a new vault base on the BLueprint.
+    @notice Deploys a new vault base on the bLueprint.
     @param asset The asset to be used for the vault.
     @param name The name of the new vault.
     @param symbol The symbol of the new vault.
     @param role_manager The address of the role manager.
-    @param profit_max_unlock_time The time that the profits will unlock over.
+    @param profit_max_unlock_time The time over which the profits will unlock.
     @return The address of the new vault.
     """
     # Make sure the factory is not shutdown.
     assert not self.shutdown, "shutdown"
 
-    # Deploye the new vault using the blueprint.
+    # Deploy the new vault using the blueprint.
     vault_address: address = create_from_blueprint(
             VAULT_BLUEPRINT, 
             asset, 

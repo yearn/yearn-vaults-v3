@@ -9,8 +9,9 @@
     depositors for a specific `asset` into different opportunities (aka Strategies)
     and manage accounting in a robust way.
 
-    The depositors receive shares of the the vaults token representative to their 
-    deposit that can then be redeemed or used as yield-bearing tokens.
+    Depositors receive shares (aka vaults tokens) proportional to their deposit amount. 
+    Vault tokens are yield-bearing and can be redeemed at any time to get back deposit 
+    plus any yield generated.
 
     Addresses that are given different permissioned roles by the `role_manager` 
     are then able to allocate funds as they best see fit to different strategies 
@@ -1310,7 +1311,7 @@ def unlocked_shares() -> uint256:
 @external
 def pricePerShare() -> uint256:
     """
-    @notice Get the price per share of the vault.
+    @notice Get the price per share (pps) of the vault.
     @dev This value offers limited precision. Integrations that require 
         exact precision should use convertToAssets or convertToShares instead.
     @return The price per share.

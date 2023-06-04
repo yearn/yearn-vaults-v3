@@ -13,13 +13,13 @@
 # VaultV3 Specification
 The Vault code has been designed as an non-opinionated system to distribute funds of depositors into different opportunities (aka Strategies) and manage accounting in a robust way. That's all.
 
-The depositors receive shares of the the vaults token representative to their deposit that can then be redeemed or used as yield-bearing tokens.
+Depositors receive shares (aka vaults tokens) proportional to their deposit amount. Vault tokens are yield-bearing and can be redeemed at any time to get back deposit plus any yield generated.
 
 The Vault does not have a preference on any of the dimensions that should be considered when operating a vault:
-- *Decentralization*: roles can be filled by EOA, smart contract like multi-sig or governance module
-- *Liquidity*: vault can have 0 liquidity or be fully liquid. It will depend on parameters and strategies added
-- *Security*: vault managers can choose what strategies to add and how to do that process
-- *Automation*: all the required actions to maintain the vault can be called by bots or manually, depending on periphery implementation
+- *Decentralization*: Roles can be filled by any address (e.g. EOA, smart contract, multi-sig).
+- *Liquidity*: Vault can have 0 liquidity or be fully liquid. It will depend on parameters and strategies added.
+- *Security*: Vault managers can choose what strategies to add and how to do that process.
+- *Automation*: All the required actions to maintain the vault can be called by bots or manually, depending on periphery implementation.
 
 The compromises will come with the implementation of periphery contracts fulfilling the roles in the Vault.
 
@@ -56,7 +56,7 @@ Users can redeem their shares at any point in time if there is liquidity availab
 
 Optionally, a user can specify a list of strategies to withdraw from. If a list of strategies is passed, the vault will try to withdraw from them.
 
-If a user passed array is not defined. The redeem function will use the default_queue.. 
+If a user passed array is not defined, the redeem function will use the default_queue.
 
 If not enough funds have been recovered to honor the full request, the transaction will revert.
 
