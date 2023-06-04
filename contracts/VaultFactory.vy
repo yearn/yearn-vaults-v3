@@ -6,14 +6,12 @@
 @author yearn.finance
 @notice
     This vault Factory can be used by anyone wishing to deploy their own
-    ERC4626 compliant Vault. As well as used by Yearn Governance to handle 
-    the configuration of the protocol fees for all vaults deployed through
-    the factory.
+    ERC4626 compliant Vault.
 
     The factory uses the Blueprint (ERC-5202) standard to handle the
     deployment of any new vaults off of the immutable address stored 
-    at `VAULT_BLUEPRINT`. This allows the vaults to be fully deployed
-    and initialized onchain with there init bytecode, thus not 
+    at `VAULT_BLUEPRINT`. This allows the vaults to be deployed and
+    initialized fully on-chain with their init byte code, thus not 
     requiring any delegatecall patterns or post deployment initialization.
     The deployments are done through create2 with a specific `salt` 
     that is dereived from a combination of the deployers address,
@@ -24,12 +22,12 @@
 
     The factory also holds the protocol fee configs for each vault and strategy
     of its specific `API_VERSION` that determine how much of the fees
-    charged are desingated "protocol fees" and sent to the designated
+    charged are designated "protocol fees" and sent to the designated
     `fee_recipient`. The protocol fees work through rev share system,
     where if the vault or strategy determines to charge X amount of total
     fees during a `report` the protocol fees are X * fee_bps / 10_000.
     The protocol fees will be sent to the designated fee_recipient and
-    then (X - protoco_fees) will be sent to the vault/strategy specific
+    then (X - protocol_fees) will be sent to the vault/strategy specific
     fee recipient.
 
 """

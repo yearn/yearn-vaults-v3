@@ -7,24 +7,24 @@
 @notice
     The Yearn VaultV3 is designed as an non-opinionated system to distribute funds of 
     depositors for a specific `asset` into different opportunities (aka Strategies)
-    and manage accounting in a robust way. That's all.
+    and manage accounting in a robust way.
 
     The depositors receive shares of the the vaults token representative to their 
     deposit that can then be redeemed or used as yield-bearing tokens.
 
-    Addresses given different permissioned roles by the `role_manager` are then
-    able to allocate funds as best seen fit to different strategies and adjust 
-    the strategies and allocations as needed, as well as reporting realized
-    profits.
+    Addresses that are given different permissioned roles by the `role_manager` 
+    are then able to allocate funds as they best see fit to different strategies 
+    and adjust the strategies and allocations as needed, as well as reporting realized
+    profits or losses.
 
-    Those holding vault tokens are able to redeem the tokens for the new corresponding
+    Strategies are any ERC-4626 compliant contracts that use the same underlying `asset` 
+    as the vault. The vault provides no assurances as to the safety of any strategy
+    and it is the responsibility of those that hold the corresponding roles to choose
+    and fund strategies that best fit their desired specifications.
+
+    Those holding vault tokens are able to redeem the tokens for the corresponding
     amount of underlying asset based on any reported profits or losses since their
     initial deposit.
-
-    Strategies are any ERC-4626 contracts that use the same underlying `asset` as
-    the vault. The vault provides no assurances as to the safety of any strategy
-    and is the responsibility of those that hold the corresponding roles to choose
-    and fund strategies that best fit their desired specifications.
 
     The vault is built to be customized by the management to be able to fit their
     specific desired needs Including the customization of strategies, accountants, 
