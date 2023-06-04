@@ -5,13 +5,30 @@
 @license GNU AGPLv3
 @author yearn.finance
 @notice
-    The Yearn VaultV3 is designed as an unopinionated system to distribute funds of 
+    The Yearn VaultV3 is designed as an non-opinionated system to distribute funds of 
     depositors for a specific `asset` into different opportunities (aka Strategies)
     and manage accounting in a robust way. That's all.
 
-    The depositors receive shares of the the vaults token repersentative to their 
+    The depositors receive shares of the the vaults token representative to their 
     deposit that can then be redeemed or used as yield-bearing tokens.
 
+    Addresses given different permissioned roles by the `role_manager` are then
+    able to allocate funds as best seen fit to different strategies and adjust 
+    the strategies and allocations as needed, as well as reporting realized
+    profits.
+
+    Those holding vault tokens are able to redeem the tokens for the new corresponding
+    amount of underlying asset based on any reported profits or losses since their
+    initial deposit.
+
+    Strategies are any ERC-4626 contracts that use the same underlying `asset` as
+    the vault. The vault provides no assurances as to the safety of any strategy
+    and is the responsibility of those that hold the corresponding roles to choose
+    and fund strategies that best fit their desired specifications.
+
+    The vault is built to be customized by the management to be able to fit their
+    specific desired needs Including the customization of strategies, accountants, 
+    ownership etc.
 """
 
 from vyper.interfaces import ERC20
@@ -114,24 +131,32 @@ event UpdateMinimumTotalIdle:
 event UpdateProfitMaxUnlockTime:
     profit_max_unlock_time: uint256
 
-event Shutdown:
-    pass
-
 event DebtPurchased:
     strategy: indexed(address)
     amount: uint256
 
+event Shutdown:
+    pass
+
 # STRUCTS #
 struct StrategyParams:
-    activation: uint256 # Timestamp when the strategy was added.
-    last_report: uint256 # Timestamp of the strategies last report.
-    current_debt: uint256 # The current assets the strategy holds.
-    max_debt: uint256 # The max assets the strategy can hold.
+    # Timestamp when the strategy was added.
+    activation: uint256 
+    # Timestamp of the strategies last report.
+    last_report: uint256
+    # The current assets the strategy holds.
+    current_debt: uint256
+    # The max assets the strategy can hold. 
+    max_debt: uint256
 
 # CONSTANTS #
+# The max length the withdrawal queue can be.
 MAX_QUEUE: constant(uint256) = 10
+# 100% in Basis Points.
 MAX_BPS: constant(uint256) = 10_000
+# Extended for profit locking calculations.
 MAX_BPS_EXTENDED: constant(uint256) = 1_000_000_000_000
+# The version of this vault.
 API_VERSION: constant(String[28]) = "3.0.1-beta"
 
 # ENUMS #
@@ -139,19 +164,19 @@ API_VERSION: constant(String[28]) = "3.0.1-beta"
 # Roles can be combined in any combination or all kept seperate.
 # Follows python Enum patterns so the first Enum == 1 and doubles each time.
 enum Roles:
-    ADD_STRATEGY_MANAGER # can add strategies to the vault
-    REVOKE_STRATEGY_MANAGER # can remove strategies from the vault
-    FORCE_REVOKE_MANAGER # can force remove a strategy causing a loss
-    ACCOUNTANT_MANAGER # can set the accountant that assesss fees
-    QUEUE_MANAGER # can set the default withdrawal queue.
-    REPORTING_MANAGER # calls report for strategies
-    DEBT_MANAGER # adds and removes debt from strategies
-    MAX_DEBT_MANAGER # can set the max debt for a strategy
-    DEPOSIT_LIMIT_MANAGER # sets deposit limit for the vault
-    MINIMUM_IDLE_MANAGER # sets the minimun total idle the vault should keep
-    PROFIT_UNLOCK_MANAGER # sets the profit_max_unlock_time
-    DEBT_PURCHASER # can purchase bad debt from the vault
-    EMERGENCY_MANAGER # can shutdown vault in an emergency
+    ADD_STRATEGY_MANAGER # Can add strategies to the vault.
+    REVOKE_STRATEGY_MANAGER # Can remove strategies from the vault.
+    FORCE_REVOKE_MANAGER # Can force remove a strategy causing a loss.
+    ACCOUNTANT_MANAGER # Can set the accountant that assesss fees.
+    QUEUE_MANAGER # Can set the default withdrawal queue.
+    REPORTING_MANAGER # Calls report for strategies.
+    DEBT_MANAGER # Adds and removes debt from strategies.
+    MAX_DEBT_MANAGER # Can set the max debt for a strategy.
+    DEPOSIT_LIMIT_MANAGER # Sets deposit limit for the vault.
+    MINIMUM_IDLE_MANAGER # Sets the minimun total idle the vault should keep.
+    PROFIT_UNLOCK_MANAGER # Sets the profit_max_unlock_time.
+    DEBT_PURCHASER # Can purchase bad debt from the vault.
+    EMERGENCY_MANAGER # Can shutdown vault in an emergency.
 
 enum StrategyChangeType:
     ADDED
@@ -170,7 +195,7 @@ enum RoleStatusChange:
 ASSET: immutable(ERC20)
 # Based off the `asset` decimals.
 DECIMALS: immutable(uint256)
-# Deployer contract used to retreive protocol fee config.
+# Deployer contract used to retreive the protocol fee config.
 FACTORY: public(immutable(address))
 
 # STORAGE #
@@ -184,7 +209,7 @@ balance_of: HashMap[address, uint256]
 # ERC20 - owner -> (spender -> amount)
 allowance: public(HashMap[address, HashMap[address, uint256]])
 # Total amount of shares that are currently minted including those locked.
-# To get the ERC20 compliant version user totalSupply().
+# NOTE: To get the ERC20 compliant version user totalSupply().
 total_supply: public(uint256)
 
 # Total amount of assets that has been deposited in strategies.
@@ -356,16 +381,18 @@ def _burn_shares(shares: uint256, owner: address):
 @internal
 def _unlocked_shares() -> uint256:
     """
-    To avoid sudden price_per_share spikes, profit must be processed through 
-    an unlocking period. The mechanism involves shares to be minted to the 
-    vault which are unlocked gradually over time. Shares that have been locked
-    are gradually unlocked over profit_max_unlock_time seconds
+    Returns the amount of shares that have been unlocked.
+    To avoid sudden price_per_share spikes, profits must be processed 
+    through an unlocking period. The mechanism involves shares to be 
+    minted to the vault which are unlocked gradually over time. Shares 
+    that have been locked are gradually unlocked over profit_max_unlock_time.
     """
     _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
     unlocked_shares: uint256 = 0
     if _full_profit_unlock_date > block.timestamp:
-        # If we have not fully unlocked, we need to caluclat how much has been.
+        # If we have not fully unlocked, we need to calculate how much has been.
         unlocked_shares = self.profit_unlocking_rate * (block.timestamp - self.last_profit_update) / MAX_BPS_EXTENDED
+
     elif _full_profit_unlock_date != 0:
         # All shares have been unlocked
         unlocked_shares = self.balance_of[self]
@@ -376,13 +403,14 @@ def _unlocked_shares() -> uint256:
 @view
 @internal
 def _total_supply() -> uint256:
+    # Need to account for the shares issued to the vault that have unlockded.
     return self.total_supply - self._unlocked_shares()
 
 @internal
 def _burn_unlocked_shares():
     """
     Burns shares that have been unlocked since last update. 
-    In case the full unlocking period has passed, it stops the unlocking
+    In case the full unlocking period has passed, it stops the unlocking.
     """
     # Get the amount of shares that have unlocked
     unlocked_shares: uint256 = self._unlocked_shares()
@@ -509,9 +537,9 @@ def _issue_shares(shares: uint256, recipient: address):
 @internal
 def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
     """
-    Issues shares that are worth 'amount' in the underlying token (asset)
+    Issues shares that are worth 'amount' in the underlying token (asset).
     WARNING: this takes into account that any new assets have been summed 
-    to total_assets (otherwise pps will go down)
+    to total_assets (otherwise pps will go down).
     """
     total_supply: uint256 = self._total_supply()
     total_assets: uint256 = self._total_assets()
@@ -540,7 +568,7 @@ def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
 ## ERC4626 ##
 @view
 @internal
-def _max_deposit(receiver: address) -> uint256:
+def _max_deposit(receiver: address) -> uint256: 
     if receiver in [empty(address), self]:
         return 0
 
@@ -563,6 +591,11 @@ def _max_withdraw(owner: address) -> uint256:
 
 @internal
 def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
+    """
+    Used for `deposit` and `mint` calls to transfer the amoutn of `asset` to
+    the vault, issue the corresponding shares to the `recipient` and update 
+    all needed vault accounting.
+    """
     assert self.shutdown == False # dev: shutdown
     assert recipient not in [self, empty(address)], "invalid recipient"
     assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
@@ -598,10 +631,11 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
     if strategy_assets >= strategy_current_debt or strategy_current_debt == 0:
         return 0
 
-    # user will withdraw assets_to_withdraw divided by loss ratio (strategy_assets / strategy_current_debt - 1)
-    # but will only receive assets_to_withdraw
-    # NOTE: if there are unrealised losses, the user will take his share
+    # Users will withdraw assets_to_withdraw divided by loss ratio (strategy_assets / strategy_current_debt - 1),
+    # but will only receive assets_to_withdraw.
+    # NOTE: If there are unrealised losses, the user will take his share.
     losses_user_share: uint256 = assets_needed - assets_needed * strategy_assets / strategy_current_debt
+
     return losses_user_share
 
 @internal
@@ -641,9 +675,10 @@ def _redeem(
     curr_total_idle: uint256 = self.total_idle
     
     # If there are not enough assets in the Vault contract, we try to free 
-    # funds from strategies specified in the input,
+    # funds from strategies.
     if requested_assets > curr_total_idle:
 
+        # Cache the input withdrawal queue.
         _strategies: DynArray[address, MAX_QUEUE] = strategies
 
         # If no queue was passed.
@@ -664,6 +699,7 @@ def _redeem(
         previous_balance: uint256 = ASSET.balanceOf(self)
 
         for strategy in _strategies:
+            # Make sure we have a valid strategy.
             assert self.strategies[strategy].activation != 0, "inactive strategy"
 
             # How much should the strategy have.
@@ -815,12 +851,11 @@ def _revoke_strategy(strategy: address, force: bool=False):
     # Remove strategy if it is in the default queue.
     new_queue: DynArray[address, MAX_QUEUE] = []
     for _strategy in self.default_queue:
-        if _strategy == strategy:
-            continue
+        # Add all strategies to the new queue besides the one revoked.
+        if _strategy != strategy:
+            new_queue.append(_strategy)
         
-        new_queue.append(_strategy)
-        
-    # Set the default queue to our updated queue
+    # Set the default queue to our updated queue.
     self.default_queue = new_queue
 
     log StrategyChanged(strategy, StrategyChangeType.REVOKED)
@@ -965,17 +1000,20 @@ def _process_report(strategy: address) -> (uint256, uint256):
     Any applicable fees are charged and distributed during the report as well
     to the specified recipients.
     """
+    # Make sure we have a valid strategy.
     assert self.strategies[strategy].activation != 0, "inactive strategy"
+
+    # Burn shares that have been unlocked since the last update
+    self._burn_unlocked_shares()
 
     # Vault asseses profits using 4626 compliant interface. 
     # NOTE: It is important that a strategies `convertToAssets` implementation
-    # cannot be manipulated or else the vaults report incorrect gains/losses.
+    # cannot be manipulated or else the vault could report incorrect gains/losses.
     strategy_shares: uint256 = IStrategy(strategy).balanceOf(self)
+    # How much the vaults position is worth.
     total_assets: uint256 = IStrategy(strategy).convertToAssets(strategy_shares)
+    # How much the vault had deposited to the strategy.
     current_debt: uint256 = self.strategies[strategy].current_debt
-    
-    # Burn shares that have been unlocked since the last update
-    self._burn_unlocked_shares()
 
     gain: uint256 = 0
     loss: uint256 = 0
@@ -1003,6 +1041,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         # Protocol fees will be 0 if accountant fees are 0.
         if total_fees > 0:
             protocol_fee_bps: uint16 = 0
+            # Get the config for this vault.
             protocol_fee_bps, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
 
             if(protocol_fee_bps > 0):
@@ -1071,7 +1110,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         newly_locked_shares -= shares_not_to_lock
         previously_locked_shares -= (shares_to_burn - shares_not_to_lock)
 
-    # Issue shares for fees that were calculated above i applicable.
+    # Issue shares for fees that were calculated above if applicable.
     if accountant_fees_shares > 0:
         self._issue_shares(accountant_fees_shares, accountant)
 
@@ -1335,6 +1374,7 @@ def buy_debt(strategy: address, amount: uint256):
 
     # Get the current shares value for the amount.
     shares: uint256 = IStrategy(strategy).convertToShares(amount)
+
     assert shares > 0, "can't buy 0"
     assert shares <= IStrategy(strategy).balanceOf(self), "not enough shares"
 
