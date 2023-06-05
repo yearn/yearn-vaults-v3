@@ -159,7 +159,10 @@ def vault_blueprint(project, gov):
 @pytest.fixture(scope="session")
 def vault_factory(project, gov, vault_blueprint):
     return gov.deploy(
-        project.VaultFactory, "Vault V3 Factory 3.0.1-beta", vault_blueprint
+        project.VaultFactory,
+        "Vault V3 Factory 3.0.1-beta",
+        vault_blueprint,
+        gov.address,
     )
 
 

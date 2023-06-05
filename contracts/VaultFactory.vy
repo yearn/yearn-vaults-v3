@@ -29,7 +29,6 @@
     The protocol fees will be sent to the designated fee_recipient and
     then (X - protocol_fees) will be sent to the vault/strategy specific
     fee recipient.
-
 """
 
 from vyper.interfaces import ERC20
@@ -96,10 +95,10 @@ custom_protocol_fee: public(HashMap[address, uint16])
 use_custom_protocol_fee: public(HashMap[address, bool])
 
 @external
-def __init__(name: String[64], vault_blueprint: address):
+def __init__(name: String[64], vault_blueprint: address, governance: address):
     self.name = name
     VAULT_BLUEPRINT = vault_blueprint
-    self.governance = msg.sender
+    self.governance = governance
 
 @external
 def deploy_new_vault(
