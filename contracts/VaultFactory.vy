@@ -4,6 +4,32 @@
 @title Yearn Vault Factory
 @license GNU AGPLv3
 @author yearn.finance
+@notice
+    This vault Factory can be used by anyone wishing to deploy their own
+    ERC4626 compliant Vault.
+
+    The factory uses the Blueprint (ERC-5202) standard to handle the
+    deployment of any new vaults off of the immutable address stored 
+    at `VAULT_BLUEPRINT`. This allows the vaults to be deployed and
+    initialized fully on-chain with their init byte code, thus not 
+    requiring any delegatecall patterns or post deployment initialization.
+    The deployments are done through create2 with a specific `salt` 
+    that is dereived from a combination of the deployers address,
+    the underlying asset used, as well as the name and symbol specified.
+    Meaning a deployer will not be able to deploy the exact same vault
+    twice and will need to use different name and or symbols for vaults
+    that use the same other parameters such as `asset`.
+
+    The factory also holds the protocol fee configs for each vault and strategy
+    of its specific `API_VERSION` that determine how much of the fees
+    charged are designated "protocol fees" and sent to the designated
+    `fee_recipient`. The protocol fees work through rev share system,
+    where if the vault or strategy determines to charge X amount of total
+    fees during a `report` the protocol fees are X * fee_bps / 10_000.
+    The protocol fees will be sent to the designated fee_recipient and
+    then (X - protocol_fees) will be sent to the vault/strategy specific
+    fee recipient.
+
 """
 
 from vyper.interfaces import ERC20
@@ -39,13 +65,14 @@ event NewPendingGovernance:
 struct PFConfig:
     # Percent of protocol's split of fees in Basis Points.
     fee_bps: uint16
-    # Address for protocol fees to get paid to.
+    # Address the protocol fees get paid to.
     fee_recipient: address
 
-# The max amount the protocol fee can be set to.
-MAX_FEE_BPS: constant(uint16) = 5_000
 # Identifier for this version of the vault.
 API_VERSION: constant(String[28]) = "3.0.1-beta"
+
+# The max amount the protocol fee can be set to.
+MAX_FEE_BPS: constant(uint16) = 5_000 # 50%
 
 # The address that all newly deployed vaults are based from.
 VAULT_BLUEPRINT: immutable(address)
@@ -83,16 +110,18 @@ def deploy_new_vault(
     profit_max_unlock_time: uint256
 ) -> address:
     """
-    @notice Deploys a new vault
-    @param asset The asset to be used for the vault
-    @param name The name of the vault
-    @param symbol The symbol of the vault
-    @param role_manager The address of the role manager
-    @param profit_max_unlock_time The maximum time that the profit can be locked for
-    @return The address of the new vault
+    @notice Deploys a new vault base on the bLueprint.
+    @param asset The asset to be used for the vault.
+    @param name The name of the new vault.
+    @param symbol The symbol of the new vault.
+    @param role_manager The address of the role manager.
+    @param profit_max_unlock_time The time over which the profits will unlock.
+    @return The address of the new vault.
     """
+    # Make sure the factory is not shutdown.
     assert not self.shutdown, "shutdown"
 
+    # Deploy the new vault using the blueprint.
     vault_address: address = create_from_blueprint(
             VAULT_BLUEPRINT, 
             asset, 
@@ -132,7 +161,7 @@ def protocol_fee_config() -> PFConfig:
     @notice Called during vault and strategy reports 
     to retreive the protocol fee to charge and address
     to receive the fees.
-    @return The protocol fee config for the msg sender
+    @return The protocol fee config for the msg sender.
     """
     # If there is a custom protocol fee set we return it.
     if self.use_custom_protocol_fee[msg.sender]:
@@ -168,6 +197,7 @@ def set_protocol_fee_bps(new_protocol_fee_bps: uint16):
 def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
     """
     @notice Set the protocol fee recipient
+    @dev Can never be set to 0 to avoid issuing fees to the 0 addresss.
     @param new_protocol_fee_recipient The new protocol fee recipient
     """
     assert msg.sender == self.governance, "not governance"

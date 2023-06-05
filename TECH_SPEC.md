@@ -11,15 +11,15 @@
 - Queue_Manager: smart contract that can be configured by management to hold the optimal withdrawal queues for each vault
 
 # VaultV3 Specification
-The Vault code has been designed as an unopinionated system to distribute funds of depositors into different opportunities (aka Strategies) and manage accounting in a robust way. That's all.
+The Vault code has been designed as an non-opinionated system to distribute funds of depositors into different opportunities (aka Strategies) and manage accounting in a robust way. That's all.
 
-The depositors receive shares of the different investments that can then be redeemed or used as yield-bearing tokens.
+Depositors receive shares (aka vaults tokens) proportional to their deposit amount. Vault tokens are yield-bearing and can be redeemed at any time to get back deposit plus any yield generated.
 
 The Vault does not have a preference on any of the dimensions that should be considered when operating a vault:
-- *Decentralization*: roles can be filled by EOA, smart contract like multisig or governance module
-- *Liquidity*: vault can have 0 liquidity or be fully liquid. It will depend on parameters and strategies added
-- *Security*: vault managers can choose what strategies to add and how to do that process
-- *Automation*: all the required actions to maintain the vault can be called by bots or manually, depending on periphery implementation
+- *Decentralization*: Roles can be filled by any address (e.g. EOA, smart contract, multi-sig).
+- *Liquidity*: Vault can have 0 liquidity or be fully liquid. It will depend on parameters and strategies added.
+- *Security*: Vault managers can choose what strategies to add and how to do that process.
+- *Automation*: All the required actions to maintain the vault can be called by bots or manually, depending on periphery implementation.
 
 The compromises will come with the implementation of periphery contracts fulfilling the roles in the Vault.
 
@@ -56,7 +56,7 @@ Users can redeem their shares at any point in time if there is liquidity availab
 
 Optionally, a user can specify a list of strategies to withdraw from. If a list of strategies is passed, the vault will try to withdraw from them.
 
-If a user passed array is not defined. The redeem function will check if there is a queue_manager set to get a valid withdraw queue from. If neither happens the vault will check if there are enough idle funds to serve the request. If there are not enough, it will revert. 
+If a user passed array is not defined, the redeem function will use the default_queue.
 
 If not enough funds have been recovered to honor the full request, the transaction will revert.
 
@@ -92,9 +92,9 @@ new_profit_distribution_rate = (locked_profit + new_profit) / new_locking_period
 
 Losses will be offset by locked profit, if possible.
 
-Issue of new shares due to fees will also unlock profit so that pps does not go down. 
+Issue of new shares due to fees will also unlock profit so that PPS does not go down. 
 
-Both of this offsets will prevent frontrunning (as the profit was already earned and was not distributed yet)
+Both of this offsets will prevent front running (as the profit was already earned and was not distributed yet)
 
 ## Vault Management
 Vault management is split into function specific roles. Each permissioned function has its own corresponding Role.
@@ -109,7 +109,7 @@ These are:
 - REVOKE_STRATEGY_MANAGER: role that can remove strategies from the vault
 - FORCE_REVOKE_MANAGER: role that can force remove a strategy causing a loss
 - ACCOUNTANT_MANAGER: role that can set the accountant that assesses fees
-- QUEUE_MANAGER: role that can set the queue_manager
+- QUEUE_MANAGER: role that can set the default_queue
 - REPORTING_MANAGER: role that calls report for strategies
 - DEBT_MANAGER: role that adds and removes debt from strategies
 - MAX_DEBT_MANAGER: role that can set the max debt for a strategy
@@ -119,16 +119,16 @@ These are:
 - DEBT_PURCHASER # can purchase bad debt from the vault
 - EMERGENCY_MANAGER: role that can shutdown vault in an emergency
 
-Every role can be filled by an EOA, multisig or other smart contracts. Each role can be filled by several accounts.
+Every role can be filled by an EOA, multi-sig or other smart contracts. Each role can be filled by several accounts.
 
 The account that manages roles is a single account, set in `role_manager`.
 
-This role_manager can be an EOA, a multisig or a Governance Module that relays calls. 
+This role_manager can be an EOA, a multi-sig or a Governance Module that relays calls. 
 
 ### Strategy Management
 This responsibility is taken by callers with ADD_STRATEGY_MANAGER, REVOKE_STRATEGY_MANAGER and FORCE_REVOKE_MANAGER roles
 
-A vault can have strategies added, removed oe forcefully removed 
+A vault can have strategies added, removed or forcefully removed 
 
 Added strategies will be eligible to receive funds from the vault, when the max_debt is set to > 0
 
@@ -137,9 +137,9 @@ Revoked strategies will return all debt and stop being eligible to receive more.
 Force revoking a strategy is only used in cases of a faulty strategy that cannot otherwise have its current_debt reduced to 0. Force revoking a strategy will result in a loss being reported by the vault.
 
 #### Setting the periphery contracts
-The accountant and the queue_manager contracts can each be set by the ACCOUNTANT_MANAGER and QUEUE_MANAGER respectfully
+The accountant can each be set by the ACCOUNTANT_MANAGER.
 
-The contracts are not needed for the vault to function but are recommended for optimal use
+The contract is not needed for the vault to function but are recommended for optimal use.
 
 #### Reporting profits
 The REPORTING_MANAGER is in charge of calling process_report() for each strategy in the vault according to its own timeline
@@ -164,7 +164,7 @@ The MAX_DEBT_MANAGER can set the maximum amount of tokens the vault will allow a
 
 Stored in strategies[strategy].max_debt
 
-When a debt rebalance is triggered, the Vault will cap the new target debt to this number (max_debt)
+When a debt re-balance is triggered, the Vault will cap the new target debt to this number (max_debt)
 
 #### Setting the deposit limit
 The DEPOSIT_LIMIT_MANAGER is in charge of setting the deposit_limit for the vault
@@ -182,6 +182,11 @@ It is recommended that if no queue_manager is set some amount of funds should re
 The PROFIT_UNLOCK_MANAGER is in charge of updating and setting the profit_max_unlock_time which controls how fast profits will unlock
 
 This can be customized based on the vault based on aspects such as number of strategies, TVL, expected returns etc.
+
+### Setting the default queue
+The QUEUE_MANAGER has the option to set a custom default_queue if desired. The vault will arrange the default queue automatically based only on the order that strategies were added to the vault. If a different order is desired the queue manager role can set a custom queue.
+
+All strategies in the default queue must have been previously added to the vault.
 
 #### Buying Debt
 The DEBT_PURCHASER role can buy debt from the vault in return for the equal amount of `asset`.
@@ -237,10 +242,10 @@ Shutdown mode does not affect accounting
 ### Debt rebalance
 _Light emergency_: Setting minimumTotalIdle to MAX_UINT256 will result in the vault requesting the debt back from strategies. This would stop new strategies from getting funded too, as the vault prioritizes minimumTotalIdle
 
-_Shutdown mode_: All strategies' maxDebt is set to 0. Strategies will return funds as soon as they can.
+_Shutdown mode_: All strategies maxDebt is set to 0. Strategies will return funds as soon as they can.
 
 ### Relevant emergency
-In the case the current roles stop fulfilling their responsibilities or something else's happens, the EMERGENCY_MANAGER can shutdown the vault. 
+In the case the current roles stop fulfilling their responsibilities or something else happens, the EMERGENCY_MANAGER can shutdown the vault. 
 
 The shutdown mode should be the last option in an emergency as it is irreversible. 
 
