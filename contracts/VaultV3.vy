@@ -635,7 +635,12 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
     # Users will withdraw assets_to_withdraw divided by loss ratio (strategy_assets / strategy_current_debt - 1),
     # but will only receive assets_to_withdraw.
     # NOTE: If there are unrealised losses, the user will take his share.
-    losses_user_share: uint256 = assets_needed - assets_needed * strategy_assets / strategy_current_debt
+    numerator: uint256 = assets_needed * strategy_assets
+    losses_user_share: uint256 = assets_needed - numerator / strategy_current_debt
+
+    # Round up if needed.
+    if numerator % strategy_current_debt != 0:
+        losses_user_share += 1
 
     return losses_user_share
 
