@@ -665,6 +665,8 @@ def _redeem(
     Any losses realized during the withdraw from a strategy will be passed on
     to the user that is redeeming their vault shares.
     """
+    assert receiver != empty(address), "ZERO ADDRESS"
+    
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
 
