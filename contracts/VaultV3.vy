@@ -593,9 +593,9 @@ def _max_withdraw(owner: address) -> uint256:
 @internal
 def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
     """
-    Used for `deposit` and `mint` calls to transfer the amoutn of `asset` to
-    the vault, issue the corresponding shares to the `recipient` and update 
-    all needed vault accounting.
+    Used for `deposit` calls to transfer the amoutn of `asset` to the vault, 
+    issue the corresponding shares to the `recipient` and update all needed 
+    vault accounting.
     """
     assert self.shutdown == False # dev: shutdown
     assert recipient not in [self, empty(address)], "invalid recipient"
@@ -613,6 +613,32 @@ def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
 
     log Deposit(sender, recipient, assets, shares)
     return shares
+
+@internal
+def _mint(sender: address, recipient: address, shares: uint256) -> uint256:
+    """
+    Used for `mint` calls to transfer the amount of `asset` to the vault, 
+    issue the corresponding shares to the `recipient` and update all 
+    needed vault accounting.
+    """
+    assert self.shutdown == False # dev: shutdown
+    assert recipient not in [self, empty(address)], "invalid recipient"
+
+    assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_UP)
+
+    assert assets > 0, "cannot mint zero"
+    assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
+
+    # Transfer the tokens to the vault first.
+    self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, assets)
+    # Record the change in total assets.
+    self.total_idle += assets
+    
+    # Issue the corresponding shares for assets.
+    self._issue_shares(shares, recipient)
+
+    log Deposit(sender, recipient, assets, shares)
+    return assets
 
 @view
 @internal
@@ -666,7 +692,7 @@ def _redeem(
     to the user that is redeeming their vault shares.
     """
     assert receiver != empty(address), "ZERO ADDRESS"
-    
+
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
 
@@ -1507,8 +1533,8 @@ def mint(shares: uint256, receiver: address) -> uint256:
     @param receiver The address to receive the shares.
     @return The amount of assets deposited.
     """
-    assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_UP)
-    self._deposit(msg.sender, receiver, assets)
+    assets: uint256 = self._mint(msg.sender, receiver, shares) #self._convert_to_assets(shares, Rounding.ROUND_UP)
+    #self._deposit(msg.sender, receiver, assets)
     return assets
 
 @external
