@@ -1846,10 +1846,10 @@ def profitUnlockingRate() -> uint256:
 
 @view
 @external
-def lastReport() -> uint256:
+def lastProfitUpdate() -> uint256:
     """
-    @notice The timestamp of the last time protocol fees were charged.
-    @return The last report.
+    @notice The timestamp of the last time shares were locked.
+    @return The last profit update.
     """
     return self.last_profit_update
 
