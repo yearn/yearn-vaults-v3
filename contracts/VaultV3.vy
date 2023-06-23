@@ -477,56 +477,23 @@ def _convert_to_shares(assets: uint256, rounding: Rounding) -> uint256:
 
     return shares
 
-
 @internal
 def _erc20_safe_approve(token: address, spender: address, amount: uint256):
-    # Used only to send tokens that are not the type managed by this Vault.
-    # HACK: Used to handle non-compliant tokens like USDT
-    response: Bytes[32] = raw_call(
-        token,
-        concat(
-            method_id("approve(address,uint256)"),
-            convert(spender, bytes32),
-            convert(amount, bytes32),
-        ),
-        max_outsize=32,
-    )
-    if len(response) > 0:
-        assert convert(response, bool), "Transfer failed!"
-
+    # Used only to approve tokens that are not the type managed by this Vault.
+    # Used to handle non-compliant tokens like USDT
+    assert ERC20(token).approve(spender, amount, default_return_value=True), "approval failed"
 
 @internal
 def _erc20_safe_transfer_from(token: address, sender: address, receiver: address, amount: uint256):
-    # Used only to send tokens that are not the type managed by this Vault.
-    # HACK: Used to handle non-compliant tokens like USDT
-    response: Bytes[32] = raw_call(
-        token,
-        concat(
-            method_id("transferFrom(address,address,uint256)"),
-            convert(sender, bytes32),
-            convert(receiver, bytes32),
-            convert(amount, bytes32),
-        ),
-        max_outsize=32,
-    )
-    if len(response) > 0:
-        assert convert(response, bool), "Transfer failed!"
+    # Used only to transfer tokens that are not the type managed by this Vault.
+    # Used to handle non-compliant tokens like USDT
+    assert ERC20(token).transferFrom(sender, receiver, amount, default_return_value=True), "transfer failed"
 
 @internal
 def _erc20_safe_transfer(token: address, receiver: address, amount: uint256):
     # Used only to send tokens that are not the type managed by this Vault.
-    # HACK: Used to handle non-compliant tokens like USDT
-    response: Bytes[32] = raw_call(
-        token,
-        concat(
-            method_id("transfer(address,uint256)"),
-            convert(receiver, bytes32),
-            convert(amount, bytes32),
-        ),
-        max_outsize=32,
-    )
-    if len(response) > 0:
-        assert convert(response, bool), "Transfer failed!"
+    # Used to handle non-compliant tokens like USDT
+    assert ERC20(token).transfer(receiver, amount, default_return_value=True), "transfer failed"
 
 @internal
 def _issue_shares(shares: uint256, recipient: address):
