@@ -149,6 +149,7 @@ def test_profitable_strategy_flow(
         vault.balanceOf(user_1),
         user_1,
         user_1,
+        0,
         [strategy.address],
         sender=user_1,
     )
@@ -159,7 +160,7 @@ def test_profitable_strategy_flow(
     assert asset.balanceOf(user_1) > user_1_initial_balance
 
     vault.redeem(
-        vault.balanceOf(user_2), user_2, user_2, [strategy.address], sender=user_2
+        vault.balanceOf(user_2), user_2, user_2, 0, [strategy.address], sender=user_2
     )
 
     assert vault.totalIdle() == 0

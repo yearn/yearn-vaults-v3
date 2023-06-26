@@ -61,6 +61,7 @@ def test_multiple_strategy_withdraw_flow(
         fish_amount // 2,
         fish.address,
         fish.address,
+        0,
         [s.address for s in strategies],
         sender=fish,
     )
@@ -75,7 +76,7 @@ def test_multiple_strategy_withdraw_flow(
     assert asset.balanceOf(locked_strategy) == locked_strategy_debt
 
     # drain remaining total idle as whale
-    vault.withdraw(current_idle, whale.address, whale.address, [], sender=whale)
+    vault.withdraw(current_idle, whale.address, whale.address, sender=whale)
 
     assert asset.balanceOf(whale) == current_idle
     assert vault.totalIdle() == 0
@@ -89,6 +90,7 @@ def test_multiple_strategy_withdraw_flow(
         fish_amount // 2,
         bunny.address,
         fish.address,
+        0,
         [locked_strategy.address],
         sender=fish,
     )
@@ -110,6 +112,7 @@ def test_multiple_strategy_withdraw_flow(
             whale_balance,
             whale.address,
             whale.address,
+            0,
             [liquid_strategy.address],
             sender=whale,
         )
@@ -119,6 +122,7 @@ def test_multiple_strategy_withdraw_flow(
         whale_balance,
         whale.address,
         whale.address,
+        0,
         [s.address for s in strategies],
         sender=whale,
     )
@@ -143,6 +147,7 @@ def test_multiple_strategy_withdraw_flow(
         amount_to_lock,
         whale.address,
         whale.address,
+        0,
         [s.address for s in strategies],
         sender=whale,
     )

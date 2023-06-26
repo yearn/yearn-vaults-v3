@@ -42,10 +42,11 @@ interface IStrategy:
     def maxDeposit(receiver: address) -> uint256: view
     def maxWithdraw(owner: address) -> uint256: view
     def withdraw(amount: uint256, receiver: address, owner: address) -> uint256: nonpayable
+    def redeem(shares: uint256, receiver: address, owner: address) -> uint256: nonpayable
     def deposit(assets: uint256, receiver: address) -> uint256: nonpayable
     def totalAssets() -> (uint256): view
-    def convertToAssets(shares: uint256) -> (uint256): view
-    def convertToShares(assets: uint256) -> (uint256): view
+    def convertToAssets(shares: uint256) -> uint256: view
+    def convertToShares(assets: uint256) -> uint256: view
 
 interface IAccountant:
     def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
@@ -636,8 +637,10 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
 def _redeem(
     sender: address, 
     receiver: address, 
-    owner: address, 
+    owner: address,
+    assets: uint256,
     shares_to_burn: uint256, 
+    max_loss: uint256,
     strategies: DynArray[address, MAX_QUEUE]
 ) -> uint256:
     """
@@ -665,7 +668,7 @@ def _redeem(
         self._spend_allowance(owner, sender, shares_to_burn)
 
     # The amount of the underlying token to withdraw.
-    requested_assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_DOWN)
+    requested_assets: uint256 = assets
 
     # load to memory to save gas
     curr_total_idle: uint256 = self.total_idle
@@ -752,6 +755,7 @@ def _redeem(
                 continue
             
             # WITHDRAW FROM STRATEGY
+            shares_to_withdraw: uint256 = IStrategy(strategy).convertToShares(assets_to_withdraw)
             IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
             post_balance: uint256 = ASSET.balanceOf(self)
             
@@ -788,6 +792,11 @@ def _redeem(
         assert curr_total_idle >= requested_assets, "insufficient assets in vault"
         # Commit memory to storage.
         self.total_debt = curr_total_debt
+
+    # Check if there is a loss and a non-default value was set.
+    if assets > requested_assets and max_loss < MAX_BPS:
+        # The loss is withen the allowed range.
+        assert assets - requested_assets <= assets * max_loss / MAX_BPS, "to much loss"
 
     # First burn the corresponding shares from the redeemer.
     self._burn_shares(shares, owner)
@@ -1505,18 +1514,27 @@ def withdraw(
     assets: uint256, 
     receiver: address, 
     owner: address, 
+    max_loss: uint256 = 0,
     strategies: DynArray[address, MAX_QUEUE] = []
 ) -> uint256:
     """
     @notice Withdraw an amount of asset to `receiver` burning `owner`s shares.
+    @dev The default behavior is to not allow any loss.
     @param assets The amount of asset to withdraw.
     @param receiver The address to receive the assets.
     @param owner The address whos shares are being burnt.
+    @param max_loss Optional amount of acceptable loss in Basis Points.
     @param strategies Optional array of strategies to withdraw from.
     @return The amount of shares actually burnt.
     """
     shares: uint256 = self._convert_to_shares(assets, Rounding.ROUND_UP)
-    self._redeem(msg.sender, receiver, owner, shares, strategies)
+    self._redeem(msg.sender, receiver, owner, assets, shares, max_loss, strategies)
+    
+    # If we have a loss
+    #if assets > withdrawn:
+        # Make sure we are withen the acceptable range.
+        #assert assets - withdrawn <= assets * max_loss / MAX_BPS, "to much loss"
+    
     return shares
 
 @external
@@ -1525,18 +1543,29 @@ def redeem(
     shares: uint256, 
     receiver: address, 
     owner: address, 
+    max_loss: uint256 = MAX_BPS,
     strategies: DynArray[address, MAX_QUEUE] = []
 ) -> uint256:
     """
     @notice Redeems an amount of shares of `owners` shares sending funds to `receiver`.
+    @dev The default behavior is to allow losses to be realized.
     @param shares The amount of shares to burn.
     @param receiver The address to receive the assets.
     @param owner The address whos shares are being burnt.
+    @param max_loss Optional amount of acceptable loss in Basis Points.
     @param strategies Optional array of strategies to withdraw from.
     @return The amount of assets actually withdrawn.
     """
-    assets: uint256 = self._redeem(msg.sender, receiver, owner, shares, strategies)
-    return assets
+    assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_DOWN)
+    # Always return the actual amount of assets withdrawn.
+    withdrawn: uint256 = self._redeem(msg.sender, receiver, owner, assets, shares, max_loss, strategies)
+    
+    # Only check if a non-default value was set.
+    #if max_loss < MAX_BPS and assets > withdrawn:
+        # Make sure we got out enough assets.
+        #assert assets - withdrawn <= assets * max_loss / MAX_BPS, "to much loss"
+    
+    return withdrawn
 
 @external
 def approve(spender: address, amount: uint256) -> bool:
