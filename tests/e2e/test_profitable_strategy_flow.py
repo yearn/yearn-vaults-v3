@@ -119,6 +119,10 @@ def test_profitable_strategy_flow(
     assert vault.strategies(strategy).current_debt != new_debt
 
     user_1_withdraw = vault.totalIdle()
+    print(
+        f"Unrealized losses 1= {vault.assess_share_of_unrealised_losses(strategy, user_1_withdraw)}"
+    )
+    print(f"Asset balance 1 {asset.balanceOf(vault.address)}")
     vault.withdraw(user_1_withdraw, user_1, user_1, sender=user_1)
 
     assert pytest.approx(0, abs=1) == vault.totalIdle()
@@ -152,14 +156,12 @@ def test_profitable_strategy_flow(
         sender=user_1,
     )
 
-    assert vault.totalIdle() == 0
     assert pytest.approx(0, abs=1) == vault.balanceOf(user_1)
 
     assert asset.balanceOf(user_1) > user_1_initial_balance
 
-    vault.redeem(vault.balanceOf(user_2), user_2, user_2, sender=user_2)
+    vault.redeem(vault.balanceOf(user_2), user_2, user_2, 0, sender=user_2)
 
-    assert vault.totalIdle() == 0
     assert pytest.approx(0, abs=1) == vault.balanceOf(user_2)
     assert asset.balanceOf(user_2) > user_2_initial_balance
 
@@ -173,6 +175,7 @@ def test_profitable_strategy_flow(
     # Let's empty the strategy and revoke it
     add_debt_to_strategy(gov, strategy, vault, 0)
 
+    assert strategy.totalAssets() == 0
     assert vault.strategies(strategy).current_debt == 0
     vault.revoke_strategy(strategy, sender=gov)
     assert vault.strategies(strategy).activation == 0
