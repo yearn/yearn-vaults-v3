@@ -47,6 +47,7 @@ interface IStrategy:
     def totalAssets() -> (uint256): view
     def convertToAssets(shares: uint256) -> uint256: view
     def convertToShares(assets: uint256) -> uint256: view
+    def previewWithdraw(assets: uint256) -> uint256: view
 
 interface IAccountant:
     def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
@@ -585,9 +586,9 @@ def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
 @internal
 def _mint(sender: address, recipient: address, shares: uint256) -> uint256:
     """
-    Used for `mint` calls to transfer the amount of `asset` to the vault, 
-    issue the corresponding shares to the `recipient` and update all 
-    needed vault accounting.
+    Used for `mint` calls to issue the corresponding shares to the `recipient`,
+    transfer the amount of `asset` to the vault, and update all needed vault 
+    accounting.
     """
     assert self.shutdown == False # dev: shutdown
     assert recipient not in [self, empty(address)], "invalid recipient"
@@ -629,7 +630,11 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
     # Users will withdraw assets_to_withdraw divided by loss ratio (strategy_assets / strategy_current_debt - 1),
     # but will only receive assets_to_withdraw.
     # NOTE: If there are unrealised losses, the user will take his share.
-    losses_user_share: uint256 = assets_needed - (assets_needed * strategy_assets + 1) / strategy_current_debt
+    numerator: uint256 = assets_needed * strategy_assets
+    losses_user_share: uint256 = assets_needed - numerator / strategy_current_debt
+    # Always round up.
+    if numerator % strategy_current_debt != 0:
+        losses_user_share += 1
 
     return losses_user_share
 
@@ -755,8 +760,9 @@ def _redeem(
                 continue
             
             # WITHDRAW FROM STRATEGY
-            shares_to_withdraw: uint256 = IStrategy(strategy).convertToShares(assets_to_withdraw)
-            IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
+            # We use redeem to be able to take on losses, and previewWithdraw since it should round up.
+            shares_to_withdraw: uint256 = min(IStrategy(strategy).previewWithdraw(assets_to_withdraw), IStrategy(strategy).balanceOf(self))
+            IStrategy(strategy).redeem(shares_to_withdraw, self, self)
             post_balance: uint256 = ASSET.balanceOf(self)
             
             loss: uint256 = 0
@@ -1504,9 +1510,7 @@ def mint(shares: uint256, receiver: address) -> uint256:
     @param receiver The address to receive the shares.
     @return The amount of assets deposited.
     """
-    assets: uint256 = self._mint(msg.sender, receiver, shares) #self._convert_to_assets(shares, Rounding.ROUND_UP)
-    #self._deposit(msg.sender, receiver, assets)
-    return assets
+    return self._mint(msg.sender, receiver, shares)
 
 @external
 @nonreentrant("lock")
@@ -1529,12 +1533,6 @@ def withdraw(
     """
     shares: uint256 = self._convert_to_shares(assets, Rounding.ROUND_UP)
     self._redeem(msg.sender, receiver, owner, assets, shares, max_loss, strategies)
-    
-    # If we have a loss
-    #if assets > withdrawn:
-        # Make sure we are withen the acceptable range.
-        #assert assets - withdrawn <= assets * max_loss / MAX_BPS, "to much loss"
-    
     return shares
 
 @external
@@ -1558,14 +1556,8 @@ def redeem(
     """
     assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_DOWN)
     # Always return the actual amount of assets withdrawn.
-    withdrawn: uint256 = self._redeem(msg.sender, receiver, owner, assets, shares, max_loss, strategies)
-    
-    # Only check if a non-default value was set.
-    #if max_loss < MAX_BPS and assets > withdrawn:
-        # Make sure we got out enough assets.
-        #assert assets - withdrawn <= assets * max_loss / MAX_BPS, "to much loss"
-    
-    return withdrawn
+    return self._redeem(msg.sender, receiver, owner, assets, shares, max_loss, strategies)
+
 
 @external
 def approve(spender: address, amount: uint256) -> bool:
