@@ -164,19 +164,19 @@ API_VERSION: constant(String[28]) = "3.0.1-beta"
 
 # ENUMS #
 # Each permissioned function has its own Role.
-# Roles can be combined in any combination or all kept seperate.
+# Roles can be combined in any combination or all kept separate.
 # Follows python Enum patterns so the first Enum == 1 and doubles each time.
 enum Roles:
     ADD_STRATEGY_MANAGER # Can add strategies to the vault.
     REVOKE_STRATEGY_MANAGER # Can remove strategies from the vault.
     FORCE_REVOKE_MANAGER # Can force remove a strategy causing a loss.
-    ACCOUNTANT_MANAGER # Can set the accountant that assesss fees.
+    ACCOUNTANT_MANAGER # Can set the accountant that assess fees.
     QUEUE_MANAGER # Can set the default withdrawal queue.
     REPORTING_MANAGER # Calls report for strategies.
     DEBT_MANAGER # Adds and removes debt from strategies.
     MAX_DEBT_MANAGER # Can set the max debt for a strategy.
     DEPOSIT_LIMIT_MANAGER # Sets deposit limit for the vault.
-    MINIMUM_IDLE_MANAGER # Sets the minimun total idle the vault should keep.
+    MINIMUM_IDLE_MANAGER # Sets the minimum total idle the vault should keep.
     PROFIT_UNLOCK_MANAGER # Sets the profit_max_unlock_time.
     DEBT_PURCHASER # Can purchase bad debt from the vault.
     EMERGENCY_MANAGER # Can shutdown vault in an emergency.
@@ -198,7 +198,7 @@ enum RoleStatusChange:
 ASSET: immutable(ERC20)
 # Based off the `asset` decimals.
 DECIMALS: immutable(uint256)
-# Deployer contract used to retreive the protocol fee config.
+# Deployer contract used to retrieve the protocol fee config.
 FACTORY: public(immutable(address))
 
 # STORAGE #
@@ -418,7 +418,7 @@ def _burn_unlocked_shares():
     # Get the amount of shares that have unlocked
     unlocked_shares: uint256 = self._unlocked_shares()
 
-    # IF 0 theres nothing to do.
+    # IF 0 there's nothing to do.
     if unlocked_shares == 0:
         return
 
@@ -562,7 +562,7 @@ def _max_withdraw(owner: address) -> uint256:
 @internal
 def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
     """
-    Used for `deposit` calls to transfer the amoutn of `asset` to the vault, 
+    Used for `deposit` calls to transfer the amount of `asset` to the vault, 
     issue the corresponding shares to the `recipient` and update all needed 
     vault accounting.
     """
@@ -649,7 +649,7 @@ def _redeem(
     strategies: DynArray[address, MAX_QUEUE]
 ) -> uint256:
     """
-    This will attempt to free up the full amount of assets equivalant to
+    This will attempt to free up the full amount of assets equivalent to
     `shares_to_burn` and transfer them to the `receiver`. If the vault does
     not have enough idle funds it will go through any strategies provided by
     either the withdrawer or the queue_manaager to free up enough funds to 
@@ -693,7 +693,7 @@ def _redeem(
         # load to memory to save gas
         curr_total_debt: uint256 = self.total_debt
 
-        # Withdraw from strategies only what idle doesnt cover.
+        # Withdraw from strategies only what idle doesn't cover.
         # `assets_needed` is the total amount we need to fill the request.
         assets_needed: uint256 = requested_assets - curr_total_idle
         # `assets_to_withdraw` is the amount to request from the current strategy.
@@ -798,7 +798,7 @@ def _redeem(
             previous_balance = post_balance
 
             # Reduce what we still need. Safe to use assets_to_withdraw 
-            # here since it has been checked agains requested_assets
+            # here since it has been checked against requested_assets
             assets_needed -= assets_to_withdraw
 
         # If we exhaust the queue and still have insufficient total idle, revert.
@@ -808,7 +808,7 @@ def _redeem(
 
     # Check if there is a loss and a non-default value was set.
     if assets > requested_assets and max_loss < MAX_BPS:
-        # The loss is withen the allowed range.
+        # The loss is within the allowed range.
         assert assets - requested_assets <= assets * max_loss / MAX_BPS, "to much loss"
 
     # First burn the corresponding shares from the redeemer.
@@ -882,7 +882,7 @@ def _revoke_strategy(strategy: address, force: bool=False):
 @internal
 def _update_debt(strategy: address, target_debt: uint256) -> uint256:
     """
-    The vault will rebalance the debt vs target debt. Target debt must be
+    The vault will re-balance the debt vs target debt. Target debt must be
     smaller or equal to strategy's max_debt. This function will compare the 
     current debt with the target debt and will take funds or deposit new 
     funds to the strategy. 
@@ -1439,7 +1439,7 @@ def revoke_strategy(strategy: address):
 def force_revoke_strategy(strategy: address):
     """
     @notice Force revoke a strategy.
-    @dev The vault will remove the inputed strategy and write off any debt left 
+    @dev The vault will remove the strategy and write off any debt left 
         in it as a loss. This function is a dangerous function as it can force a 
         strategy to take a loss. All possible assets should be removed from the 
         strategy first via update_debt. If a strategy is removed erroneously it 
@@ -1533,7 +1533,7 @@ def withdraw(
     @dev The default behavior is to not allow any loss.
     @param assets The amount of asset to withdraw.
     @param receiver The address to receive the assets.
-    @param owner The address whos shares are being burnt.
+    @param owner The address who's shares are being burnt.
     @param max_loss Optional amount of acceptable loss in Basis Points.
     @param strategies Optional array of strategies to withdraw from.
     @return The amount of shares actually burnt.
@@ -1556,7 +1556,7 @@ def redeem(
     @dev The default behavior is to allow losses to be realized.
     @param shares The amount of shares to burn.
     @param receiver The address to receive the assets.
-    @param owner The address whos shares are being burnt.
+    @param owner The address who's shares are being burnt.
     @param max_loss Optional amount of acceptable loss in Basis Points.
     @param strategies Optional array of strategies to withdraw from.
     @return The amount of assets actually withdrawn.
