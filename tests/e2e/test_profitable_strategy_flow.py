@@ -78,7 +78,6 @@ def test_profitable_strategy_flow(
 
     assert vault.totalIdle() == deposit_amount
 
-    strategy.totalAssets()
     add_debt_to_strategy(gov, strategy, vault, strategy.totalAssets() + deposit_amount)
 
     assert vault.totalIdle() == 0
@@ -144,7 +143,6 @@ def test_profitable_strategy_flow(
         - user_1_withdraw
     )
 
-    # we need to use strategies param to take assets from strategies
     vault.redeem(
         vault.balanceOf(user_1),
         user_1,
@@ -159,9 +157,7 @@ def test_profitable_strategy_flow(
 
     assert asset.balanceOf(user_1) > user_1_initial_balance
 
-    vault.redeem(
-        vault.balanceOf(user_2), user_2, user_2, 0, [strategy.address], sender=user_2
-    )
+    vault.redeem(vault.balanceOf(user_2), user_2, user_2, sender=user_2)
 
     assert vault.totalIdle() == 0
     assert pytest.approx(0, abs=1) == vault.balanceOf(user_2)
@@ -177,6 +173,6 @@ def test_profitable_strategy_flow(
     # Let's empty the strategy and revoke it
     add_debt_to_strategy(gov, strategy, vault, 0)
 
-    assert strategy.totalAssets() == 0
+    assert vault.strategies(strategy).current_debt == 0
     vault.revoke_strategy(strategy, sender=gov)
     assert vault.strategies(strategy).activation == 0
