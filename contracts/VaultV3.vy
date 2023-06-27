@@ -762,16 +762,18 @@ def _redeem(
             # WITHDRAW FROM STRATEGY
             # We use redeem to be able to take on losses, and previewWithdraw since it should round up.
             shares_to_withdraw: uint256 = min(IStrategy(strategy).previewWithdraw(assets_to_withdraw), IStrategy(strategy).balanceOf(self))
-            withdrawn: uint256 = IStrategy(strategy).redeem(shares_to_withdraw, self, self)
+            IStrategy(strategy).redeem(shares_to_withdraw, self, self)
             post_balance: uint256 = ASSET.balanceOf(self)
             
+            # Always check withdrawn against the real amounts.
+            withdrawn: uint256 = post_balance - previous_balance
+            loss: uint256 = 0
             # Check if we redeemed to much.
             if withdrawn > assets_to_withdraw:
                 assets_to_withdraw += withdrawn - assets_to_withdraw
 
-            loss: uint256 = 0
             # If we have not received what we expected, we consider the difference a loss.
-            if(previous_balance + assets_to_withdraw > post_balance):
+            elif withdrawn < assets_to_withdraw:
                 loss = previous_balance + assets_to_withdraw - post_balance
 
             # NOTE: strategy's debt decreases by the full amount but the total idle increases 
