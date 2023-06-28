@@ -125,7 +125,7 @@ def test_gain_no_fees_no_refunds_no_existing_buffer(
     )
 
     # User redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert_price_per_share(vault, 1.0)
     check_vault_totals(
@@ -253,7 +253,7 @@ def test_gain_no_fees_with_refunds_no_buffer(
     assert vault.strategies(strategy).current_debt == 0
 
     # Fish redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert_price_per_share(vault, 1.0)
 
@@ -268,7 +268,7 @@ def test_gain_no_fees_with_refunds_no_buffer(
     # Accountant redeems shares
     with reverts("no shares to redeem"):
         vault.redeem(
-            vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
+            vault.balanceOf(accountant), accountant, accountant, sender=accountant
         )
 
 
@@ -405,7 +405,7 @@ def test_gain_no_fees_with_refunds_with_buffer(
     total_shares = vault.totalSupply()
 
     # Fish redeems shares
-    vault.redeem(shares_fish, fish, fish, [], sender=fish)
+    vault.redeem(shares_fish, fish, fish, sender=fish)
 
     assert_price_per_share(vault, 1.0)
 
@@ -423,7 +423,7 @@ def test_gain_no_fees_with_refunds_with_buffer(
     # Accountant redeems shares
     with reverts("no shares to redeem"):
         vault.redeem(
-            vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
+            vault.balanceOf(accountant), accountant, accountant, sender=accountant
         )
 
 
@@ -516,7 +516,7 @@ def test_gain_no_fees_no_refunds_with_buffer(
     )
 
     # Fish redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert_price_per_share(vault, 1.0)
 
@@ -605,7 +605,7 @@ def test_gain_fees_no_refunds_no_existing_buffer(
     )
 
     # Fish redeems shares
-    tx = vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    tx = vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
     withdraw_assets = list(tx.decode_logs(vault.Withdraw))[0].assets
     withdrawn_diff = int(
         amount
@@ -630,9 +630,7 @@ def test_gain_fees_no_refunds_no_existing_buffer(
     assert asset.balanceOf(fish) < fish_amount + first_profit
 
     # Accountant redeems shares
-    vault.redeem(
-        vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
-    )
+    vault.redeem(vault.balanceOf(accountant), accountant, accountant, sender=accountant)
 
     check_vault_totals(
         vault, total_debt=0, total_idle=0, total_assets=0, total_supply=0
@@ -721,7 +719,7 @@ def test_gain_fees_refunds_no_existing_buffer(
     )
 
     # Fish redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert_price_per_share(vault, vault.totalAssets() / vault.balanceOf(accountant))
     check_vault_totals(
@@ -750,9 +748,7 @@ def test_gain_fees_refunds_no_existing_buffer(
     )
 
     # Accountant redeems shares
-    vault.redeem(
-        vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
-    )
+    vault.redeem(vault.balanceOf(accountant), accountant, accountant, sender=accountant)
     check_vault_totals(
         vault, total_debt=0, total_idle=0, total_assets=0, total_supply=0
     )
@@ -898,7 +894,7 @@ def test_gain_fees_with_refunds_with_buffer(
     assert vault.strategies(strategy).current_debt == 0
 
     # Fish redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     check_vault_totals(
         vault,
@@ -914,9 +910,7 @@ def test_gain_fees_with_refunds_with_buffer(
     ) + second_profit * (1 + refund_ratio / MAX_BPS_ACCOUNTANT)
 
     # Accountant redeems shares
-    vault.redeem(
-        vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
-    )
+    vault.redeem(vault.balanceOf(accountant), accountant, accountant, sender=accountant)
     check_vault_totals(
         vault, total_debt=0, total_idle=0, total_assets=0, total_supply=0
     )
@@ -1077,7 +1071,7 @@ def test_gain_fees_no_refunds_with_buffer(
     )
 
     # Fish redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert_price_per_share(vault, vault.totalAssets() / vault.balanceOf(accountant))
 
@@ -1095,9 +1089,7 @@ def test_gain_fees_no_refunds_with_buffer(
     assert asset.balanceOf(fish) < fish_amount + first_profit + second_profit
 
     # Accountant redeems shares
-    vault.redeem(
-        vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
-    )
+    vault.redeem(vault.balanceOf(accountant), accountant, accountant, sender=accountant)
     check_vault_totals(
         vault, total_debt=0, total_idle=0, total_assets=0, total_supply=0
     )
@@ -1249,7 +1241,7 @@ def test_gain_fees_no_refunds_not_enough_buffer(
     )
 
     # Fish redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     check_vault_totals(
         vault,
@@ -1260,9 +1252,7 @@ def test_gain_fees_no_refunds_not_enough_buffer(
     )
 
     # Accountant redeems shares
-    vault.redeem(
-        vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
-    )
+    vault.redeem(vault.balanceOf(accountant), accountant, accountant, sender=accountant)
     check_vault_totals(
         vault, total_debt=0, total_idle=0, total_assets=0, total_supply=0
     )
@@ -1334,7 +1324,7 @@ def test_loss_no_fees_no_refunds_no_existing_buffer(
     )
 
     # Fish redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert_price_per_share(vault, 1.0)
     check_vault_totals(
@@ -1392,7 +1382,7 @@ def test_loss_fees_no_refunds_no_existing_buffer(
     add_debt_to_strategy(gov, strategy, vault, 0)
 
     # Fish redeems shares
-    tx = vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    tx = vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     check_vault_totals(
         vault,
@@ -1405,9 +1395,7 @@ def test_loss_fees_no_refunds_no_existing_buffer(
     assert asset.balanceOf(fish) < fish_amount - first_loss
 
     # Accountant redeems shares
-    vault.redeem(
-        vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
-    )
+    vault.redeem(vault.balanceOf(accountant), accountant, accountant, sender=accountant)
 
     check_vault_totals(
         vault,
@@ -1490,7 +1478,7 @@ def test_loss_no_fees_refunds_no_existing_buffer(
     )
 
     # Fish redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert_price_per_share(vault, 1.0)
     check_vault_totals(
@@ -1623,7 +1611,7 @@ def test_loss_no_fees_with_refunds_with_buffer(
     assert vault.strategies(strategy).current_debt == 0
 
     # Fish redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert_price_per_share(vault, 1.0)
 
@@ -1643,7 +1631,7 @@ def test_loss_no_fees_with_refunds_with_buffer(
     # Accountant redeems shares
     with reverts("no shares to redeem"):
         vault.redeem(
-            vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
+            vault.balanceOf(accountant), accountant, accountant, sender=accountant
         )
 
 
@@ -1767,7 +1755,7 @@ def test_loss_no_fees_no_refunds_with_buffer(
     )
 
     # Fish redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert_price_per_share(vault, 1.0)
 
@@ -1899,7 +1887,7 @@ def test_loss_fees_no_refunds_with_buffer(
     )
 
     # Fish redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     check_vault_totals(
         vault,
@@ -1916,9 +1904,7 @@ def test_loss_fees_no_refunds_with_buffer(
     assert asset.balanceOf(fish) > fish_amount
 
     # Accountant redeems shares
-    vault.redeem(
-        vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
-    )
+    vault.redeem(vault.balanceOf(accountant), accountant, accountant, sender=accountant)
 
     check_vault_totals(
         vault,
@@ -2030,7 +2016,7 @@ def test_loss_no_fees_no_refunds_with_not_enough_buffer(
     )
 
     # Fish redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert_price_per_share(vault, 1.0)
 
@@ -2168,7 +2154,7 @@ def test_loss_fees_no_refunds_with_not_enough_buffer(
     )
 
     # Fish redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     check_vault_totals(
         vault,
@@ -2182,9 +2168,7 @@ def test_loss_fees_no_refunds_with_not_enough_buffer(
     assert asset.balanceOf(fish) < fish_amount + first_profit - first_loss
 
     # Accountant redeems shares
-    vault.redeem(
-        vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
-    )
+    vault.redeem(vault.balanceOf(accountant), accountant, accountant, sender=accountant)
 
     check_vault_totals(
         vault,
@@ -2262,7 +2246,7 @@ def test_loss_fees_refunds(
     )
 
     # Fish redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert_price_per_share(vault, 0.99)
     check_vault_totals(
@@ -2278,9 +2262,7 @@ def test_loss_fees_refunds(
     )
 
     # Accountant redeems shares
-    vault.redeem(
-        vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
-    )
+    vault.redeem(vault.balanceOf(accountant), accountant, accountant, sender=accountant)
 
     check_vault_totals(
         vault,
@@ -2418,7 +2400,7 @@ def test_loss_fees_refunds_with_buffer(
     assert vault.strategies(strategy).current_debt == 0
 
     # Fish redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert pytest.approx(vault.totalSupply(), 1e-4) == total_fees + total_second_fees
 
@@ -2428,9 +2410,7 @@ def test_loss_fees_refunds_with_buffer(
     assert asset.balanceOf(fish) > fish_amount
 
     # Accountant redeems shares
-    vault.redeem(
-        vault.balanceOf(accountant), accountant, accountant, [], sender=accountant
-    )
+    vault.redeem(vault.balanceOf(accountant), accountant, accountant, sender=accountant)
 
     check_vault_totals(
         vault,
@@ -2565,7 +2545,7 @@ def test_increase_profit_max_period__no_change(
     )
 
     # User redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert_price_per_share(vault, 1.0)
     check_vault_totals(
@@ -2634,7 +2614,7 @@ def test_decrease_profit_max_period__no_change(
     )
 
     # User redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert_price_per_share(vault, 1.0)
     check_vault_totals(
@@ -2739,7 +2719,7 @@ def test_increase_profit_max_period__next_report_works(
     )
 
     # User redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert_price_per_share(vault, 1.0)
     check_vault_totals(
@@ -2844,7 +2824,7 @@ def test_decrease_profit_max_period__next_report_works(
     )
 
     # User redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert_price_per_share(vault, 1.0)
     check_vault_totals(

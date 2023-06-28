@@ -62,9 +62,7 @@ def test_shutdown_cant_deposit_can_withdraw(
 
     assert vault_balance_before == asset.balanceOf(vault)
     gov_balance_before = asset.balanceOf(gov)
-    vault.withdraw(
-        vault.balanceOf(gov.address), gov.address, gov.address, [], sender=gov
-    )
+    vault.withdraw(vault.balanceOf(gov.address), gov.address, gov.address, sender=gov)
     assert asset.balanceOf(gov) == gov_balance_before + vault_balance_before
     assert asset.balanceOf(vault) == 0
 

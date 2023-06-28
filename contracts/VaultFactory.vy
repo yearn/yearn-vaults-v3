@@ -14,7 +14,7 @@
     initialized fully on-chain with their init byte code, thus not 
     requiring any delegatecall patterns or post deployment initialization.
     The deployments are done through create2 with a specific `salt` 
-    that is dereived from a combination of the deployers address,
+    that is derived from a combination of the deployers address,
     the underlying asset used, as well as the name and symbol specified.
     Meaning a deployer will not be able to deploy the exact same vault
     twice and will need to use different name and or symbols for vaults
@@ -91,7 +91,7 @@ name: public(String[64])
 default_protocol_fee_config: public(PFConfig)
 # Custom fee to charge for a specific vault or strategy.
 custom_protocol_fee: public(HashMap[address, uint16])
-# Repersents if a custom protocol fee should be used.
+# Represents if a custom protocol fee should be used.
 use_custom_protocol_fee: public(HashMap[address, bool])
 
 @external
@@ -158,7 +158,7 @@ def api_version() -> String[28]:
 def protocol_fee_config() -> PFConfig:
     """
     @notice Called during vault and strategy reports 
-    to retreive the protocol fee to charge and address
+    to retrieve the protocol fee to charge and address
     to receive the fees.
     @return The protocol fee config for the msg sender.
     """

@@ -477,7 +477,7 @@ def test__mint_shares_with_zero_total_supply_positive_assets(
     )  # there are more shares than deposits (due to profit unlock)
 
     # User redeems shares
-    vault.redeem(vault.balanceOf(fish), fish, fish, [], sender=fish)
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert vault.totalSupply() > 0
 

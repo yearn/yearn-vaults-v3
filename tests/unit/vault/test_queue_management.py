@@ -135,6 +135,7 @@ def test_withdraw__queue__with_inactive_strategy__reverts(
             shares,
             fish.address,
             fish.address,
+            0,
             strategies,
             sender=fish,
         )
@@ -170,7 +171,7 @@ def test_withdraw__queue__with_liquid_strategy__withdraws(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, amount)
 
-    tx = vault.withdraw(shares, fish.address, fish.address, strategies, sender=fish)
+    tx = vault.withdraw(shares, fish.address, fish.address, 0, strategies, sender=fish)
     event = list(tx.decode_logs(vault.Withdraw))
 
     assert len(event) >= 1
@@ -223,6 +224,7 @@ def test_withdraw__queue__with_inactive_strategy__reverts(
             shares,
             fish.address,
             fish.address,
+            0,
             [s.address for s in strategies],
             sender=fish,
         )
