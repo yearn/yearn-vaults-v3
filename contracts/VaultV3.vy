@@ -293,7 +293,6 @@ def __init__(
     self.name = name
     self.symbol = symbol
     self.role_manager = role_manager
-    self.shutdown = False
 
 ## SHARE MANAGEMENT ##
 ## ERC20 ##
@@ -303,13 +302,14 @@ def _spend_allowance(owner: address, spender: address, amount: uint256):
     current_allowance: uint256 = self.allowance[owner][spender]
     if (current_allowance < max_value(uint256)):
         assert current_allowance >= amount, "insufficient allowance"
-        self._approve(owner, spender, current_allowance - amount)
+        self._approve(owner, spender, unsafe_sub(current_allowance, amount))
 
 @internal
 def _transfer(sender: address, receiver: address, amount: uint256):
-    assert self.balance_of[sender] >= amount, "insufficient funds"
-    self.balance_of[sender] -= amount
-    self.balance_of[receiver] += amount
+    sender_balance: uint256 = self.balance_of[sender]
+    assert sender_balance >= amount, "insufficient funds"
+    self.balance_of[sender] = unsafe_sub(sender_balance, amount)
+    self.balance_of[receiver] = unsafe_add(self.balance_of[receiver], amount)
     log Transfer(sender, receiver, amount)
 
 @internal
@@ -326,14 +326,16 @@ def _approve(owner: address, spender: address, amount: uint256) -> bool:
 
 @internal
 def _increase_allowance(owner: address, spender: address, amount: uint256) -> bool:
-    self.allowance[owner][spender] += amount
-    log Approval(owner, spender, self.allowance[owner][spender])
+    new_allowance: uint256 = self.allowance[owner][spender] + amount
+    self.allowance[owner][spender] = new_allowance
+    log Approval(owner, spender, new_allowance)
     return True
 
 @internal
 def _decrease_allowance(owner: address, spender: address, amount: uint256) -> bool:
-    self.allowance[owner][spender] -= amount
-    log Approval(owner, spender, self.allowance[owner][spender])
+    new_allowance: uint256 = self.allowance[owner][spender] - amount
+    self.allowance[owner][spender] = new_allowance
+    log Approval(owner, spender, new_allowance)
     return True
 
 @internal
@@ -377,7 +379,7 @@ def _permit(
 @internal
 def _burn_shares(shares: uint256, owner: address):
     self.balance_of[owner] -= shares
-    self.total_supply -= shares
+    self.total_supply = unsafe_sub(self.total_supply, shares)
     log Transfer(owner, empty(address), shares)
 
 @view
@@ -499,7 +501,7 @@ def _erc20_safe_transfer(token: address, receiver: address, amount: uint256):
 
 @internal
 def _issue_shares(shares: uint256, recipient: address):
-    self.balance_of[recipient] += shares
+    self.balance_of[recipient] = unsafe_add(self.balance_of[recipient], shares)
     self.total_supply += shares
 
     log Transfer(empty(address), recipient, shares)
@@ -547,7 +549,7 @@ def _max_deposit(receiver: address) -> uint256:
     if (_total_assets >= _deposit_limit):
         return 0
 
-    return _deposit_limit - _total_assets
+    return unsafe_sub(_deposit_limit, _total_assets)
 
 @view
 @internal
@@ -695,7 +697,7 @@ def _redeem(
 
         # Withdraw from strategies only what idle doesn't cover.
         # `assets_needed` is the total amount we need to fill the request.
-        assets_needed: uint256 = requested_assets - curr_total_idle
+        assets_needed: uint256 = unsafe_sub(requested_assets, curr_total_idle)
         # `assets_to_withdraw` is the amount to request from the current strategy.
         assets_to_withdraw: uint256 = 0
 
@@ -781,11 +783,11 @@ def _redeem(
                     assets_to_withdraw = current_debt
                 else:
                     # Add the extra to how much we withdrew.
-                    assets_to_withdraw += (withdrawn - assets_to_withdraw)
+                    assets_to_withdraw += (unsafe_sub(withdrawn, assets_to_withdraw))
 
             # If we have not received what we expected, we consider the difference a loss.
             elif withdrawn < assets_to_withdraw:
-                loss = assets_to_withdraw - withdrawn
+                loss = unsafe_sub(assets_to_withdraw, withdrawn)
 
             # NOTE: strategy's debt decreases by the full amount but the total idle increases 
             # by the actual amount only (as the difference is considered lost).
@@ -914,7 +916,7 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
 
     if current_debt > new_debt:
         # Reduce debt.
-        assets_to_withdraw: uint256 = current_debt - new_debt
+        assets_to_withdraw: uint256 = unsafe_sub(current_debt, new_debt)
 
         # Ensure we always have minimum_total_idle when updating debt.
         minimum_total_idle: uint256 = self.minimum_total_idle
@@ -922,7 +924,7 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         
         # Respect minimum total idle in vault
         if total_idle + assets_to_withdraw < minimum_total_idle:
-            assets_to_withdraw = minimum_total_idle - total_idle
+            assets_to_withdraw = unsafe_sub(minimum_total_idle, total_idle)
             # Cant withdraw more than the strategy has.
             if assets_to_withdraw > current_debt:
                 assets_to_withdraw = current_debt
@@ -975,7 +977,7 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         total_idle: uint256 = self.total_idle
 
         assert total_idle > minimum_total_idle, "no funds to deposit"
-        available_idle: uint256 = total_idle - minimum_total_idle
+        available_idle: uint256 = unsafe_sub(total_idle, minimum_total_idle)
 
         # If insufficient funds to deposit, transfer only what is free.
         if assets_to_deposit > available_idle:
@@ -1050,10 +1052,10 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Compare reported assets vs. the current debt.
     if total_assets > current_debt:
         # We have a gain.
-        gain = total_assets - current_debt
+        gain = unsafe_sub(total_assets, current_debt)
     else:
         # We have a loss.
-        loss = current_debt - total_assets
+        loss = unsafe_sub(current_debt, total_assets)
 
     # For Accountant fee assessment.
     total_fees: uint256 = 0
@@ -1353,8 +1355,10 @@ def availableDepositLimit() -> uint256:
     @notice Get the available deposit limit.
     @return The available deposit limit.
     """
-    if self.deposit_limit > self._total_assets():
-        return self.deposit_limit - self._total_assets()
+    limit: uint256 = self.deposit_limit
+    assets: uint256 = self._total_assets()
+    if limit > assets:
+        return unsafe_sub(limit, assets)
     return 0
 
 @view
