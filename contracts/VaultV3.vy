@@ -326,14 +326,16 @@ def _approve(owner: address, spender: address, amount: uint256) -> bool:
 
 @internal
 def _increase_allowance(owner: address, spender: address, amount: uint256) -> bool:
-    self.allowance[owner][spender] += amount
-    log Approval(owner, spender, self.allowance[owner][spender])
+    new_allowance: uint256 = self.allowance[owner][spender] + amount
+    self.allowance[owner][spender] = new_allowance
+    log Approval(owner, spender, new_allowance)
     return True
 
 @internal
 def _decrease_allowance(owner: address, spender: address, amount: uint256) -> bool:
-    self.allowance[owner][spender] -= amount
-    log Approval(owner, spender, self.allowance[owner][spender])
+    new_allowance: uint256 = self.allowance[owner][spender] - amount
+    self.allowance[owner][spender] = new_allowance
+    log Approval(owner, spender, new_allowance)
     return True
 
 @internal
@@ -1353,8 +1355,10 @@ def availableDepositLimit() -> uint256:
     @notice Get the available deposit limit.
     @return The available deposit limit.
     """
-    if self.deposit_limit > self._total_assets():
-        return self.deposit_limit - self._total_assets()
+    limit: uint256 = self.deposit_limit
+    assets: uint256 = self._total_assets()
+    if limit > assets:
+        return limit - assets
     return 0
 
 @view
