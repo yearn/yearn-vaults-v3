@@ -293,7 +293,6 @@ def __init__(
     self.name = name
     self.symbol = symbol
     self.role_manager = role_manager
-    self.shutdown = False
 
 ## SHARE MANAGEMENT ##
 ## ERC20 ##
