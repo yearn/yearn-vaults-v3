@@ -8,7 +8,6 @@
 - Vault: ERC4626 compliant Smart contract that receives Assets from Depositors to then distribute them among the different Strategies added to the vault, managing accounting and Assets distribution. 
 - Role: the different flags an Account can have in the Vault so that the Account can do certain specific actions. Can be fulfilled by a smart contract or an EOA.
 - Accountant: smart contract that receives P&L reporting and returns shares and refunds to the strategy
-- Queue_Manager: smart contract that can be configured by management to hold the optimal withdrawal queues for each vault
 
 # VaultV3 Specification
 The Vault code has been designed as an non-opinionated system to distribute funds of depositors into different opportunities (aka Strategies) and manage accounting in a robust way. That's all.
@@ -58,7 +57,9 @@ Optionally, a user can specify a list of strategies to withdraw from. If a list 
 
 If a user passed array is not defined, the redeem function will use the default_queue.
 
-If not enough funds have been recovered to honor the full request, the transaction will revert.
+In order to properly comply with the ERC-4626 standard and still allow losses, both withdraw and redeem have an additional optional parameter of 'maxLoss' that can be used. The default for 'maxLoss' is 0 (i.e. revert if any loss) for withdraws, and 10_000 (100%) for redeems.
+
+If not enough funds have been recovered to honor the full request within the maxLoss, the transaction will revert.
 
 ### Vault Shares
 Vault shares are ERC20 transferable yield-bearing tokens.
@@ -109,7 +110,7 @@ These are:
 - REVOKE_STRATEGY_MANAGER: role that can remove strategies from the vault
 - FORCE_REVOKE_MANAGER: role that can force remove a strategy causing a loss
 - ACCOUNTANT_MANAGER: role that can set the accountant that assesses fees
-- QUEUE_MANAGER: role that can set the default_queue
+- QUEUE_MANAGER: role that can set the default withdrawal queue.
 - REPORTING_MANAGER: role that calls report for strategies
 - DEBT_MANAGER: role that adds and removes debt from strategies
 - MAX_DEBT_MANAGER: role that can set the max debt for a strategy
@@ -183,7 +184,7 @@ The PROFIT_UNLOCK_MANAGER is in charge of updating and setting the profit_max_un
 
 This can be customized based on the vault based on aspects such as number of strategies, TVL, expected returns etc.
 
-### Setting the default queue
+#### Setting the default queue
 The QUEUE_MANAGER has the option to set a custom default_queue if desired. The vault will arrange the default queue automatically based only on the order that strategies were added to the vault. If a different order is desired the queue manager role can set a custom queue.
 
 All strategies in the default queue must have been previously added to the vault.
@@ -206,22 +207,26 @@ Strategies are completely independent smart contracts that can be implemented fo
 
 In any case, to be compatible with the vault, they need to implement the following functions, which are a subset of ERC4626 vaults: 
 - asset(): view returning underlying asset
-- vault(): view returning vault this strategy is plugged to
 - totalAssets(): view returning current amount of assets. It can include rewards valued in `asset` ¡
 - maxDeposit(address): view returning the amount max that the strategy can take safely
 - deposit(assets, receiver): deposits `assets` amount of tokens into the strategy. it can be restricted to vault only or be open
 - maxWithdraw(address): view returning how many asset can the vault take from the vault at any given point in time
 - withdraw(assets, receiver, owner): withdraws `assets` amount of tokens from the strategy
+- redeem(shares, receiver, owner): redeems `shares` of the strategy for the underlying asset.
 - balanceOf(address): return the number of shares of the strategy that the address has
+- convertToAssets(shares: uint256): Converts `shares` into the corresponding amount of asset.
+- convertToShares(assets: uint256): Converts `assets` into the corresponding amount of shares.
+- previewWithdraw(assets: uint256): Converst `assets` into the corresponding amount of shares rounding up.
 
 This means that the vault can deposit into any ERC4626 vault but also that a non-compliant strategy can be implemented provided that these functions have been implemented (even in a non ERC4626 compliant way). 
 
 ## ERC4626 compliance
 Vault Shares are ERC4626 compliant. 
 
-The most important implication is that `withdraw` and `redeem` functions as presented in ERC4626, if no queue_manager is set the liquidity to redeem shares will just be the one in the vault. No strategies will be passed to the redeem function to withdraw from with the ERC4626 compliant `withdraw` and `redeem` function. 
+The most important implication is that `withdraw` and `redeem` functions as presented in ERC4626, with the ability to add two additional non-standard options.
 
-## Emergency Operation
+1. max_loss: The amount in basis points that the withdrawer will accept as a loss. I.E. 100 = 1% loss accepted.
+2. strategies: This is an array of strategies to use as the withdrawal queue instead of the default queue.
 
 ### Shutdown mode
 In the case the current roles stop fulfilling their responsibilities or something else happens, the EMERGENCY_MANAGER can shutdown the vault.
