@@ -641,15 +641,22 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
 
 @internal
 def _withdraw_from_strategy(strategy: address, assets_to_withdraw: uint256):
-    # WITHDRAW FROM STRATEGY
+    """
+    This takes the amount denominated in asset and performs a {redeem}
+    with the corresponding amount of shares.
+
+    We use {redeem} because the Tokenized Strategies cannot natively take on
+    losses during {withdraw} without aditional non-4626 standard parameters.
+    """
     # Need to get shares since we use redeem to be able to take on losses.
-    shares_to_withdraw: uint256 = min(
+    shares_to_redeem: uint256 = min(
         # Use previewWithdraw since it should round up.
         IStrategy(strategy).previewWithdraw(assets_to_withdraw), 
         # And check against our actual balance.
         IStrategy(strategy).balanceOf(self)
     )
-    IStrategy(strategy).redeem(shares_to_withdraw, self, self)
+    # Redeem the shares.
+    IStrategy(strategy).redeem(shares_to_redeem, self, self)
 
 @internal
 def _redeem(
@@ -773,14 +780,7 @@ def _redeem(
                 continue
             
             # WITHDRAW FROM STRATEGY
-            # Need to get shares since we use redeem to be able to take on losses.
-            shares_to_withdraw: uint256 = min(
-                # Use previewWithdraw since it should round up.
-                IStrategy(strategy).previewWithdraw(assets_to_withdraw), 
-                # And check against our actual balance.
-                IStrategy(strategy).balanceOf(self)
-            )
-            IStrategy(strategy).redeem(shares_to_withdraw, self, self)
+            self._withdraw_from_strategy(strategy, assets_to_withdraw)
             post_balance: uint256 = ASSET.balanceOf(self)
             
             # Always check withdrawn against the real amounts.
