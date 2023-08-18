@@ -58,4 +58,22 @@ contract ERC4626FaultyStrategy is ERC4626BaseStrategyMock {
 
         return shares;
     }
+
+    function redeem(
+        uint256 _shares,
+        address _receiver,
+        address _owner
+    ) public override returns (uint256) {
+        require(
+            _shares <= maxRedeem(_owner),
+            "ERC4626: withdraw more than max"
+        );
+
+        // this will simulate withdrawing less than the vault wanted to
+        uint256 toRedeem = _shares / 2;
+        uint256 assets = previewRedeem(toRedeem);
+        _withdraw(_msgSender(), _receiver, _owner, toRedeem, assets);
+
+        return assets;
+    }
 }

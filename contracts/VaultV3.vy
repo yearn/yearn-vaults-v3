@@ -41,7 +41,6 @@ interface IStrategy:
     def balanceOf(owner: address) -> uint256: view
     def maxDeposit(receiver: address) -> uint256: view
     def maxWithdraw(owner: address) -> uint256: view
-    def withdraw(amount: uint256, receiver: address, owner: address) -> uint256: nonpayable
     def redeem(shares: uint256, receiver: address, owner: address) -> uint256: nonpayable
     def deposit(assets: uint256, receiver: address) -> uint256: nonpayable
     def totalAssets() -> (uint256): view
@@ -641,6 +640,18 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
     return losses_user_share
 
 @internal
+def _withdraw_from_strategy(strategy: address, assets_to_withdraw: uint256):
+    # WITHDRAW FROM STRATEGY
+    # Need to get shares since we use redeem to be able to take on losses.
+    shares_to_withdraw: uint256 = min(
+        # Use previewWithdraw since it should round up.
+        IStrategy(strategy).previewWithdraw(assets_to_withdraw), 
+        # And check against our actual balance.
+        IStrategy(strategy).balanceOf(self)
+    )
+    IStrategy(strategy).redeem(shares_to_withdraw, self, self)
+
+@internal
 def _redeem(
     sender: address, 
     receiver: address, 
@@ -943,7 +954,7 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         
         # Always check the actual amount withdrawn.
         pre_balance: uint256 = ASSET.balanceOf(self)
-        IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
+        self._withdraw_from_strategy(strategy, assets_to_withdraw)
         post_balance: uint256 = ASSET.balanceOf(self)
         
         # making sure we are changing according to the real result no matter what. 
