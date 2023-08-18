@@ -786,7 +786,7 @@ def _redeem(
             # Always check withdrawn against the real amounts.
             withdrawn: uint256 = post_balance - previous_balance
             loss: uint256 = 0
-            # Check if we redeemed to much.
+            # Check if we redeemed too much.
             if withdrawn > assets_to_withdraw:
                 # Make sure we don't underlfow in debt updates.
                 if withdrawn > current_debt:
@@ -832,8 +832,8 @@ def _redeem(
 
     # Check if there is a loss and a non-default value was set.
     if assets > requested_assets and max_loss < MAX_BPS:
-        # The loss is within the allowed range.
-        assert assets - requested_assets <= assets * max_loss / MAX_BPS, "to much loss"
+        # Assure the loss is within the allowed range.
+        assert assets - requested_assets <= assets * max_loss / MAX_BPS, "too much loss"
 
     # First burn the corresponding shares from the redeemer.
     self._burn_shares(shares, owner)

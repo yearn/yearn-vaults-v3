@@ -330,7 +330,7 @@ def test_withdraw__with_lossy_strategy__no_max_loss__reverts(
     # lose half of assets in lossy strategy
     lossy_strategy.setLoss(gov, amount_to_lose, sender=gov)
 
-    with ape.reverts("to much loss"):
+    with ape.reverts("too much loss"):
         vault.withdraw(
             amount_to_withdraw,
             fish.address,
@@ -964,7 +964,7 @@ def test_withdraw__with_liquid_and_lossy_strategy_that_losses_while_withdrawing_
     # lose half of assets in lossy strategy
     lossy_strategy.setWithdrawingLoss(amount_to_lose, sender=gov)
 
-    with ape.reverts("to much loss"):
+    with ape.reverts("too much loss"):
         tx = vault.withdraw(
             amount_to_withdraw,
             fish.address,
@@ -1167,7 +1167,7 @@ def test_redeem__half_of_assets_from_lossy_strategy_that_losses_while_withdrawin
     # lose half of assets in lossy strategy
     lossy_strategy.setWithdrawingLoss(amount_to_lose, sender=gov)
 
-    with ape.reverts("to much loss"):
+    with ape.reverts("too much loss"):
         vault.redeem(
             amount_to_withdraw,
             fish.address,
@@ -1219,7 +1219,7 @@ def test_withdraw__half_of_strategy_assets_from_lossy_strategy_with_unrealised_l
     # lose half of assets in lossy strategy
     lossy_strategy.setLoss(gov, amount_to_lose, sender=gov)
 
-    with ape.reverts("to much loss"):
+    with ape.reverts("too much loss"):
         tx = vault.withdraw(
             amount_to_withdraw,
             fish.address,
@@ -1454,7 +1454,7 @@ def test_redeem__half_of_strategy_assets_from_locked_lossy_strategy_with_unreali
     # Lock half the remaining funds.
     lossy_strategy.setLockedFunds(amount_to_lock, DAY, sender=gov)
 
-    with ape.reverts("to much loss"):
+    with ape.reverts("too much loss"):
         vault.redeem(
             amount_to_withdraw,
             fish.address,
