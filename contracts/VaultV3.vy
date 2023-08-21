@@ -285,7 +285,7 @@ def __init__(
     FACTORY = msg.sender
 
     # Must be > 0 so we can unlock shares
-    assert profit_max_unlock_time > 0 # dev: profit unlock time too low
+    #assert profit_max_unlock_time > 0 # dev: profit unlock time too low
     # Must be less than one year for report cycles
     assert profit_max_unlock_time <= 31_556_952 # dev: profit unlock time too long
     self.profit_max_unlock_time = profit_max_unlock_time
@@ -1084,6 +1084,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     shares_to_burn: uint256 = 0
     accountant_fees_shares: uint256 = 0
     protocol_fees_shares: uint256 = 0
+    profit_max_unlock_time: uint256 = self.profit_max_unlock_time
     # Only need to burn shares if there is a loss or fees.
     if loss + total_fees > 0:
         # The amount of shares we will want to burn to offset losses and fees.
@@ -1105,8 +1106,10 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self._erc20_safe_transfer_from(ASSET.address, accountant, self, total_refunds)
         # Update storage to increase total assets.
         self.total_idle += total_refunds
-        # Mint new shares corresponding to the refunded assets to self.
-        newly_locked_shares += self._issue_shares_for_amount(total_refunds, self)
+        # If we are locking profit.
+        if profit_max_unlock_time != 0:
+            # Mint new shares corresponding to the refunded assets to self.
+            newly_locked_shares += self._issue_shares_for_amount(total_refunds, self)
 
     # Record any reported gains.
     if gain > 0:
@@ -1114,8 +1117,10 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self.strategies[strategy].current_debt += gain
         self.total_debt += gain
 
-        # Vault will issue shares worth the profit to itself to lock avoid instant pps change.
-        newly_locked_shares += self._issue_shares_for_amount(gain, self)
+        # If we are locking profit.
+        if profit_max_unlock_time != 0:
+            # Vault will issue shares worth the profit to itself to lock avoid instant pps change.
+            newly_locked_shares += self._issue_shares_for_amount(gain, self)
 
     # Strategy is reporting a loss
     if loss > 0:
@@ -1130,7 +1135,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Now that pps has updated, we can burn the shares we intended to burn as a result of losses/fees.
     # NOTE: If a value reduction (losses / fees) has occured, prioritize burning locked profit to avoid
     # negative impact on price per share. Price per share is reduced only if losses exceed locked value.
-    if shares_to_burn > 0:
+    if shares_to_burn != 0:
         # Cant burn more than the vault owns.
         shares_to_burn = min(shares_to_burn, previously_locked_shares + newly_locked_shares)
         self._burn_shares(shares_to_burn, self)
@@ -1160,7 +1165,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
             previously_locked_time = previously_locked_shares * (_full_profit_unlock_date - block.timestamp)
 
         # new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the profit_max_unlock_time
-        new_profit_locking_period: uint256 = (previously_locked_time + newly_locked_shares * self.profit_max_unlock_time) / total_locked_shares
+        new_profit_locking_period: uint256 = (previously_locked_time + newly_locked_shares * profit_max_unlock_time) / total_locked_shares
         # Calculate how many shares unlock per second.
         self.profit_unlocking_rate = total_locked_shares * MAX_BPS_EXTENDED / new_profit_locking_period
         # Calculate how long until the full amount of shares is unlocked.
@@ -1247,18 +1252,27 @@ def set_minimum_total_idle(minimum_total_idle: uint256):
 def set_profit_max_unlock_time(new_profit_max_unlock_time: uint256):
     """
     @notice Set the new profit max unlock time.
-    @dev The time is denominated in seconds and must be more than 0
-        and less than 1 year. We don't need to update locking period
+    @dev The time is denominated in seconds and must be less than 1 year.
+        We only need to update locking period if setting to 0,
         since the current period will use the old rate and on the next
         report it will be reset with the new unlocking time.
+    
+        Setting to 0 will cause any currently locked profit to instantly
+        unlock and an immediate increase in the vaults Price Per Share.
+
     @param new_profit_max_unlock_time The new profit max unlock time.
     """
     self._enforce_role(msg.sender, Roles.PROFIT_UNLOCK_MANAGER)
-    
-    # Must be > 0 so we can unlock shares
-    assert new_profit_max_unlock_time > 0, "profit unlock time too low"
     # Must be less than one year for report cycles
     assert new_profit_max_unlock_time <= 31_556_952, "profit unlock time too long"
+
+    # If setting to 0 we need to reset any locked values.
+    if(new_profit_max_unlock_time == 0):
+        # Burn any shares the vault still has.
+        self._burn_shares(self.balance_of[self], self)
+        # Reset unlocking variables to 0.
+        self.profit_unlocking_rate = 0
+        self.full_profit_unlock_date = 0
 
     self.profit_max_unlock_time = new_profit_max_unlock_time
 

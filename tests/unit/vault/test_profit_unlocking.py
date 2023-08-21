@@ -2421,7 +2421,7 @@ def test_loss_fees_refunds_with_buffer(
     )
 
 
-def test_accountant_and_protcol_fees_doesnt_change_pps(
+def test_accountant_and_protocol_fees_doesnt_change_pps(
     create_vault,
     asset,
     fish_amount,
@@ -2837,3 +2837,285 @@ def test_decrease_profit_max_period__next_report_works(
 
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(fish) == fish_amount + first_profit + second_profit
+
+
+def test_set_profit_max_period_to_zero__resets_rates(
+    asset, fish_amount, fish, initial_set_up, gov, add_debt_to_strategy
+):
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
+
+    vault, strategy, _ = initial_set_up(asset, gov, amount, fish)
+
+    create_and_check_profit(asset, strategy, gov, vault, first_profit)
+    timestamp = chain.pending_timestamp
+
+    assert_price_per_share(vault, 1.0)
+    check_vault_totals(
+        vault,
+        total_debt=amount + first_profit,
+        total_idle=0,
+        total_assets=amount + first_profit,
+        total_supply=amount + first_profit,
+    )
+
+    increase_time_and_check_profit_buffer(
+        chain, vault, secs=WEEK // 2, expected_buffer=first_profit // 2
+    )
+
+    assert vault.profitMaxUnlockTime() != 0
+    assert vault.balanceOf(vault.address) != 0
+    assert vault.fullProfitUnlockDate() != 0
+    assert vault.profitUnlockingRate() != 0
+
+    # update profit max unlock time
+    vault.set_profit_max_unlock_time(0, sender=gov)
+
+    assert vault.profitMaxUnlockTime() == 0
+    assert vault.balanceOf(vault.address) == 0
+    assert vault.fullProfitUnlockDate() == 0
+    assert vault.profitUnlockingRate() == 0
+
+    # All profits should have been unlocked
+    check_vault_totals(
+        vault,
+        total_debt=amount + first_profit,
+        total_idle=0,
+        total_assets=amount + first_profit,
+        total_supply=amount,
+    )
+
+    assert_price_per_share(vault, 2.0)
+
+    add_debt_to_strategy(gov, strategy, vault, 0)
+
+    assert vault.strategies(strategy).current_debt == 0
+    assert_price_per_share(vault, 2.0)
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=amount + first_profit,
+        total_assets=amount + first_profit,
+        total_supply=amount,
+    )
+
+    # User redeems shares
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
+
+    assert_price_per_share(vault, 1.0)
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=0,
+        total_assets=0,
+        total_supply=0,
+    )
+
+    assert asset.balanceOf(vault) == 0
+    assert asset.balanceOf(fish) == fish_amount + first_profit
+
+
+def test_set_profit_max_period_to_zero__doesnt_lock(
+    asset, fish_amount, fish, initial_set_up, gov, add_debt_to_strategy
+):
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
+
+    vault, strategy, _ = initial_set_up(asset, gov, amount, fish)
+
+    # update profit max unlock time
+    vault.set_profit_max_unlock_time(0, sender=gov)
+
+    assert vault.profitMaxUnlockTime() == 0
+    assert vault.balanceOf(vault.address) == 0
+    assert vault.fullProfitUnlockDate() == 0
+    assert vault.profitUnlockingRate() == 0
+
+    create_and_check_profit(asset, strategy, gov, vault, first_profit)
+
+    # All profits should have been unlocked
+    check_vault_totals(
+        vault,
+        total_debt=amount + first_profit,
+        total_idle=0,
+        total_assets=amount + first_profit,
+        total_supply=amount,
+    )
+
+    assert_price_per_share(vault, 2.0)
+
+    add_debt_to_strategy(gov, strategy, vault, 0)
+
+    assert vault.strategies(strategy).current_debt == 0
+    assert_price_per_share(vault, 2.0)
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=amount + first_profit,
+        total_assets=amount + first_profit,
+        total_supply=amount,
+    )
+
+    # User redeems shares
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
+
+    assert_price_per_share(vault, 1.0)
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=0,
+        total_assets=0,
+        total_supply=0,
+    )
+
+    assert asset.balanceOf(vault) == 0
+    assert asset.balanceOf(fish) == fish_amount + first_profit
+
+
+def test_set_profit_max_period_to_zero__with_fees_doesnt_lock(
+    asset, fish_amount, fish, initial_set_up, gov, add_debt_to_strategy
+):
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
+
+    # Using only performance_fee as its easier to measure for tests
+    management_fee = 0
+    performance_fee = 1_000
+    refund_ratio = 0
+
+    # Deposit assets to vault and get strategy ready
+    vault, strategy, accountant = initial_set_up(
+        asset, gov, amount, fish, management_fee, performance_fee, refund_ratio
+    )
+
+    # update profit max unlock time
+    vault.set_profit_max_unlock_time(0, sender=gov)
+
+    assert vault.profitMaxUnlockTime() == 0
+    assert vault.balanceOf(vault.address) == 0
+    assert vault.fullProfitUnlockDate() == 0
+    assert vault.profitUnlockingRate() == 0
+
+    expected_fees = first_profit * performance_fee / MAX_BPS_ACCOUNTANT
+    first_price_per_share = vault.pricePerShare()
+
+    create_and_check_profit(asset, strategy, gov, vault, first_profit, expected_fees)
+
+    # All profits should have been unlocked
+    check_vault_totals(
+        vault,
+        total_debt=amount + first_profit,
+        total_idle=0,
+        total_assets=amount + first_profit,
+        total_supply=amount + expected_fees,
+    )
+
+    price_per_share = vault.pricePerShare()
+    assert price_per_share > first_price_per_share
+
+    add_debt_to_strategy(gov, strategy, vault, 0)
+
+    assert vault.strategies(strategy).current_debt == 0
+    assert vault.pricePerShare() == price_per_share
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=amount + first_profit,
+        total_assets=amount + first_profit,
+        total_supply=amount,
+    )
+
+    increase_time_and_check_profit_buffer(vault=vault, secs=DAY, expected_buffer=0)
+
+    assert vault.pricePerShare() == price_per_share
+
+    # User redeems shares
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
+
+    assert vault.pricePerShare() == price_per_share
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=expected_fees * 2,
+        total_assets=expected_fees * 2,
+        total_supply=expected_fees,
+    )
+
+    assert asset.balanceOf(vault) == expected_fees * 2
+
+    vault.redeem(
+        vault.balanceOf(accountant.address), accountant, accountant, sender=accountant
+    )
+
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=0,
+        total_assets=0,
+        total_supply=0,
+    )
+
+    assert vault.pricePerShare() == first_price_per_share
+
+
+def test_set_profit_max_period_to_zero___report_loss(
+    asset, fish_amount, fish, initial_set_up_lossy, gov, add_debt_to_strategy
+):
+    amount = fish_amount // 10
+    first_loss = amount // 2
+
+    vault, strategy, _ = initial_set_up_lossy(
+        asset,
+        gov,
+        amount,
+        fish,
+    )
+
+    # update profit max unlock time
+    vault.set_profit_max_unlock_time(0, sender=gov)
+
+    assert vault.profitMaxUnlockTime() == 0
+    assert vault.balanceOf(vault.address) == 0
+    assert vault.fullProfitUnlockDate() == 0
+    assert vault.profitUnlockingRate() == 0
+
+    create_and_check_loss(strategy, gov, vault, first_loss)
+
+    # All profits should have been unlocked
+    check_vault_totals(
+        vault,
+        total_debt=amount - first_loss,
+        total_idle=0,
+        total_assets=amount - first_loss,
+        total_supply=amount,
+    )
+
+    assert vault.pricePerShare() / 10 ** vault.decimals() <= 0.5
+
+    add_debt_to_strategy(gov, strategy, vault, 0)
+
+    assert vault.strategies(strategy).current_debt == 0
+    assert vault.pricePerShare() / 10 ** vault.decimals() <= 0.5
+
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=amount - first_loss,
+        total_assets=amount - first_loss,
+        total_supply=amount,
+    )
+
+    # User redeems shares
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
+
+    assert_price_per_share(vault, 1.0)
+    check_vault_totals(
+        vault,
+        total_debt=0,
+        total_idle=0,
+        total_assets=0,
+        total_supply=0,
+    )
+
+    assert asset.balanceOf(vault) == 0
+    assert asset.balanceOf(fish) == fish_amount - first_loss
