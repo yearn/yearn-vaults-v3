@@ -47,6 +47,7 @@ interface IStrategy:
     def convertToAssets(shares: uint256) -> uint256: view
     def convertToShares(assets: uint256) -> uint256: view
     def previewWithdraw(assets: uint256) -> uint256: view
+    def maxRedeem(owner: address) -> uint256: view
 
 interface IAccountant:
     def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
@@ -653,7 +654,7 @@ def _withdraw_from_strategy(strategy: address, assets_to_withdraw: uint256):
         # Use previewWithdraw since it should round up.
         IStrategy(strategy).previewWithdraw(assets_to_withdraw), 
         # And check against our actual balance.
-        IStrategy(strategy).balanceOf(self)
+        IStrategy(strategy).maxRedeem(self)
     )
     # Redeem the shares.
     IStrategy(strategy).redeem(shares_to_redeem, self, self)
