@@ -1104,10 +1104,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self._erc20_safe_transfer_from(ASSET.address, accountant, self, total_refunds)
         # Update storage to increase total assets.
         self.total_idle += total_refunds
-        # If we are locking profit.
-        if profit_max_unlock_time != 0:
-            # Mint new shares corresponding to the refunded assets to self.
-            newly_locked_shares += self._issue_shares_for_amount(total_refunds, self)
 
     # Record any reported gains.
     if gain > 0:
@@ -1115,10 +1111,9 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self.strategies[strategy].current_debt += gain
         self.total_debt += gain
 
-        # If we are locking profit.
-        if profit_max_unlock_time != 0:
-            # Vault will issue shares worth the profit to itself to lock avoid instant pps change.
-            newly_locked_shares += self._issue_shares_for_amount(gain, self)
+    # Mint anything we are locking to the vault.
+    if gain + total_refunds != 0 and profit_max_unlock_time != 0:
+        newly_locked_shares = self._issue_shares_for_amount(gain + total_refunds, self)
 
     # Strategy is reporting a loss
     if loss > 0:
