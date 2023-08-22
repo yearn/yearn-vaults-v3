@@ -284,8 +284,6 @@ def __init__(
     
     FACTORY = msg.sender
 
-    # Must be > 0 so we can unlock shares
-    #assert profit_max_unlock_time > 0 # dev: profit unlock time too low
     # Must be less than one year for report cycles
     assert profit_max_unlock_time <= 31_556_952 # dev: profit unlock time too long
     self.profit_max_unlock_time = profit_max_unlock_time

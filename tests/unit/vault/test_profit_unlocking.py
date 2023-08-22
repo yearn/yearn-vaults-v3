@@ -2996,10 +2996,13 @@ def test_set_profit_max_period_to_zero__with_fees_doesnt_lock(
     assert vault.fullProfitUnlockDate() == 0
     assert vault.profitUnlockingRate() == 0
 
-    expected_fees = first_profit * performance_fee / MAX_BPS_ACCOUNTANT
+    expected_fees_shares = first_profit * performance_fee / MAX_BPS_ACCOUNTANT
     first_price_per_share = vault.pricePerShare()
 
-    create_and_check_profit(asset, strategy, gov, vault, first_profit, expected_fees)
+    # Fees will immediately unlock as well when not locking.
+    create_and_check_profit(
+        asset, strategy, gov, vault, first_profit, by_pass_fees=True
+    )
 
     # All profits should have been unlocked
     check_vault_totals(
@@ -3007,7 +3010,7 @@ def test_set_profit_max_period_to_zero__with_fees_doesnt_lock(
         total_debt=amount + first_profit,
         total_idle=0,
         total_assets=amount + first_profit,
-        total_supply=amount + expected_fees,
+        total_supply=amount + expected_fees_shares,
     )
 
     price_per_share = vault.pricePerShare()
@@ -3022,10 +3025,12 @@ def test_set_profit_max_period_to_zero__with_fees_doesnt_lock(
         total_debt=0,
         total_idle=amount + first_profit,
         total_assets=amount + first_profit,
-        total_supply=amount,
+        total_supply=amount + expected_fees_shares,
     )
 
-    increase_time_and_check_profit_buffer(vault=vault, secs=DAY, expected_buffer=0)
+    increase_time_and_check_profit_buffer(
+        chain=chain, vault=vault, secs=DAY, expected_buffer=0
+    )
 
     assert vault.pricePerShare() == price_per_share
 
@@ -3033,15 +3038,6 @@ def test_set_profit_max_period_to_zero__with_fees_doesnt_lock(
     vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
 
     assert vault.pricePerShare() == price_per_share
-    check_vault_totals(
-        vault,
-        total_debt=0,
-        total_idle=expected_fees * 2,
-        total_assets=expected_fees * 2,
-        total_supply=expected_fees,
-    )
-
-    assert asset.balanceOf(vault) == expected_fees * 2
 
     vault.redeem(
         vault.balanceOf(accountant.address), accountant, accountant, sender=accountant
