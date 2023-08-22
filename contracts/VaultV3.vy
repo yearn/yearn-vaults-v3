@@ -1082,7 +1082,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
     shares_to_burn: uint256 = 0
     accountant_fees_shares: uint256 = 0
     protocol_fees_shares: uint256 = 0
-    profit_max_unlock_time: uint256 = self.profit_max_unlock_time
     # Only need to burn shares if there is a loss or fees.
     if loss + total_fees > 0:
         # The amount of shares we will want to burn to offset losses and fees.
@@ -1111,8 +1110,9 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self.strategies[strategy].current_debt += gain
         self.total_debt += gain
 
+    profit_max_unlock_time: uint256 = self.profit_max_unlock_time
     # Mint anything we are locking to the vault.
-    if gain + total_refunds != 0 and profit_max_unlock_time != 0:
+    if gain + total_refunds > 0 and profit_max_unlock_time != 0:
         newly_locked_shares = self._issue_shares_for_amount(gain + total_refunds, self)
 
     # Strategy is reporting a loss
@@ -1128,7 +1128,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Now that pps has updated, we can burn the shares we intended to burn as a result of losses/fees.
     # NOTE: If a value reduction (losses / fees) has occured, prioritize burning locked profit to avoid
     # negative impact on price per share. Price per share is reduced only if losses exceed locked value.
-    if shares_to_burn != 0:
+    if shares_to_burn > 0:
         # Cant burn more than the vault owns.
         shares_to_burn = min(shares_to_burn, previously_locked_shares + newly_locked_shares)
         self._burn_shares(shares_to_burn, self)
@@ -1260,7 +1260,7 @@ def set_profit_max_unlock_time(new_profit_max_unlock_time: uint256):
     assert new_profit_max_unlock_time <= 31_556_952, "profit unlock time too long"
 
     # If setting to 0 we need to reset any locked values.
-    if(new_profit_max_unlock_time == 0):
+    if (new_profit_max_unlock_time == 0):
         # Burn any shares the vault still has.
         self._burn_shares(self.balance_of[self], self)
         # Reset unlocking variables to 0.
