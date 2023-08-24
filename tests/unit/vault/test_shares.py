@@ -18,7 +18,7 @@ def test_deposit__with_zero_funds__reverts(fish, asset, create_vault):
     vault = create_vault(asset)
     amount = 0
 
-    with ape.reverts("cannot mint zero"):
+    with ape.reverts("ZERO_SHARES"):
         vault.deposit(amount, fish.address, sender=fish)
 
 
@@ -51,7 +51,7 @@ def test_deposit__with_deposit_limit_exceed_deposit_limit__reverts(
     deposit_limit = amount - 1
     vault = create_vault(asset, deposit_limit=deposit_limit)
 
-    with ape.reverts("exceed deposit limit"):
+    with ape.reverts("ERC4626: deposit more than max"):
         vault.deposit(amount, fish.address, sender=fish)
 
 
@@ -64,7 +64,7 @@ def test_deposit_all__with_deposit_limit_exceed_deposit_limit__deposit_deposit_l
 
     asset.approve(vault.address, amount, sender=fish)
 
-    with ape.reverts("exceed deposit limit"):
+    with ape.reverts("ERC4626: deposit more than max"):
         vault.deposit(MAX_INT, fish.address, sender=fish)
 
 
@@ -111,7 +111,7 @@ def test_mint__with_zero_funds__reverts(fish, asset, create_vault):
     vault = create_vault(asset)
     shares = 0
 
-    with ape.reverts("cannot mint zero"):
+    with ape.reverts("ZERO_ASSETS"):
         vault.mint(shares, fish.address, sender=fish)
 
 
@@ -146,7 +146,7 @@ def test_mint__with_deposit_limit_exceed_deposit_limit__reverts(
     deposit_limit = amount - 1
     vault = create_vault(asset, deposit_limit=deposit_limit)
 
-    with ape.reverts("exceed deposit limit"):
+    with ape.reverts("ERC4626: mint more than max"):
         vault.mint(shares, fish.address, sender=fish)
 
 
@@ -218,7 +218,7 @@ def test_withdraw__with_no_shares__reverts(fish, asset, create_vault):
     vault = create_vault(asset)
     shares = 0
 
-    with ape.reverts("no shares to redeem"):
+    with ape.reverts("ZERO_SHARES"):
         vault.withdraw(shares, fish.address, fish.address, sender=fish)
 
 
@@ -345,7 +345,7 @@ def test_redeem__with_no_shares__reverts(fish, asset, create_vault):
     vault = create_vault(asset)
     amount = 0
 
-    with ape.reverts("no shares to redeem"):
+    with ape.reverts("ZERO_SHARES"):
         vault.withdraw(amount, fish.address, fish.address, sender=fish)
 
 

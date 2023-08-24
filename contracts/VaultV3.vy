@@ -570,7 +570,7 @@ def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
     """
     assert self.shutdown == False # dev: shutdown
     assert recipient not in [self, empty(address)], "invalid recipient"
-    assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
+    assert self._total_assets() + assets <= self.deposit_limit, "ERC4626: deposit more than max"
  
     # Transfer the tokens to the vault first.
     self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, assets)
@@ -580,7 +580,7 @@ def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
     # Issue the corresponding shares for assets.
     shares: uint256 = self._issue_shares_for_amount(assets, recipient)
 
-    assert shares > 0, "cannot mint zero"
+    assert shares > 0, "ZERO_SHARES"
 
     log Deposit(sender, recipient, assets, shares)
     return shares
@@ -597,8 +597,8 @@ def _mint(sender: address, recipient: address, shares: uint256) -> uint256:
 
     assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_UP)
 
-    assert assets > 0, "cannot mint zero"
-    assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
+    assert assets > 0, "ZERO_ASSETS"
+    assert self._total_assets() + assets <= self.deposit_limit, "ERC4626: mint more than max"
 
     # Transfer the tokens to the vault first.
     self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, assets)
@@ -668,7 +668,7 @@ def _redeem(
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
 
-    assert shares > 0, "no shares to redeem"
+    assert shares > 0, "ZERO_SHARES"
     assert shares_balance >= shares, "insufficient shares to redeem"
     
     if sender != owner:
@@ -1273,9 +1273,11 @@ def _enforce_role(account: address, role: Roles):
 @external
 def set_role(account: address, role: Roles):
     """
-    @notice Set the role of an account.
+    @notice Set the roles for of an account.
+    @dev This will fully override an accounts current roles
+     so it should include all roles the account should hold.
     @param account The account to set the role for.
-    @param role The role to set.
+    @param role The roles the account should hold.
     """
     assert msg.sender == self.role_manager
     self.roles[account] = role
@@ -1391,7 +1393,7 @@ def buy_debt(strategy: address, amount: uint256):
     of force revoking a strategy in order to not report a loss.
     It allows the DEBT_PURCHASER role to buy the strategies debt
     for an equal amount of `asset`. 
-    
+
     @param strategy The strategy to buy the debt for
     @param amount The amount of debt to buy from the vault.
     """
