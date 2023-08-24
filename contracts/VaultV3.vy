@@ -1285,6 +1285,34 @@ def set_role(account: address, role: Roles):
     log RoleSet(account, role)
 
 @external
+def add_role(account: address, role: Roles):
+    """
+    @notice Add a new role to an address.
+    @dev This will add a new role to the account
+     without effecting any of the previously held roles.
+    @param account The account to add a role to.
+    @param role The new role to add to account.
+    """
+    assert msg.sender == self.role_manager
+    self.roles[account] = self.roles[account] | role
+
+    log RoleSet(account, self.roles[account])
+
+@external
+def remove_role(account: address, role: Roles):
+    """
+    @notice Remove a single role from an account.
+    @dev This will leave all other roles for the 
+     account unchanged.
+    @param account The account to remove a Role from.
+    @param role The Role to remove.
+    """
+    assert msg.sender == self.role_manager
+    self.roles[account] = self.roles[account] & ~role
+
+    log RoleSet(account, self.roles[account])
+
+@external
 def set_open_role(role: Roles):
     """
     @notice Set a role to be open.
