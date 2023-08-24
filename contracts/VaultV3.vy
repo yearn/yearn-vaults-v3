@@ -1390,9 +1390,8 @@ def buy_debt(strategy: address, amount: uint256):
     @dev This should only ever be used in an emergency in place
     of force revoking a strategy in order to not report a loss.
     It allows the DEBT_PURCHASER role to buy the strategies debt
-    for an equal amount of `asset`. It's important to note that 
-    this does rely on the strategies `convertToShares` function to
-    determine the amount of shares to buy.
+    for an equal amount of `asset`. 
+    
     @param strategy The strategy to buy the debt for
     @param amount The amount of debt to buy from the vault.
     """
@@ -1401,35 +1400,37 @@ def buy_debt(strategy: address, amount: uint256):
     
     # Cache the current debt.
     current_debt: uint256 = self.strategies[strategy].current_debt
-    
-    assert current_debt > 0, "nothing to buy"
-    assert amount > 0, "nothing to buy with"
+    _amount: uint256 = amount
 
-    # Get the current shares value for the amount.
-    shares: uint256 = IStrategy(strategy).convertToShares(amount)
+    assert current_debt > 0, "nothing to buy"
+    assert _amount > 0, "nothing to buy with"
+    
+    if _amount > current_debt:
+        _amount = current_debt
+
+    # We get the proportion of the debt that is being bought and
+    # transfer the equivalant shares. We assume this is being used
+    # due to strategy issues so won't rely on its conversion rates.
+    shares: uint256 = IStrategy(strategy).balanceOf(self) * _amount / current_debt
 
     assert shares > 0, "can't buy 0"
-    assert shares <= IStrategy(strategy).balanceOf(self), "not enough shares"
 
-    self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, amount)
-
-    # Adjust if needed to not underflow on math
-    bought: uint256 = min(current_debt, amount)
+    self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, _amount)
 
     # Lower strategy debt
-    self.strategies[strategy].current_debt -= bought
+    self.strategies[strategy].current_debt -= _amount
     # lower total debt
-    self.total_debt -= bought
+    self.total_debt -= _amount
     # Increase total idle
-    self.total_idle += bought
+    self.total_idle += _amount
 
     # log debt change
-    log DebtUpdated(strategy, current_debt, current_debt - bought)
+    log DebtUpdated(strategy, current_debt, current_debt - _amount)
 
     # Transfer the strategies shares out.
     self._erc20_safe_transfer(strategy, msg.sender, shares)
 
-    log DebtPurchased(strategy, bought)
+    log DebtPurchased(strategy, _amount)
 
 ## STRATEGY MANAGEMENT ##
 @external

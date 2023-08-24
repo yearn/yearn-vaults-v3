@@ -75,7 +75,7 @@ def test_buy_debt__no_amount__reverts(
         vault.buy_debt(strategy, 0, sender=gov)
 
 
-def test_buy_debt__to_many_shares__reverts(
+def test_buy_debt__more_than_available__withdraws_current_debt(
     gov,
     asset,
     vault,
@@ -94,8 +94,30 @@ def test_buy_debt__to_many_shares__reverts(
     asset.mint(gov.address, amount, sender=gov)
     asset.approve(vault.address, amount, sender=gov)
 
-    with ape.reverts("not enough shares"):
-        vault.buy_debt(strategy, amount * 2, sender=gov)
+    before_balance = asset.balanceOf(gov)
+    before_shares = strategy.balanceOf(gov)
+
+    tx = vault.buy_debt(strategy, amount * 2, sender=gov)
+
+    logs = list(tx.decode_logs(vault.DebtPurchased))[0]
+
+    assert logs.strategy == strategy.address
+    assert logs.amount == amount
+
+    logs = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(logs) == 1
+    assert logs[0].strategy == strategy.address
+    assert logs[0].current_debt == amount
+    assert logs[0].new_debt == 0
+
+    assert vault.totalIdle() == amount
+    assert vault.totalDebt() == 0
+    assert vault.pricePerShare() == 10 ** asset.decimals()
+    assert vault.strategies(strategy)["current_debt"] == 0
+    # assert shares got moved
+    assert asset.balanceOf(gov) == before_balance - amount
+    assert strategy.balanceOf(gov) == before_shares + amount
 
 
 def test_buy_debt__full_debt(
@@ -120,7 +142,19 @@ def test_buy_debt__full_debt(
     before_balance = asset.balanceOf(gov)
     before_shares = strategy.balanceOf(gov)
 
-    vault.buy_debt(strategy, amount, sender=gov)
+    tx = vault.buy_debt(strategy, amount, sender=gov)
+
+    logs = list(tx.decode_logs(vault.DebtPurchased))[0]
+
+    assert logs.strategy == strategy.address
+    assert logs.amount == amount
+
+    logs = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(logs) == 1
+    assert logs[0].strategy == strategy.address
+    assert logs[0].current_debt == amount
+    assert logs[0].new_debt == 0
 
     assert vault.totalIdle() == amount
     assert vault.totalDebt() == 0
@@ -155,7 +189,19 @@ def test_buy_debt__half_debt(
     before_balance = asset.balanceOf(gov)
     before_shares = strategy.balanceOf(gov)
 
-    vault.buy_debt(strategy, to_buy, sender=gov)
+    tx = vault.buy_debt(strategy, to_buy, sender=gov)
+
+    logs = list(tx.decode_logs(vault.DebtPurchased))[0]
+
+    assert logs.strategy == strategy.address
+    assert logs.amount == to_buy
+
+    logs = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(logs) == 1
+    assert logs[0].strategy == strategy.address
+    assert logs[0].current_debt == amount
+    assert logs[0].new_debt == amount - to_buy
 
     assert vault.totalIdle() == to_buy
     assert vault.totalDebt() == amount - to_buy
