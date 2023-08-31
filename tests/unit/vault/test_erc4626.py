@@ -1,6 +1,6 @@
 import ape
 import pytest
-from utils.constants import ROLES
+from utils.constants import ROLES, DAY
 
 
 def test_total_assets(asset, fish, fish_amount, create_vault, user_deposit):
@@ -155,6 +155,104 @@ def test_max_withdraw__with_balance_less_than_or_equal_to_total_idle__returns_ba
 
     assert vault.maxWithdraw(fish.address) == assets
 
+def test_max_withdraw__with_custom_params(
+    asset,
+    fish,
+    fish_amount,
+    gov,
+    create_vault,
+    create_strategy,
+    add_debt_to_strategy,
+    add_strategy_to_vault,
+    user_deposit,
+):
+    vault = create_vault(asset)
+    shares = fish_amount
+    assets = shares
+    strategy = create_strategy(vault)
+    strategy_deposit = assets // 2
+    total_idle = assets - strategy_deposit
+
+    vault.set_role(
+        gov.address,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
+        sender=gov,
+    )
+    user_deposit(fish, vault, asset, assets)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, strategy_deposit)
+
+    assert vault.maxWithdraw(fish.address, 22, [strategy]) == assets
+
+
+def test_max_withdraw__with_lossy_strategy(
+    asset,
+    fish,
+    fish_amount,
+    gov,
+    create_vault,
+    create_lossy_strategy,
+    add_debt_to_strategy,
+    add_strategy_to_vault,
+    user_deposit,
+):
+    vault = create_vault(asset)
+    shares = fish_amount
+    assets = shares
+    strategy = create_lossy_strategy(vault)
+    strategy_deposit = assets // 2
+    loss = strategy_deposit // 2
+    total_idle = assets - strategy_deposit
+
+    vault.set_role(
+        gov.address,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
+        sender=gov,
+    )
+    user_deposit(fish, vault, asset, assets)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, strategy_deposit)
+
+    strategy.setLoss(gov.address, loss, sender=gov)
+
+    # Should not effect the default returned value
+    assert vault.maxWithdraw(fish.address, 10_000) == assets
+
+    # Should return just idle if max_loss == 0.
+    assert vault.maxWithdraw(fish.address) == total_idle
+
+
+def test_max_withdraw__with_locked_strategy(
+    asset,
+    fish,
+    fish_amount,
+    gov,
+    create_vault,
+    create_locked_strategy,
+    add_debt_to_strategy,
+    add_strategy_to_vault,
+    user_deposit,
+):
+    vault = create_vault(asset)
+    shares = fish_amount
+    assets = shares
+    strategy = create_locked_strategy(vault)
+    strategy_deposit = assets // 2
+    locked = strategy_deposit // 2
+    total_idle = assets - strategy_deposit
+
+    vault.set_role(
+        gov.address,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
+        sender=gov,
+    )
+    user_deposit(fish, vault, asset, assets)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, strategy_deposit)
+
+    strategy.setLockedFunds(locked, DAY, sender=gov)
+
+    assert vault.maxWithdraw(fish.address) == assets - locked
 
 def test_preview_redeem(asset, fish, fish_amount, create_vault, user_deposit):
     vault = create_vault(asset)
@@ -164,7 +262,6 @@ def test_preview_redeem(asset, fish, fish_amount, create_vault, user_deposit):
     user_deposit(fish, vault, asset, assets)
 
     assert vault.previewRedeem(shares) == assets
-
 
 def test_max_redeem__with_balance_greater_than_total_idle__returns_balance(
     asset,
@@ -206,3 +303,103 @@ def test_max_redeem__with_balance_less_than_or_equal_to_total_idle__returns_bala
     user_deposit(fish, vault, asset, shares)
 
     assert vault.maxRedeem(fish.address) == assets
+
+
+def test_max_redeem__with_custom_params(
+    asset,
+    fish,
+    fish_amount,
+    gov,
+    create_vault,
+    create_strategy,
+    add_debt_to_strategy,
+    add_strategy_to_vault,
+    user_deposit,
+):
+    vault = create_vault(asset)
+    shares = fish_amount
+    assets = shares
+    strategy = create_strategy(vault)
+    strategy_deposit = assets // 2
+    total_idle = assets - strategy_deposit
+
+    vault.set_role(
+        gov.address,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
+        sender=gov,
+    )
+    user_deposit(fish, vault, asset, assets)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, strategy_deposit)
+
+    assert vault.maxRedeem(fish.address, 0, [strategy]) == assets
+
+
+def test_max_redeem__with_lossy_strategy(
+    asset,
+    fish,
+    fish_amount,
+    gov,
+    create_vault,
+    create_lossy_strategy,
+    add_debt_to_strategy,
+    add_strategy_to_vault,
+    user_deposit,
+):
+    vault = create_vault(asset)
+    shares = fish_amount
+    assets = shares
+    strategy = create_lossy_strategy(vault)
+    strategy_deposit = assets // 2
+    loss = strategy_deposit // 2
+    total_idle = assets - strategy_deposit
+
+    vault.set_role(
+        gov.address,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
+        sender=gov,
+    )
+    user_deposit(fish, vault, asset, assets)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, strategy_deposit)
+
+    strategy.setLoss(gov.address, loss, sender=gov)
+
+    # Should not effect the default returned value
+    assert vault.maxRedeem(fish.address) == assets
+
+    # Should return just idle if max_loss == 0.
+    assert vault.maxRedeem(fish.address, 0) == total_idle
+
+
+def test_max_redeem__with_locked_strategy(
+    asset,
+    fish,
+    fish_amount,
+    gov,
+    create_vault,
+    create_locked_strategy,
+    add_debt_to_strategy,
+    add_strategy_to_vault,
+    user_deposit,
+):
+    vault = create_vault(asset)
+    shares = fish_amount
+    assets = shares
+    strategy = create_locked_strategy(vault)
+    strategy_deposit = assets // 2
+    locked = strategy_deposit // 2
+    total_idle = assets - strategy_deposit
+
+    vault.set_role(
+        gov.address,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
+        sender=gov,
+    )
+    user_deposit(fish, vault, asset, assets)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, strategy_deposit)
+
+    strategy.setLockedFunds(locked, DAY, sender=gov)
+
+    assert vault.maxRedeem(fish.address) == assets - locked
