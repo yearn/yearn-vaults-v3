@@ -653,7 +653,7 @@ def _withdraw_from_strategy(strategy: address, assets_to_withdraw: uint256):
     shares_to_redeem: uint256 = min(
         # Use previewWithdraw since it should round up.
         IStrategy(strategy).previewWithdraw(assets_to_withdraw), 
-        # And check against our actual balance.
+        # And check against the max we can pull.
         IStrategy(strategy).maxRedeem(self)
     )
     # Redeem the shares.
@@ -959,8 +959,7 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         post_balance: uint256 = ASSET.balanceOf(self)
         
         # making sure we are changing according to the real result no matter what. 
-        # This will spend more gas but makes it more robust. Also prevents issues
-        # from a faulty strategy that either under or over delievers 'assets_to_withdraw'
+        # We pull funds with {redeem} so there can be losses or rounding differences.
         assets_to_withdraw = min(post_balance - pre_balance, current_debt)
 
         # Update storage.
