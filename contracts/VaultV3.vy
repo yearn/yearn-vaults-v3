@@ -551,13 +551,71 @@ def _max_deposit(receiver: address) -> uint256:
 
 @view
 @internal
-def _max_redeem(owner: address) -> uint256:
-    return self.balance_of[owner]
+def _max_withdraw(
+    owner: address,
+    max_loss: uint256 = 0,
+    strategies: DynArray[address, MAX_QUEUE] = []
+) -> uint256:
+    """
+    @dev Returns the max amount of `asset` and `owner` can withdraw.
 
-@view
-@internal
-def _max_withdraw(owner: address) -> uint256:
-    return self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN)
+    This will do a full simulation of the withdraw in order to determine
+    how much is currently liquid and if the `max_loss` would allow for the 
+    tx to not revert.
+    """
+    # Get the max amount for the owner if fully liquid.
+    max_assets: uint256 = self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN)
+    
+    # See if we have enough idle to service the withdraw.
+    current_idle: uint256 = self.total_idle
+    if max_assets > current_idle:
+        # Amount left that we need.
+        needed: uint256 = max_assets - current_idle
+        # Track how much we can pull.
+        have: uint256 = current_idle
+        loss: uint256 = 0
+
+        # If no queue was passed use the default one.
+        _strategies: DynArray[address, MAX_QUEUE] = strategies
+        if len(_strategies) == 0:
+            _strategies = self.default_queue
+
+        for strategy in _strategies:
+            # Can't use an invalid strategy.
+            assert self.strategies[strategy].activation != 0, "inactive strategy"
+
+            # Get the maximum amount the vault can withdraw from the strategy.
+            max_withdraw: uint256 = IStrategy(strategy).maxWithdraw(self)
+
+            # If 0 move on to the next strategy.
+            if max_withdraw == 0:
+                continue
+
+            # If we more than what we need, adjust it down.
+            if max_withdraw > needed:
+                max_withdraw = needed
+
+            # Add to what we can pull.
+            have += max_withdraw
+            # Reduce how much we have left.
+            needed -= max_withdraw
+            # Track how much loss would be passed on to the owner.
+            loss += self._assess_share_of_unrealised_losses(strategy, max_withdraw)
+
+            if needed == 0:
+                break
+
+        # Update the max based after going through the queue.
+        max_assets = have
+
+        # Check if there is a loss and a non-default value was set.
+        if loss > 0 and max_loss < MAX_BPS:
+            # If the loss is not within the allowed range.
+            if loss > max_assets * max_loss / MAX_BPS:
+                # The tx will revert. Can only withdraw idle.
+                max_assets = current_idle
+
+    return max_assets
 
 @internal
 def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
@@ -1844,23 +1902,37 @@ def maxMint(receiver: address) -> uint256:
 
 @view
 @external
-def maxWithdraw(owner: address) -> uint256:
+def maxWithdraw(
+    owner: address,
+    max_loss: uint256 = 0,
+    strategies: DynArray[address, MAX_QUEUE] = []
+) -> uint256:
     """
     @notice Get the maximum amount of assets that can be withdrawn.
+    @dev Complies to normal 4626 interface and takes custom params.
     @param owner The address that owns the shares.
+    @param max_loss Custom max_loss if any.
+    @param strategies Custom strategies queue if any.
     @return The maximum amount of assets that can be withdrawn.
     """
-    return self._max_withdraw(owner)
+    return self._max_withdraw(owner, max_loss, strategies)
 
 @view
 @external
-def maxRedeem(owner: address) -> uint256:
+def maxRedeem(
+    owner: address,
+    max_loss: uint256 = 0,
+    strategies: DynArray[address, MAX_QUEUE] = []
+) -> uint256:
     """
     @notice Get the maximum amount of shares that can be redeemed.
+    @dev Complies to normal 4626 interface and takes custom params.
     @param owner The address that owns the shares.
+    @param max_loss Custom max_loss if any.
+    @param strategies Custom strategies queue if any.
     @return The maximum amount of shares that can be redeemed.
     """
-    return self._max_redeem(owner)
+    return self._convert_to_shares(self._max_withdraw(owner, max_loss, strategies), Rounding.ROUND_DOWN)
 
 @view
 @external

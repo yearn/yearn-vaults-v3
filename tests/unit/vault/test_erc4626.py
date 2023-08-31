@@ -193,7 +193,7 @@ def test_max_redeem__with_balance_greater_than_total_idle__returns_balance(
     add_strategy_to_vault(gov, strategy, vault)
     add_debt_to_strategy(gov, strategy, vault, strategy_deposit)
 
-    assert vault.maxWithdraw(fish.address) == assets
+    assert vault.maxRedeem(fish.address) == assets
 
 
 def test_max_redeem__with_balance_less_than_or_equal_to_total_idle__returns_balance(
@@ -205,4 +205,4 @@ def test_max_redeem__with_balance_less_than_or_equal_to_total_idle__returns_bala
 
     user_deposit(fish, vault, asset, shares)
 
-    assert vault.maxWithdraw(fish.address) == assets
+    assert vault.maxRedeem(fish.address) == assets
