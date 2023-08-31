@@ -23,6 +23,7 @@ class ROLES(IntFlag):
     PROFIT_UNLOCK_MANAGER = 1024
     DEBT_PURCHASER = 2048
     EMERGENCY_MANAGER = 4096
+    ALL = 8191
 
 
 class StrategyChangeType(IntFlag):
