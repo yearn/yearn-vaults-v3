@@ -553,8 +553,8 @@ def _max_deposit(receiver: address) -> uint256:
 @internal
 def _max_withdraw(
     owner: address,
-    max_loss: uint256 = 0,
-    strategies: DynArray[address, MAX_QUEUE] = []
+    max_loss: uint256,
+    strategies: DynArray[address, MAX_QUEUE]
 ) -> uint256:
     """
     @dev Returns the max amount of `asset` and `owner` can withdraw.
@@ -1921,7 +1921,7 @@ def maxWithdraw(
 @external
 def maxRedeem(
     owner: address,
-    max_loss: uint256 = 0,
+    max_loss: uint256 = MAX_BPS,
     strategies: DynArray[address, MAX_QUEUE] = []
 ) -> uint256:
     """
@@ -1932,7 +1932,11 @@ def maxRedeem(
     @param strategies Custom strategies queue if any.
     @return The maximum amount of shares that can be redeemed.
     """
-    return self._convert_to_shares(self._max_withdraw(owner, max_loss, strategies), Rounding.ROUND_DOWN)
+    return min(
+        # Max witdraw is rounding so we check against the full balance.
+        self._convert_to_shares(self._max_withdraw(owner, max_loss, strategies), Rounding.ROUND_UP),
+        self.balance_of[owner]
+    )
 
 @view
 @external
