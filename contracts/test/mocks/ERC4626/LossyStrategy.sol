@@ -7,7 +7,8 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
     using SafeERC20 for IERC20;
 
-    uint256 public withdrawingLoss;
+    int256 public withdrawingLoss;
+    uint256 public lockedFunds;
 
     constructor(
         address _vault,
@@ -19,8 +20,20 @@ contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
         IERC20(asset()).safeTransfer(_target, _loss);
     }
 
-    function setWithdrawingLoss(uint256 _loss) external {
+    function setWithdrawingLoss(int256 _loss) external {
         withdrawingLoss = _loss;
+    }
+
+    function setLockedFunds(uint256 _lockedFunds) external {
+        lockedFunds = _lockedFunds;
+    }
+
+    function totalAssets() public view override returns (uint256) {
+        if (withdrawingLoss < 0) {
+            return uint256(int256(IERC20(asset()).balanceOf(address(this))) + withdrawingLoss);
+        } else {
+            return super.totalAssets();
+        }
     }
 
     function _withdraw(
@@ -34,17 +47,20 @@ contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
             _spendAllowance(_owner, _caller, _shares);
         }
 
+        uint256 toWithdraw = uint256(int256(_assets) - withdrawingLoss);
         _burn(_owner, _shares);
         // Withdrawing loss simulates a loss while withdrawing
-        IERC20(asset()).safeTransfer(_receiver, _assets - withdrawingLoss);
-        // burns (to simulate loss while withdrawing)
-        IERC20(asset()).safeTransfer(asset(), withdrawingLoss);
+        IERC20(asset()).safeTransfer(_receiver, toWithdraw);
+        if(withdrawingLoss > 0) {
+            // burns (to simulate loss while withdrawing)
+            IERC20(asset()).safeTransfer(asset(), uint256(withdrawingLoss));
+        }
 
         emit Withdraw(
             _caller,
             _receiver,
             _owner,
-            _assets - withdrawingLoss,
+            toWithdraw,
             _shares
         );
     }
@@ -54,7 +70,7 @@ contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
     ) internal override returns (uint256 _amountFreed) {}
 
     function maxWithdraw(address) public view override returns (uint256) {
-        return IERC20(asset()).balanceOf(address(this));
+        return IERC20(asset()).balanceOf(address(this)) - lockedFunds;
     }
 
     function migrate(address _newStrategy) external override {

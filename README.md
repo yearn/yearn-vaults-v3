@@ -6,6 +6,8 @@ This repository contains the Smart Contracts for Yearns V3 vault implementation.
 
 [Vault.vy](contracts/VaultV3.vy) - The ERC4626 compliant Vault that will handle all logic associated with deposits, withdraws, strategy management, profit reporting etc.
 
+For the V3 strategy implementation see the [Tokenized Strategy](https://github.com/yearn/tokenized-strategy) repo.
+
 ## Requirements
 
 This repository runs on [ApeWorx](https://www.apeworx.io/). A python based development tool kit.

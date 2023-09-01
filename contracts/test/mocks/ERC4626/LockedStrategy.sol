@@ -49,6 +49,16 @@ contract ERC4626LockedStrategy is ERC4626BaseStrategyMock {
         }
     }
 
+    function maxRedeem(address) public view override returns (uint256) {
+        uint256 balance = IERC20(asset()).balanceOf(address(this));
+        if (block.timestamp < lockedUntil) {
+            return convertToShares(balance - lockedBalance);
+        } else {
+            // no locked assets, withdraw all
+            return convertToShares(balance);
+        }
+    }
+
     function migrate(address _newStrategy) external override {
         require(lockedBalance == 0, "strat not liquid");
         IERC20(asset()).safeTransfer(

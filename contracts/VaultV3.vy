@@ -41,13 +41,13 @@ interface IStrategy:
     def balanceOf(owner: address) -> uint256: view
     def maxDeposit(receiver: address) -> uint256: view
     def maxWithdraw(owner: address) -> uint256: view
-    def withdraw(amount: uint256, receiver: address, owner: address) -> uint256: nonpayable
     def redeem(shares: uint256, receiver: address, owner: address) -> uint256: nonpayable
     def deposit(assets: uint256, receiver: address) -> uint256: nonpayable
     def totalAssets() -> (uint256): view
     def convertToAssets(shares: uint256) -> uint256: view
     def convertToShares(assets: uint256) -> uint256: view
     def previewWithdraw(assets: uint256) -> uint256: view
+    def maxRedeem(owner: address) -> uint256: view
 
 interface IAccountant:
     def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
@@ -639,6 +639,24 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
     return losses_user_share
 
 @internal
+def _withdraw_from_strategy(strategy: address, assets_to_withdraw: uint256):
+    """
+    This takes the amount denominated in asset and performs a {redeem}
+    with the corresponding amount of shares.
+
+    We use {redeem} to natively take on losses without aditional non-4626 standard parameters.
+    """
+    # Need to get shares since we use redeem to be able to take on losses.
+    shares_to_redeem: uint256 = min(
+        # Use previewWithdraw since it should round up.
+        IStrategy(strategy).previewWithdraw(assets_to_withdraw), 
+        # And check against the max we can pull.
+        IStrategy(strategy).maxRedeem(self)
+    )
+    # Redeem the shares.
+    IStrategy(strategy).redeem(shares_to_redeem, self, self)
+
+@internal
 def _redeem(
     sender: address, 
     receiver: address, 
@@ -760,20 +778,13 @@ def _redeem(
                 continue
             
             # WITHDRAW FROM STRATEGY
-            # Need to get shares since we use redeem to be able to take on losses.
-            shares_to_withdraw: uint256 = min(
-                # Use previewWithdraw since it should round up.
-                IStrategy(strategy).previewWithdraw(assets_to_withdraw), 
-                # And check against our actual balance.
-                IStrategy(strategy).balanceOf(self)
-            )
-            IStrategy(strategy).redeem(shares_to_withdraw, self, self)
+            self._withdraw_from_strategy(strategy, assets_to_withdraw)
             post_balance: uint256 = ASSET.balanceOf(self)
             
             # Always check withdrawn against the real amounts.
             withdrawn: uint256 = post_balance - previous_balance
             loss: uint256 = 0
-            # Check if we redeemed to much.
+            # Check if we redeemed too much.
             if withdrawn > assets_to_withdraw:
                 # Make sure we don't underlfow in debt updates.
                 if withdrawn > current_debt:
@@ -819,8 +830,8 @@ def _redeem(
 
     # Check if there is a loss and a non-default value was set.
     if assets > requested_assets and max_loss < MAX_BPS:
-        # The loss is within the allowed range.
-        assert assets - requested_assets <= assets * max_loss / MAX_BPS, "to much loss"
+        # Assure the loss is within the allowed range.
+        assert assets - requested_assets <= assets * max_loss / MAX_BPS, "too much loss"
 
     # First burn the corresponding shares from the redeemer.
     self._burn_shares(shares, owner)
@@ -941,18 +952,22 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         
         # Always check the actual amount withdrawn.
         pre_balance: uint256 = ASSET.balanceOf(self)
-        IStrategy(strategy).withdraw(assets_to_withdraw, self, self)
+        self._withdraw_from_strategy(strategy, assets_to_withdraw)
         post_balance: uint256 = ASSET.balanceOf(self)
         
-        # making sure we are changing according to the real result no matter what. 
-        # This will spend more gas but makes it more robust. Also prevents issues
-        # from a faulty strategy that either under or over delievers 'assets_to_withdraw'
-        assets_to_withdraw = min(post_balance - pre_balance, current_debt)
+        # making sure we are changing idle according to the real result no matter what. 
+        # We pull funds with {redeem} so there can be losses or rounding differences.
+        withdrawn: uint256 = min(post_balance - pre_balance, current_debt)
+
+        # If we got too much make sure not to increase PPS.
+        if withdrawn > assets_to_withdraw:
+            assets_to_withdraw = withdrawn
 
         # Update storage.
-        self.total_idle += assets_to_withdraw
-        self.total_debt -= assets_to_withdraw
-  
+        self.total_idle += withdrawn # actual amount we got.
+        # Amount we tried to withdraw in case of losses
+        self.total_debt -= assets_to_withdraw 
+
         new_debt = current_debt - assets_to_withdraw
     else: 
         # We are increasing the strategies debt
