@@ -646,8 +646,7 @@ def _withdraw_from_strategy(strategy: address, assets_to_withdraw: uint256):
     This takes the amount denominated in asset and performs a {redeem}
     with the corresponding amount of shares.
 
-    We use {redeem} because the Tokenized Strategies cannot natively take on
-    losses during {withdraw} without aditional non-4626 standard parameters.
+    We use {redeem} to natively take on losses without aditional non-4626 standard parameters.
     """
     # Need to get shares since we use redeem to be able to take on losses.
     shares_to_redeem: uint256 = min(
@@ -958,14 +957,19 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         self._withdraw_from_strategy(strategy, assets_to_withdraw)
         post_balance: uint256 = ASSET.balanceOf(self)
         
-        # making sure we are changing according to the real result no matter what. 
+        # making sure we are changing idle according to the real result no matter what. 
         # We pull funds with {redeem} so there can be losses or rounding differences.
-        assets_to_withdraw = min(post_balance - pre_balance, current_debt)
+        withdrawn: uint256 = min(post_balance - pre_balance, current_debt)
+
+        # If we got too much make sure not to increase PPS.
+        if withdrawn > assets_to_withdraw:
+            assets_to_withdraw = withdrawn
 
         # Update storage.
-        self.total_idle += assets_to_withdraw
-        self.total_debt -= assets_to_withdraw
-  
+        self.total_idle += withdrawn # actual amount we got.
+        # Amount we tried to withdraw in case of losses
+        self.total_debt -= assets_to_withdraw 
+
         new_debt = current_debt - assets_to_withdraw
     else: 
         # We are increasing the strategies debt

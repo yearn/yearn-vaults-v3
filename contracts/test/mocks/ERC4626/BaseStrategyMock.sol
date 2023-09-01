@@ -38,7 +38,7 @@ abstract contract ERC4626BaseStrategyMock is ERC4626BaseStrategy {
         return _maxDebt > _totalAssets ? _maxDebt - _totalAssets : 0;
     }
 
-    function totalAssets() public view override returns (uint256) {
+    function totalAssets() public view virtual override returns (uint256) {
         return IERC20(asset()).balanceOf(address(this));
     }
 
