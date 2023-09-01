@@ -155,6 +155,7 @@ def test_max_withdraw__with_balance_less_than_or_equal_to_total_idle__returns_ba
 
     assert vault.maxWithdraw(fish.address) == assets
 
+
 def test_max_withdraw__with_custom_params(
     asset,
     fish,
@@ -254,6 +255,7 @@ def test_max_withdraw__with_locked_strategy(
 
     assert vault.maxWithdraw(fish.address) == assets - locked
 
+
 def test_preview_redeem(asset, fish, fish_amount, create_vault, user_deposit):
     vault = create_vault(asset)
     shares = fish_amount
@@ -262,6 +264,7 @@ def test_preview_redeem(asset, fish, fish_amount, create_vault, user_deposit):
     user_deposit(fish, vault, asset, assets)
 
     assert vault.previewRedeem(shares) == assets
+
 
 def test_max_redeem__with_balance_greater_than_total_idle__returns_balance(
     asset,
