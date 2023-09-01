@@ -557,11 +557,19 @@ def _max_withdraw(
     strategies: DynArray[address, MAX_QUEUE]
 ) -> uint256:
     """
-    @dev Returns the max amount of `asset` and `owner` can withdraw.
+    @dev Returns the max amount of `asset` an `owner` can withdraw.
 
     This will do a full simulation of the withdraw in order to determine
     how much is currently liquid and if the `max_loss` would allow for the 
     tx to not revert.
+
+    This will track any expected loss to check if the tx will revert, but
+    not account for it in the amount returned since it is unrealised and 
+    therefore will not be accounted for in the conversion rates.
+
+    i.e. If we have 100 debt and 10 of unrealised loss, the max we can get
+    out is 90, but a user of the vault will need to call withdraw with 100
+    in order to get the full 90 out.
     """
     # Get the max amount for the owner if fully liquid.
     max_assets: uint256 = self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN)
@@ -570,7 +578,7 @@ def _max_withdraw(
     current_idle: uint256 = self.total_idle
     if max_assets > current_idle:
         # Amount left that we need.
-        needed: uint256 = max_assets - current_idle
+        needed: uint256 = unsafe_sub(max_assets, current_idle)
         # Track how much we can pull.
         have: uint256 = current_idle
         loss: uint256 = 0
@@ -585,22 +593,30 @@ def _max_withdraw(
             assert self.strategies[strategy].activation != 0, "inactive strategy"
 
             # Get the maximum amount the vault can withdraw from the strategy.
-            max_withdraw: uint256 = IStrategy(strategy).maxWithdraw(self)
+            max_withdraw: uint256 = min(needed, self.strategies[strategy].current_debt)
+
+            # Get any unrealised loss for the strategy.
+            unrealised_loss: uint256 = self._assess_share_of_unrealised_losses(strategy, max_withdraw)
+
+            # See if any limit is enforced by the strategy.
+            strategy_limit: uint256 = IStrategy(strategy).maxWithdraw(self)
+
+            # Adjust accordingly if there is a max withdraw limit.
+            if strategy_limit < max_withdraw - unrealised_loss:
+                # lower unrealised loss to the proportion to the limit.
+                unrealised_loss = unrealised_loss * strategy_limit / max_withdraw
+                # Still count the unrealised loss as withdrawable.
+                max_withdraw = strategy_limit + unrealised_loss
 
             # If 0 move on to the next strategy.
             if max_withdraw == 0:
                 continue
 
-            # If we more than what we need, adjust it down.
-            if max_withdraw > needed:
-                max_withdraw = needed
-
             # Add to what we can pull.
             have += max_withdraw
             # Reduce how much we have left.
             needed -= max_withdraw
-            # Track how much loss would be passed on to the owner.
-            loss += self._assess_share_of_unrealised_losses(strategy, max_withdraw)
+            loss += unrealised_loss
 
             if needed == 0:
                 break
