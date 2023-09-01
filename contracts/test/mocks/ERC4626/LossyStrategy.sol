@@ -8,6 +8,7 @@ contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
     using SafeERC20 for IERC20;
 
     uint256 public withdrawingLoss;
+    uint256 public lockedFunds;
 
     constructor(
         address _vault,
@@ -21,6 +22,10 @@ contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
 
     function setWithdrawingLoss(uint256 _loss) external {
         withdrawingLoss = _loss;
+    }
+
+    function setLockedFunds(uint256 _lockedFunds) external {
+        lockedFunds = _lockedFunds;
     }
 
     function _withdraw(
@@ -54,7 +59,7 @@ contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
     ) internal override returns (uint256 _amountFreed) {}
 
     function maxWithdraw(address) public view override returns (uint256) {
-        return IERC20(asset()).balanceOf(address(this));
+        return IERC20(asset()).balanceOf(address(this)) - lockedFunds;
     }
 
     function migrate(address _newStrategy) external override {
