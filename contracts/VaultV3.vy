@@ -52,6 +52,10 @@ interface IStrategy:
 interface IAccountant:
     def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
 
+interface ILimitModule:
+    def available_deposit_limit(receiver: address) -> uint256: view
+    def available_withdraw_limit(owner: address, max_loss: uint256, strategies: DynArray[address, MAX_QUEUE]) -> uint256: view
+
 interface IFactory:
     def protocol_fee_config() -> (uint16, address): view
 
@@ -117,6 +121,12 @@ event UpdateRoleManager:
 event UpdateAccountant:
     accountant: indexed(address)
 
+event UpdateDepositLimitModule:
+    deposit_limit_module: indexed(address)
+
+event UpdateWithdrawLimitModule:
+    withdraw_limit_module: indexed(address)
+
 event UpdateDefaultQueue:
     new_default_queue: DynArray[address, MAX_QUEUE]
 
@@ -175,7 +185,8 @@ enum Roles:
     REPORTING_MANAGER # Calls report for strategies.
     DEBT_MANAGER # Adds and removes debt from strategies.
     MAX_DEBT_MANAGER # Can set the max debt for a strategy.
-    DEPOSIT_LIMIT_MANAGER # Sets deposit limit for the vault.
+    DEPOSIT_LIMIT_MANAGER # Sets deposit limit and module for the vault.
+    WITHDRAW_LIMIT_MANAGER # Sets the withdraw limit module.
     MINIMUM_IDLE_MANAGER # Sets the minimum total idle the vault should keep.
     PROFIT_UNLOCK_MANAGER # Sets the profit_max_unlock_time.
     DEBT_PURCHASER # Can purchase bad debt from the vault.
@@ -225,6 +236,10 @@ minimum_total_idle: public(uint256)
 deposit_limit: public(uint256)
 # Contract that charges fees and can give refunds.
 accountant: public(address)
+# Contract to control the deposit limit.
+deposit_limit_module: public(address)
+# Contract to control the withdraw limit.
+withdraw_limit_module: public(address)
 # HashMap mapping addresses to their roles
 roles: public(HashMap[address, Roles])
 # HashMap mapping roles to their permissioned state. If false, the role is not open to the public.
@@ -542,6 +557,12 @@ def _max_deposit(receiver: address) -> uint256:
     if receiver in [empty(address), self]:
         return 0
 
+    # If there is a deposit limit module set use that.
+    deposit_limit_module: address = self.deposit_limit_module
+    if deposit_limit_module != empty(address):
+        return ILimitModule(deposit_limit_module).available_deposit_limit(receiver)
+    
+    # Else use the standard flow.
     _total_assets: uint256 = self._total_assets()
     _deposit_limit: uint256 = self.deposit_limit
     if (_total_assets >= _deposit_limit):
@@ -571,8 +592,18 @@ def _max_withdraw(
     out is 90, but a user of the vault will need to call withdraw with 100
     in order to get the full 90 out.
     """
+
     # Get the max amount for the owner if fully liquid.
     max_assets: uint256 = self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN)
+
+    # If there is a withdraw limit module use that.
+    withdraw_limit_module: address = self.withdraw_limit_module
+    if withdraw_limit_module != empty(address):
+        return min(
+            # Use the min between the returned value and the max.
+            ILimitModule(withdraw_limit_module).available_withdraw_limit(owner, max_loss, strategies),
+            max_assets
+        )
     
     # See if we have enough idle to service the withdraw.
     current_idle: uint256 = self.total_idle
@@ -642,8 +673,7 @@ def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
     vault accounting.
     """
     assert self.shutdown == False # dev: shutdown
-    assert recipient not in [self, empty(address)], "invalid recipient"
-    assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
+    assert assets <= self._max_deposit(recipient), "exceed deposit limit"
  
     # Transfer the tokens to the vault first.
     self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, assets)
@@ -666,12 +696,11 @@ def _mint(sender: address, recipient: address, shares: uint256) -> uint256:
     accounting.
     """
     assert self.shutdown == False # dev: shutdown
-    assert recipient not in [self, empty(address)], "invalid recipient"
-
+    # Get corresponding amount of assets.
     assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_UP)
 
     assert assets > 0, "cannot deposit zero"
-    assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
+    assert assets <= self._max_deposit(recipient), "exceed deposit limit"
 
     # Transfer the tokens to the vault first.
     self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, assets)
@@ -755,6 +784,11 @@ def _redeem(
     to the user that is redeeming their vault shares.
     """
     assert receiver != empty(address), "ZERO ADDRESS"
+
+    # If there is a withdraw module, check the max.
+    withdraw_limit_module: address = self.withdraw_limit_module
+    if withdraw_limit_module != empty(address):
+        assert assets <= self._max_withdraw(owner, max_loss, strategies), "exceed withdraw limt"
 
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
@@ -1319,6 +1353,34 @@ def set_deposit_limit(deposit_limit: uint256):
     self.deposit_limit = deposit_limit
 
     log UpdateDepositLimit(deposit_limit)
+
+@external
+def set_deposit_limit_module(deposit_limit_module: address):
+    """
+    @notice Set a contract to handle the deposit limit.
+    @dev This will override the default `deposit_limit`.
+    @param deposit_limit_module Address of the module.
+    """
+    assert self.shutdown == False # Dev: shutdown
+    self._enforce_role(msg.sender, Roles.DEPOSIT_LIMIT_MANAGER)
+
+    self.deposit_limit_module = deposit_limit_module
+
+    log UpdateDepositLimitModule(deposit_limit_module)
+
+@external
+def set_withdraw_limit_module(withdraw_limit_module: address):
+    """
+    @notice Set a contract to handle the withdraw limit.
+    @dev This will override the default `max_withdraw`.
+    @param withdraw_limit_module Address of the module.
+    """
+    assert self.shutdown == False # Dev: shutdown
+    self._enforce_role(msg.sender, Roles.WITHDRAW_LIMIT_MANAGER)
+
+    self.withdraw_limit_module = withdraw_limit_module
+
+    log UpdateWithdrawLimitModule(withdraw_limit_module)
 
 @external
 def set_minimum_total_idle(minimum_total_idle: uint256):
@@ -1950,7 +2012,7 @@ def maxRedeem(
     @return The maximum amount of shares that can be redeemed.
     """
     return min(
-        # Max witdraw is rounding so we check against the full balance.
+        # Conver to shares is rounding up so we check against the full balance.
         self._convert_to_shares(self._max_withdraw(owner, max_loss, strategies), Rounding.ROUND_UP),
         self.balance_of[owner]
     )

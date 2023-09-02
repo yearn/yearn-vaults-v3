@@ -249,8 +249,8 @@ def test_shutdown_vault__emergency_manager(gov, vault, bunny):
     event = list(tx.decode_logs(vault.Shutdown))
     assert len(event) == 1
     # lets ensure that we give the EMERGENCY_MANAGER DEBT_MANAGER permissions after shutdown
-    # EMERGENCY_MANAGER=4096 DEBT_MANGER=64 -> binary or operation should give us 4160 (10001000000)
-    assert vault.roles(bunny) == 4160
+    # EMERGENCY_MANAGER=8192 DEBT_MANGER=64 -> binary or operation should give us 8256 (100001000000)
+    assert vault.roles(bunny) == 8256
 
 
 # REPORTING_MANAGER

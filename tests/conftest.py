@@ -215,6 +215,7 @@ def create_vault(project, gov, vault_factory):
             | ROLES.DEBT_MANAGER
             | ROLES.MAX_DEBT_MANAGER
             | ROLES.DEPOSIT_LIMIT_MANAGER
+            | ROLES.WITHDRAW_LIMIT_MANAGER
             | ROLES.MINIMUM_IDLE_MANAGER
             | ROLES.PROFIT_UNLOCK_MANAGER
             | ROLES.DEBT_PURCHASER
