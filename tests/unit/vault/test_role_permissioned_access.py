@@ -1,5 +1,11 @@
 import ape
-from utils.constants import ROLES, WEEK, StrategyChangeType, RoleStatusChange
+from utils.constants import (
+    ROLES,
+    WEEK,
+    StrategyChangeType,
+    RoleStatusChange,
+    ZERO_ADDRESS,
+)
 from utils.utils import from_units
 
 
@@ -340,6 +346,16 @@ def test_set_deposit_limit__deposit_limit_role_closed__reverts(vault, bunny):
         vault.set_deposit_limit(0, sender=bunny)
 
 
+def test_set_deposit_limit_module__deposit_limit_role_closed__reverts(vault, bunny):
+    with ape.reverts("not allowed"):
+        vault.set_deposit_limit_module(bunny, sender=bunny)
+
+
+def test_set_withdraw_limit_module__withdraw_limit_role_closed__reverts(vault, bunny):
+    with ape.reverts("not allowed"):
+        vault.set_withdraw_limit_module(bunny, sender=bunny)
+
+
 def test_update_max_debt_for_strategy__max_debt_role_closed__reverts(
     vault, create_strategy, bunny, gov
 ):
@@ -375,6 +391,36 @@ def test_set_deposit_limit__set_deposit_limit_role_open(vault, bunny, gov):
     event = list(tx.decode_logs(vault.UpdateDepositLimit))
     assert len(event) == 1
     assert event[0].deposit_limit == 0
+
+
+def test_set_deposit_limit_module__set_deposit_limit_role_open(vault, bunny, gov):
+    tx = vault.set_open_role(ROLES.DEPOSIT_LIMIT_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleStatusChanged))
+    assert len(event) == 1
+    assert event[0].role == ROLES.DEPOSIT_LIMIT_MANAGER
+    assert event[0].status == RoleStatusChange.OPENED
+
+    tx = vault.set_deposit_limit_module(bunny, sender=bunny)
+    event = list(tx.decode_logs(vault.UpdateDepositLimitModule))
+    assert len(event) == 1
+    assert event[0].deposit_limit_module == bunny.address
+    assert vault.deposit_limit_module() == bunny.address
+
+
+def test_set_withdraw_limit_module__set_withdraw_limit_role_open(vault, bunny, gov):
+    tx = vault.set_open_role(ROLES.WITHDRAW_LIMIT_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleStatusChanged))
+    assert len(event) == 1
+    assert event[0].role == ROLES.WITHDRAW_LIMIT_MANAGER
+    assert event[0].status == RoleStatusChange.OPENED
+
+    tx = vault.set_withdraw_limit_module(bunny, sender=bunny)
+    event = list(tx.decode_logs(vault.UpdateWithdrawLimitModule))
+    assert len(event) == 1
+    assert event[0].withdraw_limit_module == bunny.address
+    assert vault.withdraw_limit_module() == bunny.address
 
 
 def test_update_max_debt_for_strategy__max_debt_limit_role_open(
@@ -446,6 +492,58 @@ def test_set_deposit_limit__set_deposit_limit_role_open(vault, bunny, gov):
 
     with ape.reverts("not allowed"):
         vault.set_deposit_limit(0, sender=bunny)
+
+
+def test_set_deposit_limit_module__set_deposit_limit_role_open(vault, bunny, gov):
+    tx = vault.set_open_role(ROLES.DEPOSIT_LIMIT_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleStatusChanged))
+    assert len(event) == 1
+    assert event[0].role == ROLES.DEPOSIT_LIMIT_MANAGER
+    assert event[0].status == RoleStatusChange.OPENED
+
+    tx = vault.set_deposit_limit_module(bunny, sender=bunny)
+    event = list(tx.decode_logs(vault.UpdateDepositLimitModule))
+    assert len(event) == 1
+    assert event[0].deposit_limit_module == bunny.address
+    assert vault.deposit_limit_module() == bunny.address
+
+    # close role
+    tx = vault.close_open_role(ROLES.DEPOSIT_LIMIT_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleStatusChanged))
+    assert len(event) == 1
+    assert event[0].role == ROLES.DEPOSIT_LIMIT_MANAGER
+    assert event[0].status == RoleStatusChange.CLOSED
+
+    with ape.reverts("not allowed"):
+        vault.set_deposit_limit_module(ZERO_ADDRESS, sender=bunny)
+
+
+def test_set_withdraw_limit_module__set_withdraw_limit_role_open(vault, bunny, gov):
+    tx = vault.set_open_role(ROLES.WITHDRAW_LIMIT_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleStatusChanged))
+    assert len(event) == 1
+    assert event[0].role == ROLES.WITHDRAW_LIMIT_MANAGER
+    assert event[0].status == RoleStatusChange.OPENED
+
+    tx = vault.set_withdraw_limit_module(bunny, sender=bunny)
+    event = list(tx.decode_logs(vault.UpdateWithdrawLimitModule))
+    assert len(event) == 1
+    assert event[0].withdraw_limit_module == bunny.address
+    assert vault.withdraw_limit_module() == bunny.address
+
+    # close role
+    tx = vault.close_open_role(ROLES.WITHDRAW_LIMIT_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleStatusChanged))
+    assert len(event) == 1
+    assert event[0].role == ROLES.WITHDRAW_LIMIT_MANAGER
+    assert event[0].status == RoleStatusChange.CLOSED
+
+    with ape.reverts("not allowed"):
+        vault.set_withdraw_limit_module(ZERO_ADDRESS, sender=bunny)
 
 
 def test_update_max_debt_for_strategy__set_max_debt_role_open_then_close__reverts(

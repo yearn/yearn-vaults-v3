@@ -1,6 +1,6 @@
 import ape
 import pytest
-from utils.constants import ROLES, DAY
+from utils.constants import ROLES, DAY, MAX_INT, ZERO_ADDRESS
 
 
 def test_total_assets(asset, fish, fish_amount, create_vault, user_deposit):
@@ -406,3 +406,324 @@ def test_max_redeem__with_locked_strategy(
     strategy.setLockedFunds(locked, DAY, sender=gov)
 
     assert vault.maxRedeem(fish.address) == assets - locked
+
+
+# With limit modules
+
+
+def test_max_deposit__with_deposit_limit_module(
+    asset, fish, fish_amount, gov, create_vault, deploy_limit_module, user_deposit
+):
+    vault = create_vault(asset, deposit_limit=0)
+    limit_module = deploy_limit_module()
+    assets = fish_amount
+
+    assert vault.deposit_limit() == 0
+    assert vault.maxDeposit(fish.address) == 0
+
+    vault.set_deposit_limit_module(limit_module, sender=gov)
+
+    assert vault.deposit_limit_module() == limit_module.address
+    assert vault.maxDeposit(fish.address) == MAX_INT
+
+    new_limit = assets * 2
+    limit_module.set_default_deposit_limit(new_limit, sender=gov)
+
+    user_deposit(fish, vault, asset, assets)
+
+    assert vault.maxDeposit(fish.address) == new_limit - assets
+
+    # Zero address and vault address should still be 0
+    assert vault.maxDeposit(ZERO_ADDRESS) == 0
+    assert vault.maxDeposit(vault.address) == 0
+
+    # If not on a whitelist it reverts.
+    limit_module.set_enforce_whitelist(True, sender=gov)
+
+    assert vault.maxDeposit(fish.address) == 0
+
+    # If whitelisted it now works
+    limit_module.set_whitelist(fish.address, sender=gov)
+
+    assert vault.maxDeposit(fish.address) == new_limit - assets
+
+
+def test_max_mint__with_deposit_limit_module(
+    asset, fish, fish_amount, gov, create_vault, deploy_limit_module, user_deposit
+):
+    vault = create_vault(asset, deposit_limit=0)
+    limit_module = deploy_limit_module()
+    assets = fish_amount
+
+    assert vault.deposit_limit() == 0
+    assert vault.maxMint(fish.address) == 0
+
+    vault.set_deposit_limit_module(limit_module, sender=gov)
+
+    assert vault.deposit_limit_module() == limit_module.address
+    assert vault.maxDeposit(fish.address) == MAX_INT
+
+    new_limit = assets * 2
+    limit_module.set_default_deposit_limit(new_limit, sender=gov)
+
+    user_deposit(fish, vault, asset, assets)
+
+    assert vault.maxMint(fish.address) == new_limit - assets
+
+    # Zero address and vault address should still be 0
+    assert vault.maxMint(ZERO_ADDRESS) == 0
+    assert vault.maxMint(vault.address) == 0
+
+    # If not on a whitelist it reverts.
+    limit_module.set_enforce_whitelist(True, sender=gov)
+
+    assert vault.maxMint(fish.address) == 0
+
+    # If whitelisted it now works
+    limit_module.set_whitelist(fish.address, sender=gov)
+
+    assert vault.maxMint(fish.address) == new_limit - assets
+
+
+def test_max_withdraw__with_withdraw_limit_module(
+    asset,
+    fish,
+    bunny,
+    fish_amount,
+    gov,
+    create_vault,
+    deploy_limit_module,
+    user_deposit,
+):
+    vault = create_vault(asset)
+    limit_module = deploy_limit_module()
+    assets = fish_amount // 2
+
+    assert vault.maxWithdraw(fish.address) == 0
+
+    vault.set_withdraw_limit_module(limit_module, sender=gov)
+
+    assert vault.withdraw_limit_module() == limit_module.address
+    # Max withdraw should still be 0
+    assert vault.maxWithdraw(fish.address) == 0
+
+    user_deposit(fish, vault, asset, assets)
+
+    # Max should be uint max but amount is brought down based on balances.
+    assert limit_module.default_withdraw_limit() == MAX_INT
+    assert vault.maxWithdraw(fish.address) == assets
+    assert vault.maxWithdraw(bunny.address) == 0
+
+    new_limit = assets * 2
+    limit_module.set_default_withdraw_limit(new_limit, sender=gov)
+
+    # Doesn't change
+    assert vault.maxWithdraw(fish.address) == assets
+    assert vault.maxWithdraw(fish.address, 23, [vault]) == assets
+    assert vault.maxWithdraw(bunny.address) == 0
+
+    # Set limit below the balance
+    new_limit = assets // 2
+    limit_module.set_default_withdraw_limit(new_limit, sender=gov)
+
+    assert vault.maxWithdraw(fish.address) == new_limit
+    assert vault.maxWithdraw(fish.address, 23, [vault]) == new_limit
+    assert vault.maxWithdraw(bunny.address) == 0
+
+
+def test_max_redeem__with_withdraw_limit_module(
+    asset,
+    fish,
+    bunny,
+    fish_amount,
+    gov,
+    create_vault,
+    deploy_limit_module,
+    user_deposit,
+):
+    vault = create_vault(asset)
+    limit_module = deploy_limit_module()
+    assets = fish_amount // 2
+
+    assert vault.maxRedeem(fish.address) == 0
+
+    vault.set_withdraw_limit_module(limit_module, sender=gov)
+
+    assert vault.withdraw_limit_module() == limit_module.address
+    # Max withdraw should still be 0
+    assert vault.maxRedeem(fish.address) == 0
+
+    user_deposit(fish, vault, asset, assets)
+
+    # Max should be uint max but amount is brought down based on balances.
+    assert limit_module.default_withdraw_limit() == MAX_INT
+    assert vault.maxRedeem(fish.address) == assets
+    assert vault.maxRedeem(bunny.address) == 0
+
+    new_limit = assets * 2
+    limit_module.set_default_withdraw_limit(new_limit, sender=gov)
+
+    # Doesn't change
+    assert vault.maxRedeem(fish.address) == assets
+    assert vault.maxRedeem(fish.address, 23, [vault]) == assets
+    assert vault.maxRedeem(bunny.address) == 0
+
+    # Set limit below the balance
+    new_limit = assets // 2
+    limit_module.set_default_withdraw_limit(new_limit, sender=gov)
+
+    assert vault.maxRedeem(fish.address) == new_limit
+    assert vault.maxRedeem(fish.address, 23, [vault]) == new_limit
+    assert vault.maxRedeem(bunny.address) == 0
+
+
+def test_deposit__with_deposit_limit_module(
+    asset, fish, fish_amount, gov, create_vault, deploy_limit_module, user_deposit
+):
+    vault = create_vault(asset, deposit_limit=0)
+    limit_module = deploy_limit_module()
+    assets = fish_amount
+
+    asset.approve(vault.address, assets, sender=fish)
+
+    vault.set_deposit_limit_module(limit_module, sender=gov)
+
+    # If not on a whitelist it reverts.
+    limit_module.set_enforce_whitelist(True, sender=gov)
+
+    assert vault.maxDeposit(fish.address) == 0
+
+    with ape.reverts("exceed deposit limit"):
+        vault.deposit(assets, fish.address, sender=fish)
+
+    # If whitelisted it now works
+    limit_module.set_whitelist(fish.address, sender=gov)
+    assert vault.maxDeposit(fish.address) == MAX_INT
+
+    # Should go through now
+    tx = vault.deposit(assets, fish.address, sender=fish)
+
+    event = list(tx.decode_logs(vault.Deposit))[0]
+
+    assert event.assets == assets
+    assert event.shares == assets
+    assert event.owner == fish
+    assert event.sender == fish
+    assert vault.balanceOf(fish.address) == assets
+    assert asset.balanceOf(vault.address) == assets
+
+
+def test_mint__with_deposit_limit_module(
+    asset, fish, fish_amount, gov, create_vault, deploy_limit_module, user_deposit
+):
+    vault = create_vault(asset, deposit_limit=0)
+    limit_module = deploy_limit_module()
+    assets = fish_amount
+
+    asset.approve(vault.address, assets, sender=fish)
+
+    vault.set_deposit_limit_module(limit_module, sender=gov)
+
+    # If not on a whitelist it reverts.
+    limit_module.set_enforce_whitelist(True, sender=gov)
+
+    assert vault.maxMint(fish.address) == 0
+
+    with ape.reverts("exceed deposit limit"):
+        vault.mint(assets, fish.address, sender=fish)
+
+    # If whitelisted it now works
+    limit_module.set_whitelist(fish.address, sender=gov)
+    assert vault.maxMint(fish.address) == MAX_INT
+
+    # Should go through now
+    tx = vault.mint(assets, fish.address, sender=fish)
+
+    event = list(tx.decode_logs(vault.Deposit))[0]
+
+    assert event.assets == assets
+    assert event.shares == assets
+    assert event.owner == fish
+    assert event.sender == fish
+    assert vault.balanceOf(fish.address) == assets
+    assert asset.balanceOf(vault.address) == assets
+
+
+def test_withdraw__with_withdraw_limit_module(
+    asset, fish, fish_amount, gov, create_vault, deploy_limit_module, user_deposit
+):
+    vault = create_vault(asset)
+    limit_module = deploy_limit_module()
+    assets = fish_amount
+
+    user_deposit(fish, vault, asset, assets)
+
+    vault.set_withdraw_limit_module(limit_module, sender=gov)
+
+    assert vault.maxWithdraw(fish.address) == assets
+
+    new_limit = 0
+    limit_module.set_default_withdraw_limit(new_limit, sender=gov)
+
+    assert vault.maxWithdraw(fish.address) == 0
+
+    with ape.reverts("exceed withdraw limit"):
+        vault.withdraw(assets, fish.address, fish.address, sender=fish)
+
+    new_limit = assets
+    limit_module.set_default_withdraw_limit(new_limit, sender=gov)
+
+    assert vault.maxWithdraw(fish.address) == assets
+
+    # Should go through now
+    tx = vault.withdraw(assets, fish.address, fish.address, sender=fish)
+
+    event = list(tx.decode_logs(vault.Withdraw))[0]
+
+    assert event.assets == assets
+    assert event.shares == assets
+    assert event.owner == fish
+    assert event.receiver == fish
+    assert vault.balanceOf(fish.address) == 0
+    assert asset.balanceOf(vault.address) == 0
+    assert asset.balanceOf(fish.address) == assets
+
+
+def test_redeem__with_withdraw_limit_module(
+    asset, fish, fish_amount, gov, create_vault, deploy_limit_module, user_deposit
+):
+    vault = create_vault(asset)
+    limit_module = deploy_limit_module()
+    assets = fish_amount
+
+    user_deposit(fish, vault, asset, assets)
+
+    vault.set_withdraw_limit_module(limit_module, sender=gov)
+
+    assert vault.maxRedeem(fish.address) == assets
+
+    new_limit = 0
+    limit_module.set_default_withdraw_limit(new_limit, sender=gov)
+
+    assert vault.maxRedeem(fish.address) == 0
+
+    with ape.reverts("exceed withdraw limit"):
+        vault.redeem(assets, fish.address, fish.address, sender=fish)
+
+    new_limit = assets
+    limit_module.set_default_withdraw_limit(new_limit, sender=gov)
+
+    assert vault.maxRedeem(fish.address) == assets
+
+    # Should go through now
+    tx = vault.redeem(assets, fish.address, fish.address, sender=fish)
+
+    event = list(tx.decode_logs(vault.Withdraw))[0]
+
+    assert event.assets == assets
+    assert event.shares == assets
+    assert event.owner == fish
+    assert event.receiver == fish
+    assert vault.balanceOf(fish.address) == 0
+    assert asset.balanceOf(vault.address) == 0
+    assert asset.balanceOf(fish.address) == assets

@@ -355,6 +355,19 @@ def deploy_faulty_accountant(project, gov):
 
 
 @pytest.fixture(scope="session")
+def deploy_limit_module(project, gov):
+    def deploy_limit_module(
+        deposit_limit=MAX_INT, withdraw_limit=MAX_INT, whitelist=False
+    ):
+        limit_module = gov.deploy(
+            project.LimitModule, deposit_limit, withdraw_limit, whitelist
+        )
+        return limit_module
+
+    yield deploy_limit_module
+
+
+@pytest.fixture(scope="session")
 def mint_and_deposit_into_strategy(gov, asset):
     def mint_and_deposit_into_strategy(
         strategy, account=gov, amount_to_mint=10**18, amount_to_deposit=None

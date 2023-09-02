@@ -601,6 +601,7 @@ def _max_withdraw(
     if withdraw_limit_module != empty(address):
         return min(
             # Use the min between the returned value and the max.
+            # Means the limit module doesn't need to account for balances or conversions.
             ILimitModule(withdraw_limit_module).available_withdraw_limit(owner, max_loss, strategies),
             max_assets
         )
@@ -788,7 +789,7 @@ def _redeem(
     # If there is a withdraw module, check the max.
     withdraw_limit_module: address = self.withdraw_limit_module
     if withdraw_limit_module != empty(address):
-        assert assets <= self._max_withdraw(owner, max_loss, strategies), "exceed withdraw limt"
+        assert assets <= self._max_withdraw(owner, max_loss, strategies), "exceed withdraw limit"
 
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
@@ -1375,7 +1376,6 @@ def set_withdraw_limit_module(withdraw_limit_module: address):
     @dev This will override the default `max_withdraw`.
     @param withdraw_limit_module Address of the module.
     """
-    assert self.shutdown == False # Dev: shutdown
     self._enforce_role(msg.sender, Roles.WITHDRAW_LIMIT_MANAGER)
 
     self.withdraw_limit_module = withdraw_limit_module
@@ -1539,19 +1539,6 @@ def pricePerShare() -> uint256:
 
 @view
 @external
-def availableDepositLimit() -> uint256:
-    """
-    @notice Get the available deposit limit.
-    @return The available deposit limit.
-    """
-    limit: uint256 = self.deposit_limit
-    assets: uint256 = self._total_assets()
-    if limit > assets:
-        return unsafe_sub(limit, assets)
-    return 0
-
-@view
-@external
 def get_default_queue() -> DynArray[address, 10]:
     """
     @notice Get the full default queue currently set.
@@ -1693,6 +1680,11 @@ def shutdown_vault():
     self.shutdown = True
 
     # Set deposit limit to 0.
+    if self.deposit_limit_module != empty(address):
+        self.deposit_limit_module = empty(address)
+
+        log UpdateDepositLimitModule(empty(address))
+
     self.deposit_limit = 0
     log UpdateDepositLimit(0)
 
@@ -1977,6 +1969,10 @@ def maxMint(receiver: address) -> uint256:
     @return The maximum amount of shares that can be minted.
     """
     max_deposit: uint256 = self._max_deposit(receiver)
+    # Con't convert max uint
+    if max_deposit == MAX_UINT256:
+        return max_deposit
+
     return self._convert_to_shares(max_deposit, Rounding.ROUND_DOWN)
 
 @view
