@@ -616,12 +616,13 @@ def _max_withdraw(
             have += max_withdraw
             # Reduce how much we have left.
             needed -= max_withdraw
+            # Add any unrealised loss to the total
             loss += unrealised_loss
 
             if needed == 0:
                 break
 
-        # Update the max based after going through the queue.
+        # Update the max after going through the queue.
         max_assets = have
 
         # Check if there is a loss and a non-default value was set.
