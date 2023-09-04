@@ -827,13 +827,13 @@ def _redeem(
     # funds from strategies.
     if requested_assets > curr_total_idle:
 
-        # Cache the input withdrawal queue.
-        _strategies: DynArray[address, MAX_QUEUE] = strategies
+        # Cache the default queue.
+        _strategies: DynArray[address, MAX_QUEUE] = self.default_queue
 
-        # If no queue was passed, or we force an override.
-        if len(_strategies) == 0 or self.override_queue:
-                # Use the default queue.
-                _strategies = self.default_queue
+        # If a custom queue was passed, and we dont override it.
+        if len(strategies) != 0 and not self.override_queue:
+                # Use the custom queue.
+                _strategies = strategies
 
         # load to memory to save gas
         curr_total_debt: uint256 = self.total_debt
