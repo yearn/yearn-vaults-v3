@@ -131,6 +131,9 @@ event UpdateWithdrawLimitModule:
 event UpdateDefaultQueue:
     new_default_queue: DynArray[address, MAX_QUEUE]
 
+event UpdateOverrideQueue:
+    override_queue: bool
+
 event UpdatedMaxDebtForStrategy:
     sender: indexed(address)
     strategy: indexed(address)
@@ -218,6 +221,8 @@ FACTORY: public(immutable(address))
 strategies: public(HashMap[address, StrategyParams])
 # The current default withdrawal queue.
 default_queue: public(DynArray[address, MAX_QUEUE])
+# Should custom withdraw queues be overriden
+override_queue: public(bool)
 
 # ERC20 - amount of shares per account
 balance_of: HashMap[address, uint256]
@@ -825,8 +830,8 @@ def _redeem(
         # Cache the input withdrawal queue.
         _strategies: DynArray[address, MAX_QUEUE] = strategies
 
-        # If no queue was passed.
-        if len(_strategies) == 0:
+        # If no queue was passed, or we force an override.
+        if len(_strategies) == 0 or self.override_queue:
                 # Use the default queue.
                 _strategies = self.default_queue
 
@@ -1359,6 +1364,17 @@ def set_default_queue(new_default_queue: DynArray[address, MAX_QUEUE]):
     self.default_queue = new_default_queue
 
     log UpdateDefaultQueue(new_default_queue)
+
+@external
+def set_override_queue(override_queue: bool):
+    """
+    @notice Set a new value for `override_queue`.
+    @param override_queue New value.
+    """
+    self._enforce_role(msg.sender, Roles.QUEUE_MANAGER)
+    self.override_queue = override_queue
+
+    log UpdateOverrideQueue(override_queue)
 
 @external
 def set_deposit_limit(deposit_limit: uint256):
