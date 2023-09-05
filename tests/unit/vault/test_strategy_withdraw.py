@@ -2184,3 +2184,37 @@ def test_redeem__with_custom_queue_and_override_queue__overrides(
     assert asset.balanceOf(second_strategy) == 0
     assert asset.balanceOf(fish) == shares
     assert vault.balanceOf(fish) > 0
+
+
+def test_withdraw__with_max_loss_too_high__reverts(
+    fish, fish_amount, asset, create_vault
+):
+    vault = create_vault(asset)
+    amount = fish_amount
+    max_loss = 10_001
+
+    with ape.reverts("max loss"):
+        vault.withdraw(
+            amount,
+            fish.address,
+            fish.address,
+            max_loss,
+            sender=fish,
+        )
+
+
+def test_redeem__with_max_loss_too_high__reverts(
+    fish, fish_amount, asset, create_vault
+):
+    vault = create_vault(asset)
+    shares = fish_amount
+    max_loss = 10_001
+
+    with ape.reverts("max loss"):
+        vault.redeem(
+            shares,
+            fish.address,
+            fish.address,
+            max_loss,
+            sender=fish,
+        )

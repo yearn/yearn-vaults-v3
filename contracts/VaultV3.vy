@@ -803,6 +803,7 @@ def _redeem(
     to the user that is redeeming their vault shares.
     """
     assert receiver != empty(address), "ZERO ADDRESS"
+    assert max_loss <= MAX_BPS, "max loss"
 
     # If there is a withdraw limit module, check the max.
     if self.withdraw_limit_module != empty(address):
