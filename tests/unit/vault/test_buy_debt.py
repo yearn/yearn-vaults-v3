@@ -164,3 +164,42 @@ def test_buy_debt__half_debt(
     # assert shares got moved
     assert asset.balanceOf(gov) == before_balance - to_buy
     assert strategy.balanceOf(gov) == before_shares + to_buy
+
+
+def test_buy_debt__cover_loss(
+    gov,
+    asset,
+    vault,
+    mint_and_deposit_into_vault,
+    fish_amount,
+    lossy_strategy,
+    add_debt_to_strategy,
+):
+    strategy = lossy_strategy
+
+    amount = fish_amount
+
+    mint_and_deposit_into_vault(vault, gov, amount)
+
+    add_debt_to_strategy(gov, strategy, vault, amount)
+
+    to_buy = amount // 2
+
+    # Approve vault to pull funds.
+    asset.mint(gov.address, to_buy, sender=gov)
+    asset.approve(vault.address, to_buy, sender=gov)
+
+    before_balance = asset.balanceOf(gov)
+    before_shares = strategy.balanceOf(gov)
+
+    strategy.setLoss(gov, to_buy, sender=gov)
+
+    vault.buy_debt(strategy, to_buy, sender=gov)
+
+    assert vault.totalIdle() == amount
+    assert vault.totalDebt() == 0
+    assert vault.pricePerShare() == 10 ** asset.decimals()
+    assert vault.strategies(strategy)["current_debt"] == 0
+    # assert shares got moved
+    assert asset.balanceOf(gov) == before_balance - amount
+    assert strategy.balanceOf(gov) == before_shares + amount
