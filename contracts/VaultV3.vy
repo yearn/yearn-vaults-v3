@@ -1273,7 +1273,7 @@ def _enforce_role(account: address, role: Roles):
 @external
 def set_role(account: address, role: Roles):
     """
-    @notice Set the roles for of an account.
+    @notice Set the roles for an account.
     @dev This will fully override an accounts current roles
      so it should include all roles the account should hold.
     @param account The account to set the role for.
@@ -1439,7 +1439,7 @@ def buy_debt(strategy: address, amount: uint256):
         _amount = current_debt
 
     # We get the proportion of the debt that is being bought and
-    # transfer the equivalant shares. We assume this is being used
+    # transfer the equivalent shares. We assume this is being used
     # due to strategy issues so won't rely on its conversion rates.
     shares: uint256 = IStrategy(strategy).balanceOf(self) * _amount / current_debt
 
