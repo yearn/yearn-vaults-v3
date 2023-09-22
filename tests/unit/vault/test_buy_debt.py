@@ -17,13 +17,13 @@ def set_role(vault, gov):
 
 
 def test_buy_debt__strategy_not_active__reverts(
-    gov, asset, vault, mint_and_deposit_into_vault, fish_amount, create_strategy
+    gov, asset, vault, mint_and_deposit_into_vault, fish, fish_amount, create_strategy
 ):
     amount = fish_amount
 
     strategy = create_strategy(vault)
 
-    mint_and_deposit_into_vault(vault)
+    mint_and_deposit_into_vault(vault, fish, amount)
 
     # Approve vault to pull funds.
     asset.mint(gov.address, amount, sender=gov)
@@ -34,7 +34,7 @@ def test_buy_debt__strategy_not_active__reverts(
 
 
 def test_buy_debt__no_debt__reverts(
-    gov, asset, vault, mint_and_deposit_into_vault, fish_amount, create_strategy
+    gov, asset, vault, mint_and_deposit_into_vault, fish_amount, create_strategy, fish
 ):
     amount = fish_amount
 
@@ -42,7 +42,7 @@ def test_buy_debt__no_debt__reverts(
 
     vault.add_strategy(strategy.address, sender=gov)
 
-    mint_and_deposit_into_vault(vault)
+    mint_and_deposit_into_vault(vault, fish, amount)
 
     # Approve vault to pull funds.
     asset.mint(gov.address, amount, sender=gov)
@@ -60,10 +60,11 @@ def test_buy_debt__no_amount__reverts(
     fish_amount,
     strategy,
     add_debt_to_strategy,
+    fish,
 ):
     amount = fish_amount
 
-    mint_and_deposit_into_vault(vault, gov, amount)
+    mint_and_deposit_into_vault(vault, fish, amount)
 
     add_debt_to_strategy(gov, strategy, vault, amount)
 
@@ -83,10 +84,11 @@ def test_buy_debt__more_than_available__withdraws_current_debt(
     fish_amount,
     strategy,
     add_debt_to_strategy,
+    fish,
 ):
     amount = fish_amount
 
-    mint_and_deposit_into_vault(vault, gov, amount)
+    mint_and_deposit_into_vault(vault, fish, amount)
 
     add_debt_to_strategy(gov, strategy, vault, amount)
 
@@ -128,10 +130,11 @@ def test_buy_debt__full_debt(
     fish_amount,
     strategy,
     add_debt_to_strategy,
+    fish,
 ):
     amount = fish_amount
 
-    mint_and_deposit_into_vault(vault, gov, amount)
+    mint_and_deposit_into_vault(vault, fish, amount)
 
     add_debt_to_strategy(gov, strategy, vault, amount)
 
@@ -173,10 +176,11 @@ def test_buy_debt__half_debt(
     fish_amount,
     strategy,
     add_debt_to_strategy,
+    fish,
 ):
     amount = fish_amount
 
-    mint_and_deposit_into_vault(vault, gov, amount)
+    mint_and_deposit_into_vault(vault, fish, amount)
 
     add_debt_to_strategy(gov, strategy, vault, amount)
 
