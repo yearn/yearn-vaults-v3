@@ -1346,11 +1346,14 @@ def set_default_queue(new_default_queue: DynArray[address, MAX_QUEUE]):
 def set_deposit_limit(deposit_limit: uint256):
     """
     @notice Set the new deposit limit.
-    @dev Can not be changed if shutdown.
+    @dev Can not be changed if a deposit_limit_module
+    is set or if shutdown.
     @param deposit_limit The new deposit limit.
     """
     assert self.shutdown == False # Dev: shutdown
     self._enforce_role(msg.sender, Roles.DEPOSIT_LIMIT_MANAGER)
+    assert self.deposit_limit_module == empty(address), "using module"
+
     self.deposit_limit = deposit_limit
 
     log UpdateDepositLimit(deposit_limit)
@@ -1359,11 +1362,13 @@ def set_deposit_limit(deposit_limit: uint256):
 def set_deposit_limit_module(deposit_limit_module: address):
     """
     @notice Set a contract to handle the deposit limit.
-    @dev This will override the default `deposit_limit`.
+    @dev The default `deposit_limit` will need to be set to
+    max uint256 since the module will override it.
     @param deposit_limit_module Address of the module.
     """
     assert self.shutdown == False # Dev: shutdown
     self._enforce_role(msg.sender, Roles.DEPOSIT_LIMIT_MANAGER)
+    assert self.deposit_limit == MAX_UINT256, "using deposit limit"
 
     self.deposit_limit_module = deposit_limit_module
 

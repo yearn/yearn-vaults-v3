@@ -421,6 +421,7 @@ def test_max_deposit__with_deposit_limit_module(
     assert vault.deposit_limit() == 0
     assert vault.maxDeposit(fish.address) == 0
 
+    vault.set_deposit_limit(MAX_INT, sender=gov)
     vault.set_deposit_limit_module(limit_module, sender=gov)
 
     assert vault.deposit_limit_module() == limit_module.address
@@ -458,6 +459,7 @@ def test_max_mint__with_deposit_limit_module(
     assert vault.deposit_limit() == 0
     assert vault.maxMint(fish.address) == 0
 
+    vault.set_deposit_limit(MAX_INT, sender=gov)
     vault.set_deposit_limit_module(limit_module, sender=gov)
 
     assert vault.deposit_limit_module() == limit_module.address
@@ -586,6 +588,7 @@ def test_deposit__with_deposit_limit_module(
 
     asset.approve(vault.address, assets, sender=fish)
 
+    vault.set_deposit_limit(MAX_INT, sender=gov)
     vault.set_deposit_limit_module(limit_module, sender=gov)
 
     # If not on a whitelist it reverts.
@@ -622,6 +625,7 @@ def test_mint__with_deposit_limit_module(
 
     asset.approve(vault.address, assets, sender=fish)
 
+    vault.set_deposit_limit(MAX_INT, sender=gov)
     vault.set_deposit_limit_module(limit_module, sender=gov)
 
     # If not on a whitelist it reverts.
