@@ -13,9 +13,6 @@ interface IVault:
     def strategies(strategy: address) -> StrategyParams: view
     def asset() -> address: view
 
-interface IStrategy:
-    def delegatedAssets() -> uint256: view
-
 # EVENTS #
 event CommitFeeManager:
     fee_manager: address
@@ -80,7 +77,7 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
 
     #management_fee
     total_fees: uint256 = (
-        (strategy_params.current_debt - IStrategy(strategy).delegatedAssets())
+        (strategy_params.current_debt)
         * duration
         * fee.management_fee
         / MAX_BPS

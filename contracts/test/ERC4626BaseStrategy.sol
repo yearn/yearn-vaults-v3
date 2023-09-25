@@ -7,13 +7,13 @@ import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IER
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IVault} from "../interfaces/IVault.sol";
-import {IStrategyERC4626} from "../interfaces/IStrategyERC4626.sol";
+
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-abstract contract ERC4626BaseStrategy is IStrategyERC4626, ERC4626 {
+abstract contract ERC4626BaseStrategy is ERC4626 {
     using SafeERC20 for IERC20;
 
-    address public override vault;
+    address public vault;
     uint8 private _decimals;
 
     constructor(
@@ -45,18 +45,14 @@ abstract contract ERC4626BaseStrategy is IStrategyERC4626, ERC4626 {
     // TODO: add roles (including vault)
     // TODO: should we force invest and freeFunds to be in deposit and withdraw functions?
 
-    function invest() external override {
+    function invest() external virtual {
         // TODO: add permissioning ?
     }
 
     function freeFunds(
         uint256 _amount
-    ) external override returns (uint256 _freedFunds) {
+    ) external virtual returns (uint256 _freedFunds) {
         // TODO: add permissioning ?
-    }
-
-    function migrate(address _newStrategy) external virtual override {
-        // TODO: add permissioning
     }
 
     function _invest() internal virtual;
@@ -64,12 +60,6 @@ abstract contract ERC4626BaseStrategy is IStrategyERC4626, ERC4626 {
     function _freeFunds(
         uint256 _amount
     ) internal virtual returns (uint256 amountFreed);
-
-    function _protectedTokens()
-        internal
-        view
-        virtual
-        returns (address[] memory);
 
     function sweep(address _token) external {
         // TODO: add permissioning

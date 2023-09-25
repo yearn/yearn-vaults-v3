@@ -47,14 +47,6 @@ abstract contract ERC4626BaseStrategyMock is ERC4626BaseStrategy {
     function delegatedAssets()
         external
         view
-        override
         returns (uint256 _delegatedAssets)
-    {}
-
-    function _protectedTokens()
-        internal
-        view
-        override
-        returns (address[] memory _protected)
     {}
 }

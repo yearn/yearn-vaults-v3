@@ -59,11 +59,4 @@ contract ERC4626LockedStrategy is ERC4626BaseStrategyMock {
         }
     }
 
-    function migrate(address _newStrategy) external override {
-        require(lockedBalance == 0, "strat not liquid");
-        IERC20(asset()).safeTransfer(
-            _newStrategy,
-            IERC20(asset()).balanceOf(address(this))
-        );
-    }
 }

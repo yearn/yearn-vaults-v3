@@ -76,11 +76,4 @@ contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
     function maxRedeem(address) public view override returns (uint256) {
         return convertToShares(IERC20(asset()).balanceOf(address(this)) - lockedFunds);
     }
-
-    function migrate(address _newStrategy) external override {
-        IERC20(asset()).safeTransfer(
-            _newStrategy,
-            IERC20(asset()).balanceOf(address(this))
-        );
-    }
 }

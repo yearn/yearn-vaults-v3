@@ -25,11 +25,4 @@ contract ERC4626LiquidStrategy is ERC4626BaseStrategyMock {
     ) public view override returns (uint256) {
         return _convertToAssets(balanceOf(_owner), Math.Rounding.Down);
     }
-
-    function migrate(address _newStrategy) external override {
-        IERC20(asset()).safeTransfer(
-            _newStrategy,
-            IERC20(asset()).balanceOf(address(this))
-        );
-    }
 }

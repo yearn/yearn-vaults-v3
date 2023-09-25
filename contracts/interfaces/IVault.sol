@@ -5,10 +5,7 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 interface IVault is IERC4626 {
     // STRATEGY EVENTS
-    event StrategyChanged(
-        address indexed strategy,
-        StrategyChangeType indexed change_type
-    );
+    event StrategyChanged(address indexed strategy, uint256 change_type);
     event StrategyReported(
         address indexed strategy,
         uint256 gain,
@@ -25,11 +22,8 @@ interface IVault is IERC4626 {
         uint256 new_debt
     );
     // ROLE UPDATES
-    event RoleSet(address indexed account, Roles indexed role);
-    event RoleStatusChanged(
-        Roles indexed role,
-        RoleStatusChange indexed status
-    );
+    event RoleSet(address indexed account, uint256 role);
+    event RoleStatusChanged(uint256 role, uint256 indexed status);
     event UpdateRoleManager(address indexed role_manager);
     event UpdateAccountant(address indexed accountant);
     event UpdateDefaultQueue(address[] indexed new_default_queue);
@@ -87,13 +81,13 @@ interface IVault is IERC4626 {
         uint256 new_profit_max_unlock_time
     ) external;
 
-    function _enforce_role(address account, Roles role) external;
+    function _enforce_role(address account, uint256 role) external;
 
-    function set_role(address account, Roles role) external;
+    function set_role(address account, uint256 role) external;
 
-    function set_open_role(Roles role) external;
+    function set_open_role(uint256 role) external;
 
-    function close_open_role(Roles role) external;
+    function close_open_role(uint256 role) external;
 
     function transfer_role_manager(address role_manager) external;
 
