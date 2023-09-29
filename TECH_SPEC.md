@@ -1,5 +1,6 @@
 # Yearn System Specification
 
+
 ### Definitions
 - Asset: Any ERC20-compliant token
 - Shares: ERC20-compliant token that tracks Asset balance in the vault for every distributor. Named yv<Asset_Symbol>
