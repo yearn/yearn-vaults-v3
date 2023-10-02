@@ -266,7 +266,7 @@ def test_gain_no_fees_with_refunds_no_buffer(
     assert asset.balanceOf(fish) == fish_amount + first_profit + total_refunds
 
     # Accountant redeems shares
-    with reverts("ZERO_SHARES"):
+    with reverts("no shares to redeem"):
         vault.redeem(
             vault.balanceOf(accountant), accountant, accountant, sender=accountant
         )
@@ -421,7 +421,7 @@ def test_gain_no_fees_with_refunds_with_buffer(
     )
 
     # Accountant redeems shares
-    with reverts("ZERO_SHARES"):
+    with reverts("no shares to redeem"):
         vault.redeem(
             vault.balanceOf(accountant), accountant, accountant, sender=accountant
         )
@@ -1629,7 +1629,7 @@ def test_loss_no_fees_with_refunds_with_buffer(
     )
 
     # Accountant redeems shares
-    with reverts("ZERO_SHARES"):
+    with reverts("no shares to redeem"):
         vault.redeem(
             vault.balanceOf(accountant), accountant, accountant, sender=accountant
         )

@@ -580,7 +580,7 @@ def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
     # Issue the corresponding shares for assets.
     shares: uint256 = self._issue_shares_for_amount(assets, recipient)
 
-    assert shares > 0, "ZERO_SHARES"
+    assert shares > 0, "cannot mint zero"
 
     log Deposit(sender, recipient, assets, shares)
     return shares
@@ -597,7 +597,7 @@ def _mint(sender: address, recipient: address, shares: uint256) -> uint256:
 
     assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_UP)
 
-    assert assets > 0, "ZERO_ASSETS"
+    assert assets > 0, "cannot deposit zero"
     assert self._total_assets() + assets <= self.deposit_limit, "ERC4626: mint more than max"
 
     # Transfer the tokens to the vault first.
@@ -668,7 +668,7 @@ def _redeem(
     shares: uint256 = shares_to_burn
     shares_balance: uint256 = self.balance_of[owner]
 
-    assert shares > 0, "ZERO_SHARES"
+    assert shares > 0, "no shares to redeem"
     assert shares_balance >= shares, "insufficient shares to redeem"
     
     if sender != owner:
@@ -1443,7 +1443,7 @@ def buy_debt(strategy: address, amount: uint256):
     # due to strategy issues so won't rely on its conversion rates.
     shares: uint256 = IStrategy(strategy).balanceOf(self) * _amount / current_debt
 
-    assert shares > 0, "can't buy 0"
+    assert shares > 0, "cannot buy zero"
 
     self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, _amount)
 
