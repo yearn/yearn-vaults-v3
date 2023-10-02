@@ -20,7 +20,7 @@ def test_deposit_and_withdraw(asset, gov, fish, fish_amount, create_vault):
     # set deposit limit to half_amount and max deposit to test deposit limit
     vault.set_deposit_limit(half_amount, sender=gov)
 
-    with ape.reverts("ERC4626: deposit more than max"):
+    with ape.reverts("exceed deposit limit"):
         vault.deposit(amount, fish.address, sender=fish)
 
     vault.deposit(quarter_amount, fish.address, sender=fish)

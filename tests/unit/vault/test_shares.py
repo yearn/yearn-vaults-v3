@@ -51,7 +51,7 @@ def test_deposit__with_deposit_limit_exceed_deposit_limit__reverts(
     deposit_limit = amount - 1
     vault = create_vault(asset, deposit_limit=deposit_limit)
 
-    with ape.reverts("ERC4626: deposit more than max"):
+    with ape.reverts("exceed deposit limit"):
         vault.deposit(amount, fish.address, sender=fish)
 
 
@@ -64,7 +64,7 @@ def test_deposit_all__with_deposit_limit_exceed_deposit_limit__deposit_deposit_l
 
     asset.approve(vault.address, amount, sender=fish)
 
-    with ape.reverts("ERC4626: deposit more than max"):
+    with ape.reverts("exceed deposit limit"):
         vault.deposit(MAX_INT, fish.address, sender=fish)
 
 
@@ -146,7 +146,7 @@ def test_mint__with_deposit_limit_exceed_deposit_limit__reverts(
     deposit_limit = amount - 1
     vault = create_vault(asset, deposit_limit=deposit_limit)
 
-    with ape.reverts("ERC4626: mint more than max"):
+    with ape.reverts("exceed deposit limit"):
         vault.mint(shares, fish.address, sender=fish)
 
 

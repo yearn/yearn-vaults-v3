@@ -570,7 +570,7 @@ def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
     """
     assert self.shutdown == False # dev: shutdown
     assert recipient not in [self, empty(address)], "invalid recipient"
-    assert self._total_assets() + assets <= self.deposit_limit, "ERC4626: deposit more than max"
+    assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
  
     # Transfer the tokens to the vault first.
     self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, assets)
@@ -598,7 +598,7 @@ def _mint(sender: address, recipient: address, shares: uint256) -> uint256:
     assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_UP)
 
     assert assets > 0, "cannot deposit zero"
-    assert self._total_assets() + assets <= self.deposit_limit, "ERC4626: mint more than max"
+    assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
 
     # Transfer the tokens to the vault first.
     self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, assets)
