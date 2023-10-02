@@ -378,3 +378,130 @@ def test_set_profit_unlock__to_high__reverts(gov, vault, bunny):
         vault.set_profit_max_unlock_time(time, sender=bunny)
 
     assert vault.profitMaxUnlockTime() == current_time
+
+
+def test__add_role(gov, vault, bunny):
+    assert vault.roles(bunny) == 0
+
+    tx = vault.add_role(bunny.address, ROLES.PROFIT_UNLOCK_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.PROFIT_UNLOCK_MANAGER
+
+    assert vault.roles(bunny) == ROLES.PROFIT_UNLOCK_MANAGER
+
+    tx = vault.add_role(bunny.address, ROLES.FORCE_REVOKE_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.PROFIT_UNLOCK_MANAGER | ROLES.FORCE_REVOKE_MANAGER
+
+    assert (
+        vault.roles(bunny) == ROLES.PROFIT_UNLOCK_MANAGER | ROLES.FORCE_REVOKE_MANAGER
+    )
+
+    tx = vault.add_role(bunny.address, ROLES.REPORTING_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert (
+        event[0].role
+        == ROLES.PROFIT_UNLOCK_MANAGER
+        | ROLES.FORCE_REVOKE_MANAGER
+        | ROLES.REPORTING_MANAGER
+    )
+
+    assert (
+        vault.roles(bunny)
+        == ROLES.PROFIT_UNLOCK_MANAGER
+        | ROLES.FORCE_REVOKE_MANAGER
+        | ROLES.REPORTING_MANAGER
+    )
+
+
+def test__remove_role(gov, vault, bunny):
+    assert vault.roles(bunny) == 0
+
+    tx = vault.set_role(
+        bunny.address,
+        ROLES.PROFIT_UNLOCK_MANAGER
+        | ROLES.FORCE_REVOKE_MANAGER
+        | ROLES.REPORTING_MANAGER,
+        sender=gov,
+    )
+
+    assert (
+        vault.roles(bunny)
+        == ROLES.PROFIT_UNLOCK_MANAGER
+        | ROLES.FORCE_REVOKE_MANAGER
+        | ROLES.REPORTING_MANAGER
+    )
+
+    tx = vault.remove_role(bunny.address, ROLES.FORCE_REVOKE_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.PROFIT_UNLOCK_MANAGER | ROLES.REPORTING_MANAGER
+
+    assert vault.roles(bunny) == ROLES.PROFIT_UNLOCK_MANAGER | ROLES.REPORTING_MANAGER
+
+    tx = vault.remove_role(bunny.address, ROLES.REPORTING_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == ROLES.PROFIT_UNLOCK_MANAGER
+
+    assert vault.roles(bunny) == ROLES.PROFIT_UNLOCK_MANAGER
+
+    tx = vault.remove_role(bunny.address, ROLES.PROFIT_UNLOCK_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == 0
+
+    assert vault.roles(bunny) == 0
+
+
+def test__add_role__wont_remove(gov, vault):
+    roles = ROLES(vault.roles(gov))
+    role = ROLES.MINIMUM_IDLE_MANAGER
+
+    assert role in roles
+
+    tx = vault.add_role(gov.address, role, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == gov.address
+    assert event[0].role == roles
+
+    assert roles == vault.roles(gov)
+    assert role in ROLES(vault.roles(gov))
+
+    # Make sure we can set min idle.
+    vault.set_minimum_total_idle(100, sender=gov)
+
+    assert vault.minimum_total_idle() == 100
+
+
+def test__remove_role__wont_add(gov, vault, bunny, strategy):
+    assert vault.roles(bunny) == 0
+
+    tx = vault.remove_role(bunny.address, ROLES.ADD_STRATEGY_MANAGER, sender=gov)
+
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == bunny.address
+    assert event[0].role == 0
+
+    assert vault.roles(bunny) == 0
+
+    with ape.reverts("not allowed"):
+        vault.add_strategy(strategy, sender=bunny)

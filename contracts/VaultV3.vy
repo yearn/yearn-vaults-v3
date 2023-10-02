@@ -595,7 +595,7 @@ def _mint(sender: address, recipient: address, shares: uint256) -> uint256:
 
     assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_UP)
 
-    assert assets > 0, "cannot mint zero"
+    assert assets > 0, "cannot deposit zero"
     assert self._total_assets() + assets <= self.deposit_limit, "exceed deposit limit"
 
     # Transfer the tokens to the vault first.
@@ -1295,14 +1295,44 @@ def _enforce_role(account: address, role: Roles):
 @external
 def set_role(account: address, role: Roles):
     """
-    @notice Set the role of an account.
+    @notice Set the roles for an account.
+    @dev This will fully override an accounts current roles
+     so it should include all roles the account should hold.
     @param account The account to set the role for.
-    @param role The role to set.
+    @param role The roles the account should hold.
     """
     assert msg.sender == self.role_manager
     self.roles[account] = role
 
     log RoleSet(account, role)
+
+@external
+def add_role(account: address, role: Roles):
+    """
+    @notice Add a new role to an address.
+    @dev This will add a new role to the account
+     without effecting any of the previously held roles.
+    @param account The account to add a role to.
+    @param role The new role to add to account.
+    """
+    assert msg.sender == self.role_manager
+    self.roles[account] = self.roles[account] | role
+
+    log RoleSet(account, self.roles[account])
+
+@external
+def remove_role(account: address, role: Roles):
+    """
+    @notice Remove a single role from an account.
+    @dev This will leave all other roles for the 
+     account unchanged.
+    @param account The account to remove a Role from.
+    @param role The Role to remove.
+    """
+    assert msg.sender == self.role_manager
+    self.roles[account] = self.roles[account] & ~role
+
+    log RoleSet(account, self.roles[account])
 
 @external
 def set_open_role(role: Roles):
@@ -1412,9 +1442,8 @@ def buy_debt(strategy: address, amount: uint256):
     @dev This should only ever be used in an emergency in place
     of force revoking a strategy in order to not report a loss.
     It allows the DEBT_PURCHASER role to buy the strategies debt
-    for an equal amount of `asset`. It's important to note that 
-    this does rely on the strategies `convertToShares` function to
-    determine the amount of shares to buy.
+    for an equal amount of `asset`. 
+
     @param strategy The strategy to buy the debt for
     @param amount The amount of debt to buy from the vault.
     """
@@ -1423,35 +1452,37 @@ def buy_debt(strategy: address, amount: uint256):
     
     # Cache the current debt.
     current_debt: uint256 = self.strategies[strategy].current_debt
-    
+    _amount: uint256 = amount
+
     assert current_debt > 0, "nothing to buy"
-    assert amount > 0, "nothing to buy with"
+    assert _amount > 0, "nothing to buy with"
+    
+    if _amount > current_debt:
+        _amount = current_debt
 
-    # Get the current shares value for the amount.
-    shares: uint256 = IStrategy(strategy).convertToShares(amount)
+    # We get the proportion of the debt that is being bought and
+    # transfer the equivalent shares. We assume this is being used
+    # due to strategy issues so won't rely on its conversion rates.
+    shares: uint256 = IStrategy(strategy).balanceOf(self) * _amount / current_debt
 
-    assert shares > 0, "can't buy 0"
-    assert shares <= IStrategy(strategy).balanceOf(self), "not enough shares"
+    assert shares > 0, "cannot buy zero"
 
-    self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, amount)
-
-    # Adjust if needed to not underflow on math
-    bought: uint256 = min(current_debt, amount)
+    self._erc20_safe_transfer_from(ASSET.address, msg.sender, self, _amount)
 
     # Lower strategy debt
-    self.strategies[strategy].current_debt -= bought
+    self.strategies[strategy].current_debt -= _amount
     # lower total debt
-    self.total_debt -= bought
+    self.total_debt -= _amount
     # Increase total idle
-    self.total_idle += bought
+    self.total_idle += _amount
 
     # log debt change
-    log DebtUpdated(strategy, current_debt, current_debt - bought)
+    log DebtUpdated(strategy, current_debt, current_debt - _amount)
 
     # Transfer the strategies shares out.
     self._erc20_safe_transfer(strategy, msg.sender, shares)
 
-    log DebtPurchased(strategy, bought)
+    log DebtPurchased(strategy, _amount)
 
 ## STRATEGY MANAGEMENT ##
 @external

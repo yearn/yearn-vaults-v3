@@ -52,7 +52,7 @@ event UpdateCustomProtocolFee:
 event RemovedCustomProtocolFee:
     vault: indexed(address)
 
-event FactoryShutdown():
+event FactoryShutdown:
     pass
 
 event UpdateGovernance:

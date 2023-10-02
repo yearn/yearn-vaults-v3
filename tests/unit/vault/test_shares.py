@@ -111,7 +111,7 @@ def test_mint__with_zero_funds__reverts(fish, asset, create_vault):
     vault = create_vault(asset)
     shares = 0
 
-    with ape.reverts("cannot mint zero"):
+    with ape.reverts("cannot deposit zero"):
         vault.mint(shares, fish.address, sender=fish)
 
 
