@@ -52,8 +52,10 @@ interface IStrategy:
 interface IAccountant:
     def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
 
-interface ILimitModule:
+interface IDepositLimitModule:
     def available_deposit_limit(receiver: address) -> uint256: view
+    
+interface IWithdrawLimitModule:
     def available_withdraw_limit(owner: address, max_loss: uint256, strategies: DynArray[address, MAX_QUEUE]) -> uint256: view
 
 interface IFactory:
@@ -560,7 +562,7 @@ def _max_deposit(receiver: address) -> uint256:
     # If there is a deposit limit module set use that.
     deposit_limit_module: address = self.deposit_limit_module
     if deposit_limit_module != empty(address):
-        return ILimitModule(deposit_limit_module).available_deposit_limit(receiver)
+        return IDepositLimitModule(deposit_limit_module).available_deposit_limit(receiver)
     
     # Else use the standard flow.
     _total_assets: uint256 = self._total_assets()
@@ -602,7 +604,7 @@ def _max_withdraw(
         return min(
             # Use the min between the returned value and the max.
             # Means the limit module doesn't need to account for balances or conversions.
-            ILimitModule(withdraw_limit_module).available_withdraw_limit(owner, max_loss, strategies),
+            IWithdrawLimitModule(withdraw_limit_module).available_withdraw_limit(owner, max_loss, strategies),
             max_assets
         )
     
@@ -786,9 +788,8 @@ def _redeem(
     """
     assert receiver != empty(address), "ZERO ADDRESS"
 
-    # If there is a withdraw module, check the max.
-    withdraw_limit_module: address = self.withdraw_limit_module
-    if withdraw_limit_module != empty(address):
+    # If there is a withdraw limit module, check the max.
+    if self.withdraw_limit_module != empty(address):
         assert assets <= self._max_withdraw(owner, max_loss, strategies), "exceed withdraw limit"
 
     shares: uint256 = shares_to_burn
@@ -2013,7 +2014,7 @@ def maxRedeem(
     @return The maximum amount of shares that can be redeemed.
     """
     return min(
-        # Conver to shares is rounding up so we check against the full balance.
+        # Convert to shares is rounding up so we check against the full balance.
         self._convert_to_shares(self._max_withdraw(owner, max_loss, strategies), Rounding.ROUND_UP),
         self.balance_of[owner]
     )
