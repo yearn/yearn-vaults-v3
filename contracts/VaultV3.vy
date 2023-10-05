@@ -460,6 +460,9 @@ def _convert_to_assets(shares: uint256, rounding: Rounding) -> uint256:
     """ 
     assets = shares * (total_assets / total_supply) --- (== price_per_share * shares)
     """
+    if shares == MAX_UINT256:
+        return shares
+
     total_supply: uint256 = self._total_supply()
     # if total_supply is 0, price_per_share is 1
     if total_supply == 0: 
@@ -478,6 +481,9 @@ def _convert_to_shares(assets: uint256, rounding: Rounding) -> uint256:
     """
     shares = amount * (total_supply / total_assets) --- (== amount / price_per_share)
     """
+    if assets == MAX_UINT256:
+        return assets
+
     total_supply: uint256 = self._total_supply()
     total_assets: uint256 = self._total_assets()
 
@@ -811,7 +817,7 @@ def _redeem(
     # load to memory to save gas
     curr_total_idle: uint256 = self.total_idle
     
-    # If there are not enough assets in the Vault contract, we try to free 
+    # If there are not enough assets in the Vault contract, we try to free
     # funds from strategies.
     if requested_assets > curr_total_idle:
 
@@ -1979,10 +1985,6 @@ def maxMint(receiver: address) -> uint256:
     @return The maximum amount of shares that can be minted.
     """
     max_deposit: uint256 = self._max_deposit(receiver)
-    # Con't convert max uint
-    if max_deposit == MAX_UINT256:
-        return max_deposit
-
     return self._convert_to_shares(max_deposit, Rounding.ROUND_DOWN)
 
 @view
