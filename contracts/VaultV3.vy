@@ -40,7 +40,6 @@ interface IStrategy:
     def asset() -> address: view
     def balanceOf(owner: address) -> uint256: view
     def maxDeposit(receiver: address) -> uint256: view
-    def maxWithdraw(owner: address) -> uint256: view
     def redeem(shares: uint256, receiver: address, owner: address) -> uint256: nonpayable
     def deposit(assets: uint256, receiver: address) -> uint256: nonpayable
     def totalAssets() -> (uint256): view
@@ -642,7 +641,9 @@ def _max_withdraw(
             unrealised_loss: uint256 = self._assess_share_of_unrealised_losses(strategy, to_withdraw)
 
             # See if any limit is enforced by the strategy.
-            strategy_limit: uint256 = IStrategy(strategy).maxWithdraw(self)
+            strategy_limit: uint256 = IStrategy(strategy).convertToAssets(
+                IStrategy(strategy).maxRedeem(self)
+            )
 
             # Adjust accordingly if there is a max withdraw limit.
             if strategy_limit < to_withdraw - unrealised_loss:
@@ -767,8 +768,8 @@ def _withdraw_from_strategy(strategy: address, assets_to_withdraw: uint256):
     shares_to_redeem: uint256 = min(
         # Use previewWithdraw since it should round up.
         IStrategy(strategy).previewWithdraw(assets_to_withdraw), 
-        # And check against the max we can pull.
-        IStrategy(strategy).maxRedeem(self)
+        # And check against our actual balance.
+        IStrategy(strategy).balanceOf(self)
     )
     # Redeem the shares.
     IStrategy(strategy).redeem(shares_to_redeem, self, self)
@@ -852,7 +853,10 @@ def _redeem(
             assets_to_withdraw = min(assets_needed, current_debt)
 
             # Cache max_withdraw now for use if unrealized loss > 0
-            max_withdraw: uint256 = IStrategy(strategy).maxWithdraw(self)
+            # Use maxRedeem and convert since we use redeem.
+            max_withdraw: uint256 = IStrategy(strategy).convertToAssets(
+                IStrategy(strategy).maxRedeem(self)
+            )
 
             # CHECK FOR UNREALISED LOSSES
             # If unrealised losses > 0, then the user will take the proportional share 
@@ -1060,7 +1064,10 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
                 assets_to_withdraw = current_debt
 
         # Check how much we are able to withdraw.
-        withdrawable: uint256 = IStrategy(strategy).maxWithdraw(self)
+        # Use maxRedeem and convert since we use redeem.
+        withdrawable: uint256 = IStrategy(strategy).convertToAssets(
+            IStrategy(strategy).maxRedeem(self)
+        )
         assert withdrawable != 0, "nothing to withdraw"
 
         # If insufficient withdrawable, withdraw what we can.
