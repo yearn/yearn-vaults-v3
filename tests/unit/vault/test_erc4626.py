@@ -223,6 +223,60 @@ def test_max_withdraw__with_lossy_strategy(
     assert vault.maxWithdraw(fish.address) == total_idle
 
 
+# Tests if the first strategy has no losses but the second does
+# maxWithdraw will account for the first and not the second.
+def test_max_withdraw__with_liquid_and_lossy_strategy(
+    asset,
+    fish,
+    fish_amount,
+    gov,
+    create_vault,
+    create_strategy,
+    create_lossy_strategy,
+    add_debt_to_strategy,
+    add_strategy_to_vault,
+    user_deposit,
+):
+    vault = create_vault(asset)
+    shares = fish_amount
+    assets = shares
+    liquid_strategy = create_strategy(vault)
+    lossy_strategy = create_lossy_strategy(vault)
+    strategy_deposit = assets // 2
+    loss = strategy_deposit // 2
+    total_idle = 0
+
+    vault.set_role(
+        gov.address,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
+        sender=gov,
+    )
+    user_deposit(fish, vault, asset, assets)
+    add_strategy_to_vault(gov, liquid_strategy, vault)
+    add_strategy_to_vault(gov, lossy_strategy, vault)
+    add_debt_to_strategy(gov, liquid_strategy, vault, strategy_deposit)
+    add_debt_to_strategy(gov, lossy_strategy, vault, strategy_deposit)
+
+    lossy_strategy.setLoss(gov.address, loss, sender=gov)
+
+    # With a max loss of 100% it should not effect the default returned value
+    assert vault.maxWithdraw(fish.address, 10_000) == assets
+    assert (
+        vault.maxWithdraw(fish.address, 10_000, [liquid_strategy, lossy_strategy])
+        == assets
+    )
+
+    # With a default max_loss of 0 Should return just the first strategies debt
+    assert vault.maxWithdraw(fish.address) == strategy_deposit
+    assert vault.maxWithdraw(fish.address, 0) == strategy_deposit
+    assert (
+        vault.maxWithdraw(fish.address, 0, [liquid_strategy, lossy_strategy])
+        == strategy_deposit
+    )
+    # With a 0 max_loss but the lossy first it should return 0.
+    assert vault.maxWithdraw(fish.address, 0, [lossy_strategy, liquid_strategy]) == 0
+
+
 def test_max_withdraw__with_locked_strategy(
     asset,
     fish,
@@ -373,6 +427,64 @@ def test_max_redeem__with_lossy_strategy(
 
     # Should return just idle if max_loss == 0.
     assert vault.maxRedeem(fish.address, 0) == total_idle
+
+
+# Tests if the first strategy has no losses but the second does
+# maxRedeem will account for the first and not the second.
+def test_max_redeem__with_liquid_and_lossy_strategy(
+    asset,
+    fish,
+    fish_amount,
+    gov,
+    create_vault,
+    create_strategy,
+    create_lossy_strategy,
+    add_debt_to_strategy,
+    add_strategy_to_vault,
+    user_deposit,
+):
+    vault = create_vault(asset)
+    shares = fish_amount
+    assets = shares
+    liquid_strategy = create_strategy(vault)
+    lossy_strategy = create_lossy_strategy(vault)
+    strategy_deposit = assets // 2
+    loss = strategy_deposit // 2
+    total_idle = 0
+
+    vault.set_role(
+        gov.address,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
+        sender=gov,
+    )
+    user_deposit(fish, vault, asset, assets)
+    add_strategy_to_vault(gov, liquid_strategy, vault)
+    add_strategy_to_vault(gov, lossy_strategy, vault)
+    add_debt_to_strategy(gov, liquid_strategy, vault, strategy_deposit)
+    add_debt_to_strategy(gov, lossy_strategy, vault, strategy_deposit)
+
+    lossy_strategy.setLoss(gov.address, loss, sender=gov)
+
+    # With a max loss of 100% it should not effect the default returned value
+    assert vault.maxRedeem(fish.address) == assets
+    assert vault.maxRedeem(fish.address, 10_000) == assets
+    assert (
+        vault.maxRedeem(fish.address, 10_000, [liquid_strategy, lossy_strategy])
+        == assets
+    )
+    assert (
+        vault.maxRedeem(fish.address, 10_000, [lossy_strategy, liquid_strategy])
+        == assets
+    )
+
+    # With a max_loss of 0 Should return just the first strategies debt
+    assert vault.maxRedeem(fish.address, 0) == strategy_deposit
+    assert (
+        vault.maxRedeem(fish.address, 0, [liquid_strategy, lossy_strategy])
+        == strategy_deposit
+    )
+    # With a 0 max_loss but the lossy first it should return 0.
+    assert vault.maxRedeem(fish.address, 0, [lossy_strategy, liquid_strategy]) == 0
 
 
 def test_max_redeem__with_locked_strategy(

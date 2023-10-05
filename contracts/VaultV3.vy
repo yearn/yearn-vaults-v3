@@ -611,8 +611,6 @@ def _max_withdraw(
     # See if we have enough idle to service the withdraw.
     current_idle: uint256 = self.total_idle
     if max_assets > current_idle:
-        # Amount left that we need.
-        needed: uint256 = unsafe_sub(max_assets, current_idle)
         # Track how much we can pull.
         have: uint256 = current_idle
         loss: uint256 = 0
@@ -626,45 +624,51 @@ def _max_withdraw(
             # Can't use an invalid strategy.
             assert self.strategies[strategy].activation != 0, "inactive strategy"
 
-            # Get the maximum amount the vault can withdraw from the strategy.
-            max_withdraw: uint256 = min(needed, self.strategies[strategy].current_debt)
+            # Get the maximum amount the vault would withdraw from the strategy.
+            to_withdraw: uint256 = min(
+                # What we still need for the full withdraw.
+                max_assets - have, 
+                # The current debt the strategy has.
+                self.strategies[strategy].current_debt
+            )
 
             # Get any unrealised loss for the strategy.
-            unrealised_loss: uint256 = self._assess_share_of_unrealised_losses(strategy, max_withdraw)
+            unrealised_loss: uint256 = self._assess_share_of_unrealised_losses(strategy, to_withdraw)
 
             # See if any limit is enforced by the strategy.
             strategy_limit: uint256 = IStrategy(strategy).maxWithdraw(self)
 
             # Adjust accordingly if there is a max withdraw limit.
-            if strategy_limit < max_withdraw - unrealised_loss:
-                # lower unrealised loss to the proportion to the limit.
-                unrealised_loss = unrealised_loss * strategy_limit / max_withdraw
+            if strategy_limit < to_withdraw - unrealised_loss:
+                # lower unrealised loss to the proportional to the limit.
+                unrealised_loss = unrealised_loss * strategy_limit / to_withdraw
                 # Still count the unrealised loss as withdrawable.
-                max_withdraw = strategy_limit + unrealised_loss
+                to_withdraw = strategy_limit + unrealised_loss
 
             # If 0 move on to the next strategy.
-            if max_withdraw == 0:
+            if to_withdraw == 0:
                 continue
 
+            # If there would be a loss with a non-maximum `max_loss` value.
+            if unrealised_loss > 0 and max_loss < MAX_BPS:
+                # Check if the loss is greater than the allowed range.
+                if loss + unrealised_loss > (have + to_withdraw) * max_loss / MAX_BPS:
+                    # If so use the amounts up till now.
+                    break
+
             # Add to what we can pull.
-            have += max_withdraw
-            # Reduce how much we have left.
-            needed -= max_withdraw
+            have += to_withdraw
+
+            # If we have all we need break.
+            if have >= max_assets:
+                break
+
             # Add any unrealised loss to the total
             loss += unrealised_loss
 
-            if needed == 0:
-                break
-
         # Update the max after going through the queue.
+        # In case we broke early or exausted the queue.
         max_assets = have
-
-        # Check if there is a loss and a non-default value was set.
-        if loss > 0 and max_loss < MAX_BPS:
-            # If the loss is not within the allowed range.
-            if loss > max_assets * max_loss / MAX_BPS:
-                # The tx will revert. Can only withdraw idle.
-                max_assets = current_idle
 
     return max_assets
 
