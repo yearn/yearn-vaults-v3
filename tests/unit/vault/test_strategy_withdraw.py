@@ -1328,7 +1328,7 @@ def test_redeem__from_lossy_strategy_with_unrealised_losses(
     assert vault.balanceOf(fish) == 0
 
 
-def test_withdraw__from_lossy_strategy_with_unrealised_losses_and_max_deposit(
+def test_withdraw__from_lossy_strategy_with_unrealised_losses_and_max_redeem(
     gov,
     fish,
     fish_amount,
@@ -1369,6 +1369,14 @@ def test_withdraw__from_lossy_strategy_with_unrealised_losses_and_max_deposit(
     # lose half of assets in lossy strategy
     lossy_strategy.setLoss(gov, amount_to_lose, sender=gov)
     lossy_strategy.setLockedFunds(amount_to_lock, sender=gov)
+
+    with ape.reverts("too much loss"):
+        vault.withdraw(
+            amount_to_withdraw,
+            fish.address,
+            fish.address,
+            sender=fish,
+        )
 
     tx = vault.withdraw(
         amount_to_withdraw,
@@ -1413,7 +1421,7 @@ def test_withdraw__from_lossy_strategy_with_unrealised_losses_and_max_deposit(
     assert vault.balanceOf(fish) == amount - amount_to_withdraw
 
 
-def test_redeem__from_lossy_strategy_with_unrealised_losses_and_max_deposit(
+def test_redeem__from_lossy_strategy_with_unrealised_losses_and_max_redeem(
     gov,
     fish,
     fish_amount,
@@ -1428,8 +1436,10 @@ def test_redeem__from_lossy_strategy_with_unrealised_losses_and_max_deposit(
     vault = create_vault(asset)
     amount = fish_amount
     amount_per_strategy = amount // 2  # deposit all of amount to strategy
-    amount_to_lose = amount_per_strategy // 4  # loss only half of strategy
-    amount_to_lock = (amount_per_strategy - amount_to_lose) // 2
+    amount_to_lose = amount_per_strategy // 4  # loss only quarter of strategy
+    amount_to_lock = (
+        amount_per_strategy - amount_to_lose
+    ) // 2  # lock half of whats left
     amount_to_withdraw = amount * 3 // 4
     shares = amount_to_withdraw
     lossy_strategy = create_lossy_strategy(vault)
@@ -1451,11 +1461,21 @@ def test_redeem__from_lossy_strategy_with_unrealised_losses_and_max_deposit(
         add_strategy_to_vault(gov, strategy, vault)
         add_debt_to_strategy(gov, strategy, vault, amount_per_strategy)
 
-    # lose half of assets in lossy strategy
+    # lose and lock assets in lossy strategy
     lossy_strategy.setLoss(gov, amount_to_lose, sender=gov)
     lossy_strategy.setLockedFunds(amount_to_lock, sender=gov)
 
-    tx = vault.withdraw(
+    with ape.reverts("too much loss"):
+        vault.redeem(
+            shares,
+            fish.address,
+            fish.address,
+            0,
+            [s.address for s in strategies],
+            sender=fish,
+        )
+
+    tx = vault.redeem(
         shares,
         fish.address,
         fish.address,

@@ -6,11 +6,11 @@ from utils.constants import MAX_INT, ZERO_ADDRESS, WEEK, ROLES
 
 def test_deposit__with_invalid_recipient__reverts(fish, asset, create_vault):
     vault = create_vault(asset)
-    amount = 0
+    amount = 1000
 
-    with ape.reverts("invalid recipient"):
+    with ape.reverts("exceed deposit limit"):
         vault.deposit(amount, vault.address, sender=fish)
-    with ape.reverts("invalid recipient"):
+    with ape.reverts("exceed deposit limit"):
         vault.deposit(amount, ZERO_ADDRESS, sender=fish)
 
 
@@ -99,11 +99,11 @@ def test_deposit__with_delegation__deposits_to_delegate(
 
 def test_mint__with_invalid_recipient__reverts(fish, asset, create_vault):
     vault = create_vault(asset)
-    shares = 0
+    shares = 100
 
-    with ape.reverts("invalid recipient"):
+    with ape.reverts("exceed deposit limit"):
         vault.mint(shares, vault.address, sender=fish)
-    with ape.reverts("invalid recipient"):
+    with ape.reverts("exceed deposit limit"):
         vault.mint(shares, ZERO_ADDRESS, sender=fish)
 
 

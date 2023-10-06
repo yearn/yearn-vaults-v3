@@ -215,6 +215,7 @@ def create_vault(project, gov, vault_factory):
             | ROLES.DEBT_MANAGER
             | ROLES.MAX_DEBT_MANAGER
             | ROLES.DEPOSIT_LIMIT_MANAGER
+            | ROLES.WITHDRAW_LIMIT_MANAGER
             | ROLES.MINIMUM_IDLE_MANAGER
             | ROLES.PROFIT_UNLOCK_MANAGER
             | ROLES.DEBT_PURCHASER
@@ -351,6 +352,19 @@ def deploy_faulty_accountant(project, gov):
         return faulty_accountant
 
     yield deploy_faulty_accountant
+
+
+@pytest.fixture(scope="session")
+def deploy_limit_module(project, gov):
+    def deploy_limit_module(
+        deposit_limit=MAX_INT, withdraw_limit=MAX_INT, whitelist=False
+    ):
+        limit_module = gov.deploy(
+            project.LimitModule, deposit_limit, withdraw_limit, whitelist
+        )
+        return limit_module
+
+    yield deploy_limit_module
 
 
 @pytest.fixture(scope="session")
