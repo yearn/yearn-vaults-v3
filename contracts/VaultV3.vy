@@ -459,7 +459,7 @@ def _convert_to_assets(shares: uint256, rounding: Rounding) -> uint256:
     """ 
     assets = shares * (total_assets / total_supply) --- (== price_per_share * shares)
     """
-    if shares == MAX_UINT256:
+    if shares == MAX_UINT256 or shares == 0:
         return shares
 
     total_supply: uint256 = self._total_supply()
@@ -480,7 +480,7 @@ def _convert_to_shares(assets: uint256, rounding: Rounding) -> uint256:
     """
     shares = amount * (total_supply / total_assets) --- (== amount / price_per_share)
     """
-    if assets == MAX_UINT256:
+    if assets == MAX_UINT256 or assets == 0:
         return assets
 
     total_supply: uint256 = self._total_supply()
