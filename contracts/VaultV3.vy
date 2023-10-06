@@ -131,8 +131,8 @@ event UpdateWithdrawLimitModule:
 event UpdateDefaultQueue:
     new_default_queue: DynArray[address, MAX_QUEUE]
 
-event UpdateOverrideQueue:
-    override_queue: bool
+event UpdateUseDefaultQueue:
+    use_default_queue: bool
 
 event UpdatedMaxDebtForStrategy:
     sender: indexed(address)
@@ -221,8 +221,8 @@ FACTORY: public(immutable(address))
 strategies: public(HashMap[address, StrategyParams])
 # The current default withdrawal queue.
 default_queue: public(DynArray[address, MAX_QUEUE])
-# Should custom withdraw queues be overriden
-override_queue: public(bool)
+# Should the vault use the default_queue regardless whats passed in.
+use_default_queue: public(bool)
 
 # ERC20 - amount of shares per account
 balance_of: HashMap[address, uint256]
@@ -831,8 +831,8 @@ def _redeem(
         # Cache the default queue.
         _strategies: DynArray[address, MAX_QUEUE] = self.default_queue
 
-        # If a custom queue was passed, and we dont override it.
-        if len(strategies) != 0 and not self.override_queue:
+        # If a custom queue was passed, and we dont force the default queue.
+        if len(strategies) != 0 and not self.use_default_queue:
                 # Use the custom queue.
                 _strategies = strategies
 
@@ -1367,15 +1367,17 @@ def set_default_queue(new_default_queue: DynArray[address, MAX_QUEUE]):
     log UpdateDefaultQueue(new_default_queue)
 
 @external
-def set_override_queue(override_queue: bool):
+def set_use_default_queue(use_default_queue: bool):
     """
-    @notice Set a new value for `override_queue`.
-    @param override_queue New value.
+    @notice Set a new value for `use_default_queue`.
+    @dev If set `True` the default queue will always be
+        used no matter whats passed in.
+    @param use_default_queue new value.
     """
     self._enforce_role(msg.sender, Roles.QUEUE_MANAGER)
-    self.override_queue = override_queue
+    self.use_default_queue = use_default_queue
 
-    log UpdateOverrideQueue(override_queue)
+    log UpdateUseDefaultQueue(use_default_queue)
 
 @external
 def set_deposit_limit(deposit_limit: uint256):

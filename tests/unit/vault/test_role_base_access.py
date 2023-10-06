@@ -414,9 +414,9 @@ def test_set_default_queue__no_queue_manager__reverts(bunny, vault):
         vault.set_default_queue([], sender=bunny)
 
 
-def test_override_queue__no_queue_manager__reverts(bunny, vault):
+def test_use_default_queue__no_queue_manager__reverts(bunny, vault):
     with ape.reverts("not allowed"):
-        vault.set_override_queue(True, sender=bunny)
+        vault.set_use_default_queue(True, sender=bunny)
 
 
 def test_set_default_queue__queue_manager(gov, vault, strategy, bunny):
@@ -433,7 +433,7 @@ def test_set_default_queue__queue_manager(gov, vault, strategy, bunny):
     assert vault.get_default_queue() == []
 
 
-def test_set_override_queue__queue_manager(gov, vault, strategy, bunny):
+def test_set_use_default_queue__queue_manager(gov, vault, strategy, bunny):
     # We temporarily give bunny the role of DEBT_MANAGER
     tx = vault.set_role(bunny.address, ROLES.QUEUE_MANAGER, sender=gov)
 
@@ -442,13 +442,13 @@ def test_set_override_queue__queue_manager(gov, vault, strategy, bunny):
     assert event[0].account == bunny.address
     assert event[0].role == ROLES.QUEUE_MANAGER
 
-    assert vault.override_queue() == False
-    tx = vault.set_override_queue(True, sender=bunny)
+    assert vault.use_default_queue() == False
+    tx = vault.set_use_default_queue(True, sender=bunny)
 
-    event = list(tx.decode_logs(vault.UpdateOverrideQueue))
+    event = list(tx.decode_logs(vault.UpdateUseDefaultQueue))
     assert len(event) == 1
-    assert event[0].override_queue == True
-    assert vault.override_queue() == True
+    assert event[0].use_default_queue == True
+    assert vault.use_default_queue() == True
 
 
 # PROFIT UNLOCK MANAGER

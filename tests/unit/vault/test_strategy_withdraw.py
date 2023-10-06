@@ -2032,7 +2032,7 @@ def test_withdraw__with_multiple_liquid_strategies_more_assets_than_debt__withdr
     assert asset.balanceOf(fish) == amount
 
 
-def test_withdraw__with_custom_queue_and_override_queue__overrides(
+def test_withdraw__with_custom_queue_and_use_default_queue__overrides(
     gov,
     fish,
     fish_amount,
@@ -2069,7 +2069,7 @@ def test_withdraw__with_custom_queue_and_override_queue__overrides(
         add_debt_to_strategy(gov, strategy, vault, amount_per_strategy)
 
     # Set override to true
-    vault.set_override_queue(True, sender=gov)
+    vault.set_use_default_queue(True, sender=gov)
 
     # Set queue to opposite of the custom one
     vault.set_default_queue([second_strategy, first_strategy], sender=gov)
@@ -2109,7 +2109,7 @@ def test_withdraw__with_custom_queue_and_override_queue__overrides(
     assert vault.balanceOf(fish) > 0
 
 
-def test_redeem__with_custom_queue_and_override_queue__overrides(
+def test_redeem__with_custom_queue_and_use_default_queue__overrides(
     gov,
     fish,
     fish_amount,
@@ -2146,7 +2146,7 @@ def test_redeem__with_custom_queue_and_override_queue__overrides(
         add_debt_to_strategy(gov, strategy, vault, amount_per_strategy)
 
     # Set override to true
-    vault.set_override_queue(True, sender=gov)
+    vault.set_use_default_queue(True, sender=gov)
 
     # Set queue to opposite of the custom one
     vault.set_default_queue([second_strategy, first_strategy], sender=gov)
