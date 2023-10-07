@@ -36,12 +36,13 @@ def deploy_blueprint_and_factory():
     vault_copy = deepcopy(vault)
     blueprint_bytecode = b"\xFE\x71\x00" + HexBytes(
         vault_copy.contract_type.deployment_bytecode.bytecode
-    )  # ERC5202
+    )
     len_bytes = len(blueprint_bytecode).to_bytes(2, "big")
     blueprint_constructor = vault_copy.constructor.encode_input(
         ZERO_ADDRESS, "", "", ZERO_ADDRESS, 0
     )
 
+    # ERC5202
     blueprint_deploy_bytecode = HexBytes(
         b"\x61"
         + len_bytes

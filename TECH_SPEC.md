@@ -57,7 +57,7 @@ Users can redeem their shares at any point in time if there is liquidity availab
 
 Optionally, if the vault management allows, a user can specify a list of strategies to withdraw from. If a list of strategies is passed, the vault will try to withdraw from them.
 
-If a user passed array is not defined or the override_custom_queue flag has been turned on, the redeem function will use the default_queue.
+If a user passed array is not defined or the use_default_queue flag has been turned on, the redeem function will use the default_queue.
 
 In order to properly comply with the ERC-4626 standard and still allow losses, both withdraw and redeem have an additional optional parameter of 'max_loss' that can be used. The default for 'max_loss' is 0 (i.e. revert if any loss) for withdraws, and 10_000 (100%) for redeems.
 
@@ -207,7 +207,7 @@ The QUEUE_MANAGER has the option to set a custom default_queue if desired. The v
 
 All strategies in the default queue must have been previously added to the vault.
 
-The QUEUE_MANAGER can also set the override_custom_queue flag, which will cause the default_queue to be used during every withdraw no matter if a custom queue is passed in.
+The QUEUE_MANAGER can also set the use_default_queue flag, which will cause the default_queue to be used during every withdraw no matter if a custom queue is passed in.
 
 #### Buying Debt
 The DEBT_PURCHASER role can buy debt from the vault in return for the equal amount of `asset`.
