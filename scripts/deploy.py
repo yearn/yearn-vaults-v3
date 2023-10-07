@@ -9,6 +9,7 @@ from copy import deepcopy
 # Add the wallet to use here.
 deployer = accounts.load("")
 
+
 def deploy_blueprint_and_factory():
     print("Deploying Vault Factory on ChainID", chain.chain_id)
 
@@ -17,7 +18,9 @@ def deploy_blueprint_and_factory():
 
     vault_factory = project.VaultFactory
     vault = project.VaultV3
-    deployer_contract = project.IDeployer.at("0x8D85e7c9A4e369E53Acc8d5426aE1568198b0112")
+    deployer_contract = project.IDeployer.at(
+        "0x8D85e7c9A4e369E53Acc8d5426aE1568198b0112"
+    )
     salt_string = "v3.0.1"
 
     # Create a SHA-256 hash object

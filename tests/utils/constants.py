@@ -26,6 +26,7 @@ class ROLES(IntFlag):
     EMERGENCY_MANAGER = 8192
     ALL = 16383
 
+
 class StrategyChangeType(IntFlag):
     ADDED = 1
     REVOKED = 2
