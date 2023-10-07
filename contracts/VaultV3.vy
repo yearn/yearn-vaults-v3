@@ -625,10 +625,13 @@ def _max_withdraw(
         have: uint256 = current_idle
         loss: uint256 = 0
 
-        # If no queue was passed use the default one.
-        _strategies: DynArray[address, MAX_QUEUE] = strategies
-        if len(_strategies) == 0:
-            _strategies = self.default_queue
+        # Cache the default queue.
+        _strategies: DynArray[address, MAX_QUEUE] = self.default_queue
+
+        # If a custom queue was passed, and we dont force the default queue.
+        if len(strategies) != 0 and not self.use_default_queue:
+            # Use the custom queue.
+            _strategies = strategies
 
         for strategy in _strategies:
             # Can't use an invalid strategy.
@@ -833,8 +836,8 @@ def _redeem(
 
         # If a custom queue was passed, and we dont force the default queue.
         if len(strategies) != 0 and not self.use_default_queue:
-                # Use the custom queue.
-                _strategies = strategies
+            # Use the custom queue.
+            _strategies = strategies
 
         # load to memory to save gas
         curr_total_debt: uint256 = self.total_debt
