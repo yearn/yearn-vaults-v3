@@ -2,7 +2,7 @@
   "extends": "solhint:recommended",
   "plugins": ["prettier", "yearn"],
   "rules": {
-    "compiler-version": ["error", "0.8.14"],
+    "compiler-version": ["error", "0.8.18"],
     "code-complexity": "warn",
     "const-name-snakecase": "warn",
     "function-max-lines": "warn",

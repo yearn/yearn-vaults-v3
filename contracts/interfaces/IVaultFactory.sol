@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.14;
+pragma solidity 0.8.18;
 
 interface IVaultFactory {
     event NewVault(address indexed vaultAddress, address indexed asset);

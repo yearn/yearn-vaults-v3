@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.14;
+pragma solidity 0.8.18;
 
 import {ERC4626BaseStrategyMock, IERC20} from "./BaseStrategyMock.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -30,7 +30,11 @@ contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
 
     function totalAssets() public view override returns (uint256) {
         if (withdrawingLoss < 0) {
-            return uint256(int256(IERC20(asset()).balanceOf(address(this))) + withdrawingLoss);
+            return
+                uint256(
+                    int256(IERC20(asset()).balanceOf(address(this))) +
+                        withdrawingLoss
+                );
         } else {
             return super.totalAssets();
         }
@@ -51,18 +55,12 @@ contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
         _burn(_owner, _shares);
         // Withdrawing loss simulates a loss while withdrawing
         IERC20(asset()).safeTransfer(_receiver, toWithdraw);
-        if(withdrawingLoss > 0) {
+        if (withdrawingLoss > 0) {
             // burns (to simulate loss while withdrawing)
             IERC20(asset()).safeTransfer(asset(), uint256(withdrawingLoss));
         }
 
-        emit Withdraw(
-            _caller,
-            _receiver,
-            _owner,
-            toWithdraw,
-            _shares
-        );
+        emit Withdraw(_caller, _receiver, _owner, toWithdraw, _shares);
     }
 
     function _freeFunds(
@@ -74,6 +72,9 @@ contract ERC4626LossyStrategy is ERC4626BaseStrategyMock {
     }
 
     function maxRedeem(address) public view override returns (uint256) {
-        return convertToShares(IERC20(asset()).balanceOf(address(this)) - lockedFunds);
+        return
+            convertToShares(
+                IERC20(asset()).balanceOf(address(this)) - lockedFunds
+            );
     }
 }
