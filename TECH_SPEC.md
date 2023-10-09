@@ -207,14 +207,12 @@ The QUEUE_MANAGER has the option to set a custom default_queue if desired. The v
 
 All strategies in the default queue must have been previously added to the vault.
 
-The QUEUE_MANAGER can also set the use_default_queue flag, which will cause the default_queue to be used during every withdraw no matter if a custom queue is passed in.
+The QUEUE_MANAGER can also set the use_default_queue flag, which will cause the default_queue to be used during every withdraw even if a custom_queue is passed in.
 
 #### Buying Debt
-The DEBT_PURCHASER role can buy debt from the vault in return for the equal amount of `asset`.
+The DEBT_PURCHASER role can buy bad debt from the vault in return for the equal amount of `asset`.
 
-This should only ever be used in the case where governance wants to purchase a set amount of bade debt from the vault in order to not report a loss.
-
-It still relies on convertToShares() so will only be viable if the conversion does not reflect and large negative realized loss from the strategy.
+This should only ever be used in emergencies where governance wants to purchase a set amount of bad debt from the vault in order to not report a loss.
 
 #### Shutting down the vault
 In an emergency the EMERGENCY_MANAGER can shutdown the vault
@@ -222,20 +220,19 @@ In an emergency the EMERGENCY_MANAGER can shutdown the vault
 This will also give the EMERGENCY_MANAGER the DEBT_MANAGER roles as well so funds can start to be returned from the strategies
 
 ## Strategy Minimum API
-Strategies are completely independent smart contracts that can be implemented following the proposed template or in any other way.
+Strategies are completely independent smart contracts that can be implemented following the [Tokenized Strategy](https://github.com/yearn/tokenized-strategy) template or in any other way.
 
 In any case, to be compatible with the vault, they need to implement the following functions, which are a subset of ERC4626 vaults: 
 - asset(): view returning underlying asset
 - totalAssets(): view returning current amount of assets. It can include rewards valued in `asset` ¡
 - maxDeposit(address): view returning the amount max that the strategy can take safely
 - deposit(assets, receiver): deposits `assets` amount of tokens into the strategy. it can be restricted to vault only or be open
-- maxWithdraw(address): view returning how many asset can the vault take from the vault at any given point in time
-- withdraw(assets, receiver, owner): withdraws `assets` amount of tokens from the strategy
 - redeem(shares, receiver, owner): redeems `shares` of the strategy for the underlying asset.
 - balanceOf(address): return the number of shares of the strategy that the address has
-- convertToAssets(shares: uint256): Converts `shares` into the corresponding amount of asset.
-- convertToShares(assets: uint256): Converts `assets` into the corresponding amount of shares.
-- previewWithdraw(assets: uint256): Converst `assets` into the corresponding amount of shares rounding up.
+- convertToAssets(shares): Converts `shares` into the corresponding amount of asset.
+- convertToShares(assets): Converts `assets` into the corresponding amount of shares.
+- previewWithdraw(assets): Converts `assets` into the corresponding amount of shares rounding up.
+- maxRedeem(owner): return the max amount of shares that `owner` can redeem.
 
 This means that the vault can deposit into any ERC4626 vault but also that a non-compliant strategy can be implemented provided that these functions have been implemented (even in a non ERC4626 compliant way). 
 
@@ -246,6 +243,8 @@ The most important implication is that `withdraw` and `redeem` functions as pres
 
 1. max_loss: The amount in basis points that the withdrawer will accept as a loss. I.E. 100 = 1% loss accepted.
 2. strategies: This is an array of strategies to use as the withdrawal queue instead of the default queue.
+
+* `maxWithdraw` and `maxRedeem` also come with both of these optional parameters to get the most exact amounts.
 
 ### Shutdown mode
 In the case the current roles stop fulfilling their responsibilities or something else happens, the EMERGENCY_MANAGER can shutdown the vault.
@@ -263,7 +262,7 @@ Withdrawals can't be paused under any circumstance
 ### Accounting
 Shutdown mode does not affect accounting
 
-### Debt rebalance
+### Debt re-balance
 _Light emergency_: Setting minimumTotalIdle to MAX_UINT256 will result in the vault requesting the debt back from strategies. This would stop new strategies from getting funded too, as the vault prioritizes minimumTotalIdle
 
 _Shutdown mode_: All strategies maxDebt is set to 0. Strategies will return funds as soon as they can.

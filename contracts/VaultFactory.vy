@@ -6,7 +6,7 @@
 @author yearn.finance
 @notice
     This vault Factory can be used by anyone wishing to deploy their own
-    ERC4626 compliant Vault.
+    ERC4626 compliant Yearn V3 Vault of the same API version.
 
     The factory uses the Blueprint (ERC-5202) standard to handle the
     deployment of any new vaults off of the immutable address stored 
@@ -23,9 +23,9 @@
     The factory also holds the protocol fee configs for each vault and strategy
     of its specific `API_VERSION` that determine how much of the fees
     charged are designated "protocol fees" and sent to the designated
-    `fee_recipient`. The protocol fees work through rev share system,
-    where if the vault or strategy determines to charge X amount of total
-    fees during a `report` the protocol fees are X * fee_bps / 10_000.
+    `fee_recipient`. The protocol fees work through a revenue share system,
+    where if the vault or strategy decides to charge X amount of total
+    fees during a `report` the protocol fees are a percent of X.
     The protocol fees will be sent to the designated fee_recipient and
     then (X - protocol_fees) will be sent to the vault/strategy specific
     fee recipient.
