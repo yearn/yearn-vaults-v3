@@ -464,7 +464,7 @@ def _convert_to_assets(shares: uint256, rounding: Rounding) -> uint256:
     """ 
     assets = shares * (total_assets / total_supply) --- (== price_per_share * shares)
     """
-    if shares == MAX_UINT256 or shares == 0:
+    if shares == max_value(uint256) or shares == 0:
         return shares
 
     total_supply: uint256 = self._total_supply()
@@ -485,7 +485,7 @@ def _convert_to_shares(assets: uint256, rounding: Rounding) -> uint256:
     """
     shares = amount * (total_supply / total_assets) --- (== amount / price_per_share)
     """
-    if assets == MAX_UINT256 or assets == 0:
+    if assets == max_value(uint256) or assets == 0:
         return assets
 
     total_supply: uint256 = self._total_supply()
@@ -1408,7 +1408,7 @@ def set_deposit_limit_module(deposit_limit_module: address):
     """
     assert self.shutdown == False # Dev: shutdown
     self._enforce_role(msg.sender, Roles.DEPOSIT_LIMIT_MANAGER)
-    assert self.deposit_limit == MAX_UINT256, "using deposit limit"
+    assert self.deposit_limit == max_value(uint256), "using deposit limit"
 
     self.deposit_limit_module = deposit_limit_module
 
