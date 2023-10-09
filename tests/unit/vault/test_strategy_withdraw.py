@@ -2030,3 +2030,191 @@ def test_withdraw__with_multiple_liquid_strategies_more_assets_than_debt__withdr
     assert asset.balanceOf(first_strategy) == profit
     assert asset.balanceOf(second_strategy) == 0
     assert asset.balanceOf(fish) == amount
+
+
+def test_withdraw__with_custom_queue_and_use_default_queue__overrides(
+    gov,
+    fish,
+    fish_amount,
+    asset,
+    create_vault,
+    create_strategy,
+    user_deposit,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+):
+    vault = create_vault(asset)
+    amount = fish_amount
+    amount_per_strategy = amount // 2  # deposit half of amount per strategy
+    shares = amount // 2
+    first_strategy = create_strategy(vault)
+    second_strategy = create_strategy(vault)
+    strategies = [first_strategy, second_strategy]
+    max_loss = 0
+
+    # deposit assets to vault
+    user_deposit(fish, vault, asset, amount)
+
+    # set up strategies
+    vault.set_role(
+        gov.address,
+        ROLES.ADD_STRATEGY_MANAGER
+        | ROLES.DEBT_MANAGER
+        | ROLES.MAX_DEBT_MANAGER
+        | ROLES.QUEUE_MANAGER,
+        sender=gov,
+    )
+    for strategy in strategies:
+        add_strategy_to_vault(gov, strategy, vault)
+        add_debt_to_strategy(gov, strategy, vault, amount_per_strategy)
+
+    # Set override to true
+    vault.set_use_default_queue(True, sender=gov)
+
+    # Set queue to opposite of the custom one
+    vault.set_default_queue([second_strategy, first_strategy], sender=gov)
+
+    tx = vault.withdraw(
+        shares,
+        fish.address,
+        fish.address,
+        max_loss,
+        [s.address for s in strategies],
+        sender=fish,
+    )
+    event = list(tx.decode_logs(vault.Withdraw))
+
+    assert len(event) >= 1
+    n = len(event) - 1
+    assert event[n].sender == fish
+    assert event[n].receiver == fish
+    assert event[n].owner == fish
+    assert event[n].shares == shares
+    assert event[n].assets == shares
+
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    # Should have only withdrawn from second strategy
+    assert len(event) == 1
+    assert event[0].strategy == second_strategy.address
+    assert event[0].current_debt == amount_per_strategy
+    assert event[0].new_debt == 0
+
+    assert vault.strategies(first_strategy)["current_debt"] == amount_per_strategy
+    assert vault.strategies(second_strategy)["current_debt"] == 0
+    assert asset.balanceOf(vault) == 0
+    assert asset.balanceOf(first_strategy) == amount_per_strategy
+    assert asset.balanceOf(second_strategy) == 0
+    assert asset.balanceOf(fish) == shares
+    assert vault.balanceOf(fish) > 0
+
+
+def test_redeem__with_custom_queue_and_use_default_queue__overrides(
+    gov,
+    fish,
+    fish_amount,
+    asset,
+    create_vault,
+    create_strategy,
+    user_deposit,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+):
+    vault = create_vault(asset)
+    amount = fish_amount
+    amount_per_strategy = amount // 2  # deposit half of amount per strategy
+    shares = amount // 2
+    first_strategy = create_strategy(vault)
+    second_strategy = create_strategy(vault)
+    strategies = [first_strategy, second_strategy]
+    max_loss = 0
+
+    # deposit assets to vault
+    user_deposit(fish, vault, asset, amount)
+
+    # set up strategies
+    vault.set_role(
+        gov.address,
+        ROLES.ADD_STRATEGY_MANAGER
+        | ROLES.DEBT_MANAGER
+        | ROLES.MAX_DEBT_MANAGER
+        | ROLES.QUEUE_MANAGER,
+        sender=gov,
+    )
+    for strategy in strategies:
+        add_strategy_to_vault(gov, strategy, vault)
+        add_debt_to_strategy(gov, strategy, vault, amount_per_strategy)
+
+    # Set override to true
+    vault.set_use_default_queue(True, sender=gov)
+
+    # Set queue to opposite of the custom one
+    vault.set_default_queue([second_strategy, first_strategy], sender=gov)
+
+    tx = vault.redeem(
+        shares,
+        fish.address,
+        fish.address,
+        max_loss,
+        [s.address for s in strategies],
+        sender=fish,
+    )
+    event = list(tx.decode_logs(vault.Withdraw))
+
+    assert len(event) >= 1
+    n = len(event) - 1
+    assert event[n].sender == fish
+    assert event[n].receiver == fish
+    assert event[n].owner == fish
+    assert event[n].shares == shares
+    assert event[n].assets == shares
+
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    # Should have only withdrawn from second strategy
+    assert len(event) == 1
+    assert event[0].strategy == second_strategy.address
+    assert event[0].current_debt == amount_per_strategy
+    assert event[0].new_debt == 0
+
+    assert vault.strategies(first_strategy)["current_debt"] == amount_per_strategy
+    assert vault.strategies(second_strategy)["current_debt"] == 0
+    assert asset.balanceOf(vault) == 0
+    assert asset.balanceOf(first_strategy) == amount_per_strategy
+    assert asset.balanceOf(second_strategy) == 0
+    assert asset.balanceOf(fish) == shares
+    assert vault.balanceOf(fish) > 0
+
+
+def test_withdraw__with_max_loss_too_high__reverts(
+    fish, fish_amount, asset, create_vault
+):
+    vault = create_vault(asset)
+    amount = fish_amount
+    max_loss = 10_001
+
+    with ape.reverts("max loss"):
+        vault.withdraw(
+            amount,
+            fish.address,
+            fish.address,
+            max_loss,
+            sender=fish,
+        )
+
+
+def test_redeem__with_max_loss_too_high__reverts(
+    fish, fish_amount, asset, create_vault
+):
+    vault = create_vault(asset)
+    shares = fish_amount
+    max_loss = 10_001
+
+    with ape.reverts("max loss"):
+        vault.redeem(
+            shares,
+            fish.address,
+            fish.address,
+            max_loss,
+            sender=fish,
+        )

@@ -131,6 +131,9 @@ event UpdateWithdrawLimitModule:
 event UpdateDefaultQueue:
     new_default_queue: DynArray[address, MAX_QUEUE]
 
+event UpdateUseDefaultQueue:
+    use_default_queue: bool
+
 event UpdatedMaxDebtForStrategy:
     sender: indexed(address)
     strategy: indexed(address)
@@ -218,6 +221,8 @@ FACTORY: public(immutable(address))
 strategies: public(HashMap[address, StrategyParams])
 # The current default withdrawal queue.
 default_queue: public(DynArray[address, MAX_QUEUE])
+# Should the vault use the default_queue regardless whats passed in.
+use_default_queue: public(bool)
 
 # ERC20 - amount of shares per account
 balance_of: HashMap[address, uint256]
@@ -459,7 +464,7 @@ def _convert_to_assets(shares: uint256, rounding: Rounding) -> uint256:
     """ 
     assets = shares * (total_assets / total_supply) --- (== price_per_share * shares)
     """
-    if shares == MAX_UINT256 or shares == 0:
+    if shares == max_value(uint256) or shares == 0:
         return shares
 
     total_supply: uint256 = self._total_supply()
@@ -480,7 +485,7 @@ def _convert_to_shares(assets: uint256, rounding: Rounding) -> uint256:
     """
     shares = amount * (total_supply / total_assets) --- (== amount / price_per_share)
     """
-    if assets == MAX_UINT256 or assets == 0:
+    if assets == max_value(uint256) or assets == 0:
         return assets
 
     total_supply: uint256 = self._total_supply()
@@ -620,10 +625,13 @@ def _max_withdraw(
         have: uint256 = current_idle
         loss: uint256 = 0
 
-        # If no queue was passed use the default one.
-        _strategies: DynArray[address, MAX_QUEUE] = strategies
-        if len(_strategies) == 0:
-            _strategies = self.default_queue
+        # Cache the default queue.
+        _strategies: DynArray[address, MAX_QUEUE] = self.default_queue
+
+        # If a custom queue was passed, and we dont force the default queue.
+        if len(strategies) != 0 and not self.use_default_queue:
+            # Use the custom queue.
+            _strategies = strategies
 
         for strategy in _strategies:
             # Can't use an invalid strategy.
@@ -798,6 +806,7 @@ def _redeem(
     to the user that is redeeming their vault shares.
     """
     assert receiver != empty(address), "ZERO ADDRESS"
+    assert max_loss <= MAX_BPS, "max loss"
 
     # If there is a withdraw limit module, check the max.
     if self.withdraw_limit_module != empty(address):
@@ -822,13 +831,13 @@ def _redeem(
     # funds from strategies.
     if requested_assets > curr_total_idle:
 
-        # Cache the input withdrawal queue.
-        _strategies: DynArray[address, MAX_QUEUE] = strategies
+        # Cache the default queue.
+        _strategies: DynArray[address, MAX_QUEUE] = self.default_queue
 
-        # If no queue was passed.
-        if len(_strategies) == 0:
-                # Use the default queue.
-                _strategies = self.default_queue
+        # If a custom queue was passed, and we dont force the default queue.
+        if len(strategies) != 0 and not self.use_default_queue:
+            # Use the custom queue.
+            _strategies = strategies
 
         # load to memory to save gas
         curr_total_debt: uint256 = self.total_debt
@@ -1361,6 +1370,19 @@ def set_default_queue(new_default_queue: DynArray[address, MAX_QUEUE]):
     log UpdateDefaultQueue(new_default_queue)
 
 @external
+def set_use_default_queue(use_default_queue: bool):
+    """
+    @notice Set a new value for `use_default_queue`.
+    @dev If set `True` the default queue will always be
+        used no matter whats passed in.
+    @param use_default_queue new value.
+    """
+    self._enforce_role(msg.sender, Roles.QUEUE_MANAGER)
+    self.use_default_queue = use_default_queue
+
+    log UpdateUseDefaultQueue(use_default_queue)
+
+@external
 def set_deposit_limit(deposit_limit: uint256):
     """
     @notice Set the new deposit limit.
@@ -1386,7 +1408,7 @@ def set_deposit_limit_module(deposit_limit_module: address):
     """
     assert self.shutdown == False # Dev: shutdown
     self._enforce_role(msg.sender, Roles.DEPOSIT_LIMIT_MANAGER)
-    assert self.deposit_limit == MAX_UINT256, "using deposit limit"
+    assert self.deposit_limit == max_value(uint256), "using deposit limit"
 
     self.deposit_limit_module = deposit_limit_module
 

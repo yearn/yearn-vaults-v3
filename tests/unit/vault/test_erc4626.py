@@ -310,6 +310,53 @@ def test_max_withdraw__with_locked_strategy(
     assert vault.maxWithdraw(fish.address) == assets - locked
 
 
+def test_max_withdraw__with_use_default_queue(
+    asset,
+    fish,
+    fish_amount,
+    gov,
+    create_vault,
+    create_strategy,
+    add_debt_to_strategy,
+    add_strategy_to_vault,
+    user_deposit,
+):
+    vault = create_vault(asset)
+    shares = fish_amount
+    assets = shares
+    strategy = create_strategy(vault)
+    strategy_deposit = assets
+    total_idle = assets - strategy_deposit
+
+    vault.set_role(
+        gov.address,
+        ROLES.ADD_STRATEGY_MANAGER
+        | ROLES.DEBT_MANAGER
+        | ROLES.MAX_DEBT_MANAGER
+        | ROLES.QUEUE_MANAGER,
+        sender=gov,
+    )
+    user_deposit(fish, vault, asset, assets)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, strategy_deposit)
+
+    assert vault.maxWithdraw(fish.address) == assets
+    assert vault.maxWithdraw(fish.address, 22) == assets
+    assert vault.maxWithdraw(fish.address, 22, [strategy]) == assets
+    # Using an inactive strategy will revert.
+    with ape.reverts("inactive strategy"):
+        vault.maxWithdraw(fish.address, 22, [vault])
+
+    # Set use_default_queue to true
+    vault.set_use_default_queue(True, sender=gov)
+
+    assert vault.maxWithdraw(fish.address) == assets
+    assert vault.maxWithdraw(fish.address, 22) == assets
+    assert vault.maxWithdraw(fish.address, 22, [strategy]) == assets
+    # Even sending an inactive strategy will return the correct amount.
+    assert vault.maxWithdraw(fish.address, 22, [vault]) == assets
+
+
 def test_preview_redeem(asset, fish, fish_amount, create_vault, user_deposit):
     vault = create_vault(asset)
     shares = fish_amount
@@ -518,6 +565,53 @@ def test_max_redeem__with_locked_strategy(
     strategy.setLockedFunds(locked, DAY, sender=gov)
 
     assert vault.maxRedeem(fish.address) == assets - locked
+
+
+def test_max_redeem__with_use_default_queue(
+    asset,
+    fish,
+    fish_amount,
+    gov,
+    create_vault,
+    create_strategy,
+    add_debt_to_strategy,
+    add_strategy_to_vault,
+    user_deposit,
+):
+    vault = create_vault(asset)
+    shares = fish_amount
+    assets = shares
+    strategy = create_strategy(vault)
+    strategy_deposit = assets
+    total_idle = assets - strategy_deposit
+
+    vault.set_role(
+        gov.address,
+        ROLES.ADD_STRATEGY_MANAGER
+        | ROLES.DEBT_MANAGER
+        | ROLES.MAX_DEBT_MANAGER
+        | ROLES.QUEUE_MANAGER,
+        sender=gov,
+    )
+    user_deposit(fish, vault, asset, assets)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, strategy_deposit)
+
+    assert vault.maxRedeem(fish.address) == assets
+    assert vault.maxRedeem(fish.address, 22) == assets
+    assert vault.maxRedeem(fish.address, 22, [strategy]) == assets
+    # Using an inactive strategy will revert.
+    with ape.reverts("inactive strategy"):
+        vault.maxRedeem(fish.address, 22, [vault])
+
+    # Set use_default_queue to true
+    vault.set_use_default_queue(True, sender=gov)
+
+    assert vault.maxRedeem(fish.address) == assets
+    assert vault.maxRedeem(fish.address, 22) == assets
+    assert vault.maxRedeem(fish.address, 22, [strategy]) == assets
+    # Even sending an inactive strategy will return the correct amount.
+    assert vault.maxRedeem(fish.address, 22, [vault]) == assets
 
 
 # With limit modules
