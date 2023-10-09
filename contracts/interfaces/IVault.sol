@@ -23,10 +23,11 @@ interface IVault is IERC4626 {
     );
     // ROLE UPDATES
     event RoleSet(address indexed account, uint256 role);
-    event RoleStatusChanged(uint256 role, uint256 indexed status);
+    event RoleStatusChanged(uint256 role, uint256 status);
     event UpdateRoleManager(address indexed role_manager);
     event UpdateAccountant(address indexed accountant);
-    event UpdateDefaultQueue(address[] indexed new_default_queue);
+    event UpdateDefaultQueue(address[] new_default_queue);
+    event UpdateUseDefaultQueue(bool use_default_queue);
     event UpdatedMaxDebtForStrategy(
         address indexed sender,
         address indexed strategy,
@@ -51,11 +52,17 @@ interface IVault is IERC4626 {
 
     function default_queue(uint256) external view returns (address);
 
+    function use_default_queue() external view returns (bool);
+
     function total_supply() external view returns (uint256);
 
     function minimum_total_idle() external view returns (uint256);
 
     function deposit_limit() external view returns (uint256);
+
+    function deposit_limit_module() external view returns (address);
+
+    function withdraw_limit_module() external view returns (address);
 
     function accountant() external view returns (address);
 
@@ -69,11 +76,23 @@ interface IVault is IERC4626 {
 
     function shutdown() external view returns (bool);
 
+    function nonces(address) external view returns (uint256);
+
     function set_accountant(address new_accountant) external;
 
     function set_default_queue(address[] memory new_default_queue) external;
 
+    function set_use_default_queue(bool) external;
+
     function set_deposit_limit(uint256 deposit_limit) external;
+
+    function set_deposit_limit_module(
+        address new_deposit_limit_module
+    ) external;
+
+    function set_withdraw_limit_module(
+        address new_withdraw_limit_module
+    ) external;
 
     function set_minimum_total_idle(uint256 minimum_total_idle) external;
 
@@ -81,9 +100,11 @@ interface IVault is IERC4626 {
         uint256 new_profit_max_unlock_time
     ) external;
 
-    function _enforce_role(address account, uint256 role) external;
-
     function set_role(address account, uint256 role) external;
+
+    function add_role(address account, uint256 role) external;
+
+    function remove_role(address account, uint256 role) external;
 
     function set_open_role(uint256 role) external;
 
@@ -123,6 +144,8 @@ interface IVault is IERC4626 {
 
     function shutdown_vault() external;
 
+    //// NON-STANDARD ERC-4626 FUNCTIONS \\\\
+
     function withdraw(
         uint256 assets,
         address receiver,
@@ -153,24 +176,29 @@ interface IVault is IERC4626 {
         address[] memory strategies
     ) external returns (uint256);
 
-    function totalIdle() external view returns (uint256);
-
-    function totalDebt() external view returns (uint256);
-
-    function api_version() external view returns (string memory);
-
-    function assess_share_of_unrealised_losses(
-        address strategy,
-        uint256 assets_needed
+    function maxWithdraw(
+        address owner,
+        uint256 max_loss
     ) external view returns (uint256);
 
-    function profitMaxUnlockTime() external view returns (uint256);
+    function maxWithdraw(
+        address owner,
+        uint256 max_loss,
+        address[] memory strategies
+    ) external view returns (uint256);
 
-    function fullProfitUnlockDate() external view returns (uint256);
+    function maxRedeem(
+        address owner,
+        uint256 max_loss
+    ) external view returns (uint256);
 
-    function profitUnlockingRate() external view returns (uint256);
+    function maxRedeem(
+        address owner,
+        uint256 max_loss,
+        address[] memory strategies
+    ) external view returns (uint256);
 
-    function lastProfitUpdate() external view returns (uint256);
+    //// NON-STANDARD ERC-20 FUNCTIONS \\\\
 
     function increaseAllowance(
         address spender,
@@ -194,5 +222,22 @@ interface IVault is IERC4626 {
         bytes32 s
     ) external returns (bool);
 
-    function nonces(address) external view returns (uint256);
+    function totalIdle() external view returns (uint256);
+
+    function totalDebt() external view returns (uint256);
+
+    function api_version() external view returns (string memory);
+
+    function assess_share_of_unrealised_losses(
+        address strategy,
+        uint256 assets_needed
+    ) external view returns (uint256);
+
+    function profitMaxUnlockTime() external view returns (uint256);
+
+    function fullProfitUnlockDate() external view returns (uint256);
+
+    function profitUnlockingRate() external view returns (uint256);
+
+    function lastProfitUpdate() external view returns (uint256);
 }

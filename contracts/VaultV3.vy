@@ -1584,7 +1584,7 @@ def pricePerShare() -> uint256:
 
 @view
 @external
-def get_default_queue() -> DynArray[address, 10]:
+def get_default_queue() -> DynArray[address, MAX_QUEUE]:
     """
     @notice Get the full default queue currently set.
     @return The current default withdrawal queue.
