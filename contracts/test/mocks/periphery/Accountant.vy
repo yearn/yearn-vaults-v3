@@ -92,7 +92,7 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
         if total_fees > maximum_fee:
             return (maximum_fee, 0)
     else:
-        # Now taking loss from its own funds. In the future versions could be from different mecanisms
+        # Now taking loss from its own funds. In the future versions could be from different mechanisms
         asset_balance: uint256= ERC20(self.asset).balanceOf(self)
         refund_ratio: uint256 = self.refund_ratios[strategy]
         total_refunds = loss * refund_ratio / MAX_BPS

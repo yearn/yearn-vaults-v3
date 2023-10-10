@@ -100,7 +100,7 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
         total_fees += (gain * fee.performance_fee) / MAX_BPS
         total_refunds = min(asset_balance, gain * refund_ratio / MAX_BPS)
     else:
-        # Now taking loss from its own funds. In the future versions could be from different mecanisms
+        # Now taking loss from its own funds. In the future versions could be from different mechanisms
         total_refunds = min(asset_balance, loss * refund_ratio / MAX_BPS)
         
     # accountant will deposit whatever it needs to avoid complex math in tests

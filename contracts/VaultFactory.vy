@@ -14,7 +14,7 @@
     initialized fully on-chain with their init byte code, thus not 
     requiring any delegatecall patterns or post deployment initialization.
     The deployments are done through create2 with a specific `salt` 
-    that is derived from a combination of the deployers address,
+    that is derived from a combination of the deployer's address,
     the underlying asset used, as well as the name and symbol specified.
     Meaning a deployer will not be able to deploy the exact same vault
     twice and will need to use different name and or symbols for vaults
@@ -178,7 +178,7 @@ def set_protocol_fee_bps(new_protocol_fee_bps: uint16):
     """
     @notice Set the protocol fee in basis points
     @dev Must be below the max allowed fee, and a default
-    fee_recipient must be set so we don't issue fees to the 0 addresss.
+    fee_recipient must be set so we don't issue fees to the 0 address.
     @param new_protocol_fee_bps The new protocol fee in basis points
     """
     assert msg.sender == self.governance, "not governance"
@@ -196,7 +196,7 @@ def set_protocol_fee_bps(new_protocol_fee_bps: uint16):
 def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
     """
     @notice Set the protocol fee recipient
-    @dev Can never be set to 0 to avoid issuing fees to the 0 addresss.
+    @dev Can never be set to 0 to avoid issuing fees to the 0 address.
     @param new_protocol_fee_recipient The new protocol fee recipient
     """
     assert msg.sender == self.governance, "not governance"
@@ -215,7 +215,7 @@ def set_custom_protocol_fee_bps(vault: address, new_custom_protocol_fee: uint16)
     @notice Allows Governance to set custom protocol fees
     for a specific vault or strategy.
     @dev Must be below the max allowed fee, and a default
-    fee_recipient must be set so we don't issue fees to the 0 addresss.
+    fee_recipient must be set so we don't issue fees to the 0 address.
     @param vault The address of the vault or strategy to customize.
     @param new_custom_protocol_fee The custom protocol fee in BPS.
     """

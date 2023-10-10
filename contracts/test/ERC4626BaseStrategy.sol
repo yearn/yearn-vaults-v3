@@ -45,15 +45,11 @@ abstract contract ERC4626BaseStrategy is ERC4626 {
     // TODO: add roles (including vault)
     // TODO: should we force invest and freeFunds to be in deposit and withdraw functions?
 
-    function invest() external virtual {
-        // TODO: add permissioning ?
-    }
+    function invest() external virtual {}
 
     function freeFunds(
         uint256 _amount
-    ) external virtual returns (uint256 _freedFunds) {
-        // TODO: add permissioning ?
-    }
+    ) external virtual returns (uint256 _freedFunds) {}
 
     function _invest() internal virtual;
 
@@ -61,8 +57,5 @@ abstract contract ERC4626BaseStrategy is ERC4626 {
         uint256 _amount
     ) internal virtual returns (uint256 amountFreed);
 
-    function sweep(address _token) external {
-        // TODO: add permissioning
-        // TODO: add logic
-    }
+    function sweep(address _token) external {}
 }

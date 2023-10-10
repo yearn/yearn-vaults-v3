@@ -6,6 +6,8 @@
     "code-complexity": "warn",
     "const-name-snakecase": "warn",
     "function-max-lines": "warn",
+    "func-name-mixedcase": "off",
+    "var-name-mixedcase": "off",
     "func-visibility": ["warn", { "ignoreConstructors": true }],
     "max-line-length": ["warn", 160],
     "avoid-suicide": "error",
