@@ -25,6 +25,7 @@ interface IVault is IERC4626 {
     event RoleSet(address indexed account, uint256 role);
     event RoleStatusChanged(uint256 role, uint256 status);
     event UpdateRoleManager(address indexed role_manager);
+
     event UpdateAccountant(address indexed accountant);
     event UpdateDefaultQueue(address[] new_default_queue);
     event UpdateUseDefaultQueue(bool use_default_queue);
@@ -144,6 +145,25 @@ interface IVault is IERC4626 {
 
     function shutdown_vault() external;
 
+    function totalIdle() external view returns (uint256);
+
+    function totalDebt() external view returns (uint256);
+
+    function api_version() external view returns (string memory);
+
+    function assess_share_of_unrealised_losses(
+        address strategy,
+        uint256 assets_needed
+    ) external view returns (uint256);
+
+    function profitMaxUnlockTime() external view returns (uint256);
+
+    function fullProfitUnlockDate() external view returns (uint256);
+
+    function profitUnlockingRate() external view returns (uint256);
+
+    function lastProfitUpdate() external view returns (uint256);
+
     //// NON-STANDARD ERC-4626 FUNCTIONS \\\\
 
     function withdraw(
@@ -221,23 +241,4 @@ interface IVault is IERC4626 {
         bytes32 r,
         bytes32 s
     ) external returns (bool);
-
-    function totalIdle() external view returns (uint256);
-
-    function totalDebt() external view returns (uint256);
-
-    function api_version() external view returns (string memory);
-
-    function assess_share_of_unrealised_losses(
-        address strategy,
-        uint256 assets_needed
-    ) external view returns (uint256);
-
-    function profitMaxUnlockTime() external view returns (uint256);
-
-    function fullProfitUnlockDate() external view returns (uint256);
-
-    function profitUnlockingRate() external view returns (uint256);
-
-    function lastProfitUpdate() external view returns (uint256);
 }

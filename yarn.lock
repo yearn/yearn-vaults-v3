@@ -2404,10 +2404,10 @@ solc@0.7.3:
     semver "^5.5.0"
     tmp "0.0.33"
 
-solc@^0.8.18:
-  version "0.8.21"
-  resolved "https://registry.yarnpkg.com/solc/-/solc-0.8.21.tgz#c3cd505c360ea2fa0eaa5ab574ef96bffb1a2766"
-  integrity sha512-N55ogy2dkTRwiONbj4e6wMZqUNaLZkiRcjGyeafjLYzo/tf/IvhHY5P5wpe+H3Fubh9idu071i8eOGO31s1ylg==
+solc@0.8.18:
+  version "0.8.18"
+  resolved "https://registry.yarnpkg.com/solc/-/solc-0.8.18.tgz#a05ce8918540eda5f10aa91f0f52f239b9645dad"
+  integrity sha512-wVAa2Y3BYd64Aby5LsgS3g6YC2NvZ3bJ+A8TAIAukfVuQb3AjyGrLZpyxQk5YLn14G35uZtSnIgHEpab9klOLQ==
   dependencies:
     command-exists "^1.2.8"
     commander "^8.1.0"
