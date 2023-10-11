@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.14;
+pragma solidity 0.8.18;
 
 import {ERC4626BaseStrategyMock, IERC20} from "./BaseStrategyMock.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -24,12 +24,5 @@ contract ERC4626LiquidStrategy is ERC4626BaseStrategyMock {
         address _owner
     ) public view override returns (uint256) {
         return _convertToAssets(balanceOf(_owner), Math.Rounding.Down);
-    }
-
-    function migrate(address _newStrategy) external override {
-        IERC20(asset()).safeTransfer(
-            _newStrategy,
-            IERC20(asset()).balanceOf(address(this))
-        );
     }
 }

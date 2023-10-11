@@ -174,7 +174,7 @@ MAX_BPS: constant(uint256) = 10_000
 # Extended for profit locking calculations.
 MAX_BPS_EXTENDED: constant(uint256) = 1_000_000_000_000
 # The version of this vault.
-API_VERSION: constant(String[28]) = "3.0.0"
+API_VERSION: constant(String[28]) = "3.0.1"
 
 # ENUMS #
 # Each permissioned function has its own Role.
@@ -427,7 +427,7 @@ def _unlocked_shares() -> uint256:
 @view
 @internal
 def _total_supply() -> uint256:
-    # Need to account for the shares issued to the vault that have unlockded.
+    # Need to account for the shares issued to the vault that have unlocked.
     return self.total_supply - self._unlocked_shares()
 
 @internal
@@ -551,7 +551,7 @@ def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
         # If total_supply > 0 but amount = totalAssets we want to revert because
         # after first deposit, getting here would mean that the rest of the shares
         # would be diluted to a price_per_share of 0. Issuing shares would then mean
-        # either the new depositer or the previous depositers will loose money.
+        # either the new depositor or the previous depositors will loose money.
         assert total_assets > amount, "amount too high"
   
     # We don't make the function revert
@@ -628,7 +628,7 @@ def _max_withdraw(
         # Cache the default queue.
         _strategies: DynArray[address, MAX_QUEUE] = self.default_queue
 
-        # If a custom queue was passed, and we dont force the default queue.
+        # If a custom queue was passed, and we don't force the default queue.
         if len(strategies) != 0 and not self.use_default_queue:
             # Use the custom queue.
             _strategies = strategies
@@ -682,7 +682,7 @@ def _max_withdraw(
             loss += unrealised_loss
 
         # Update the max after going through the queue.
-        # In case we broke early or exausted the queue.
+        # In case we broke early or exhausted the queue.
         max_assets = have
 
     return max_assets
@@ -770,7 +770,7 @@ def _withdraw_from_strategy(strategy: address, assets_to_withdraw: uint256):
     This takes the amount denominated in asset and performs a {redeem}
     with the corresponding amount of shares.
 
-    We use {redeem} to natively take on losses without aditional non-4626 standard parameters.
+    We use {redeem} to natively take on losses without additional non-4626 standard parameters.
     """
     # Need to get shares since we use redeem to be able to take on losses.
     shares_to_redeem: uint256 = min(
@@ -796,7 +796,7 @@ def _redeem(
     This will attempt to free up the full amount of assets equivalent to
     `shares_to_burn` and transfer them to the `receiver`. If the vault does
     not have enough idle funds it will go through any strategies provided by
-    either the withdrawer or the queue_manaager to free up enough funds to 
+    either the withdrawer or the queue_manager to free up enough funds to 
     service the request.
 
     The vault will attempt to account for any unrealized losses taken on from
@@ -834,7 +834,7 @@ def _redeem(
         # Cache the default queue.
         _strategies: DynArray[address, MAX_QUEUE] = self.default_queue
 
-        # If a custom queue was passed, and we dont force the default queue.
+        # If a custom queue was passed, and we don't force the default queue.
         if len(strategies) != 0 and not self.use_default_queue:
             # Use the custom queue.
             _strategies = strategies
@@ -882,7 +882,7 @@ def _redeem(
                     wanted: uint256 = assets_to_withdraw - unrealised_losses_share
                     # Get the proportion of unrealised comparing what we want vs. what we can get
                     unrealised_losses_share = unrealised_losses_share * max_withdraw / wanted
-                    # Adjust assets_to_withdraw so all future calcultations work correctly
+                    # Adjust assets_to_withdraw so all future calculations work correctly
                     assets_to_withdraw = max_withdraw + unrealised_losses_share
                 
                 # User now "needs" less assets to be unlocked (as he took some as losses)
@@ -920,7 +920,7 @@ def _redeem(
             loss: uint256 = 0
             # Check if we redeemed too much.
             if withdrawn > assets_to_withdraw:
-                # Make sure we don't underlfow in debt updates.
+                # Make sure we don't underflow in debt updates.
                 if withdrawn > current_debt:
                     # Can't withdraw more than our debt.
                     assets_to_withdraw = current_debt
@@ -1014,7 +1014,7 @@ def _revoke_strategy(strategy: address, force: bool=False):
 
         log StrategyReported(strategy, 0, loss, 0, 0, 0, 0)
 
-    # Set strategy params all back to 0 (WARNING: it can be readded).
+    # Set strategy params all back to 0 (WARNING: it can be re-added).
     self.strategies[strategy] = StrategyParams({
       activation: 0,
       last_report: 0,
@@ -1187,7 +1187,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Burn shares that have been unlocked since the last update
     self._burn_unlocked_shares()
 
-    # Vault asseses profits using 4626 compliant interface. 
+    # Vault assesses profits using 4626 compliant interface. 
     # NOTE: It is important that a strategies `convertToAssets` implementation
     # cannot be manipulated or else the vault could report incorrect gains/losses.
     strategy_shares: uint256 = IStrategy(strategy).balanceOf(self)
@@ -1229,7 +1229,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
                 # Protocol fees are a percent of the fees the accountant is charging.
                 protocol_fees = total_fees * convert(protocol_fee_bps, uint256) / MAX_BPS
 
-    # `shares_to_burn` is derived from amounts that would reduce the vaullts PPS.
+    # `shares_to_burn` is derived from amounts that would reduce the vaults PPS.
     # NOTE: this needs to be done before any pps changes
     shares_to_burn: uint256 = 0
     accountant_fees_shares: uint256 = 0
@@ -1273,12 +1273,12 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self.total_debt -= loss
 
     # NOTE: should be precise (no new unlocked shares due to above's burn of shares)
-    # newly_locked_shares have already been minted / transfered to the vault, so they need to be substracted
+    # newly_locked_shares have already been minted / transferred to the vault, so they need to be subtracted
     # no risk of underflow because they have just been minted.
     previously_locked_shares: uint256 = self.balance_of[self] - newly_locked_shares
 
     # Now that pps has updated, we can burn the shares we intended to burn as a result of losses/fees.
-    # NOTE: If a value reduction (losses / fees) has occured, prioritize burning locked profit to avoid
+    # NOTE: If a value reduction (losses / fees) has occurred, prioritize burning locked profit to avoid
     # negative impact on price per share. Price per share is reduced only if losses exceed locked value.
     if shares_to_burn > 0:
         # Cant burn more than the vault owns.
@@ -1584,7 +1584,7 @@ def pricePerShare() -> uint256:
 
 @view
 @external
-def get_default_queue() -> DynArray[address, 10]:
+def get_default_queue() -> DynArray[address, MAX_QUEUE]:
     """
     @notice Get the full default queue currently set.
     @return The current default withdrawal queue.

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.14;
+pragma solidity 0.8.18;
 
 import {ERC4626BaseStrategy, IERC20} from "../../ERC4626BaseStrategy.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -47,14 +47,6 @@ abstract contract ERC4626BaseStrategyMock is ERC4626BaseStrategy {
     function delegatedAssets()
         external
         view
-        override
         returns (uint256 _delegatedAssets)
-    {}
-
-    function _protectedTokens()
-        internal
-        view
-        override
-        returns (address[] memory _protected)
     {}
 }

@@ -16,9 +16,6 @@ interface IVault:
     def asset() -> address: view
     def deposit(assets: uint256, receiver: address) -> uint256: nonpayable
 
-interface IStrategy:
-    def delegatedAssets() -> uint256: view
-
 # EVENTS #
 event CommitFeeManager:
     fee_manager: address
@@ -90,7 +87,7 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
     duration: uint256 = block.timestamp - strategy_params.last_report
 
     total_fees: uint256 = (
-        (strategy_params.current_debt - IStrategy(strategy).delegatedAssets())
+        (strategy_params.current_debt)
         * duration
         * fee.management_fee
         / MAX_BPS
@@ -103,7 +100,7 @@ def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256
         total_fees += (gain * fee.performance_fee) / MAX_BPS
         total_refunds = min(asset_balance, gain * refund_ratio / MAX_BPS)
     else:
-        # Now taking loss from its own funds. In the future versions could be from different mecanisms
+        # Now taking loss from its own funds. In the future versions could be from different mechanisms
         total_refunds = min(asset_balance, loss * refund_ratio / MAX_BPS)
         
     # accountant will deposit whatever it needs to avoid complex math in tests
