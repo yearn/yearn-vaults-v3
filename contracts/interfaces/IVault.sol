@@ -75,7 +75,7 @@ interface IVault is IERC4626 {
 
     function future_role_manager() external view returns (address);
 
-    function shutdown() external view returns (bool);
+    function isShutdown() external view returns (bool);
 
     function nonces(address) external view returns (uint256);
 
@@ -97,7 +97,7 @@ interface IVault is IERC4626 {
 
     function set_minimum_total_idle(uint256 minimum_total_idle) external;
 
-    function set_profit_max_unlock_time(
+    function setProfitMaxUnlockTime(
         uint256 new_profit_max_unlock_time
     ) external;
 
@@ -115,7 +115,7 @@ interface IVault is IERC4626 {
 
     function accept_role_manager() external;
 
-    function unlocked_shares() external view returns (uint256);
+    function unlockedShares() external view returns (uint256);
 
     function pricePerShare() external view returns (uint256);
 
@@ -149,7 +149,7 @@ interface IVault is IERC4626 {
 
     function totalDebt() external view returns (uint256);
 
-    function api_version() external view returns (string memory);
+    function apiVersion() external view returns (string memory);
 
     function assess_share_of_unrealised_losses(
         address strategy,

@@ -254,14 +254,14 @@ open_roles: public(HashMap[Roles, bool])
 role_manager: public(address)
 # Temporary variable to store the address of the next role_manager until the role is accepted.
 future_role_manager: public(address)
-# State of the vault - if set to true, only withdrawals will be available. It can't be reverted.
-shutdown: public(bool)
 
 # ERC20 - name of the vaults token.
 name: public(String[64])
 # ERC20 - symbol of the vaults token.
 symbol: public(String[32])
 
+# State of the vault - if set to true, only withdrawals will be available. It can't be reverted.
+shutdown: bool
 # The amount of time profits will unlock over.
 profit_max_unlock_time: uint256
 # The timestamp of when the current unlocking period ends.
@@ -1439,7 +1439,7 @@ def set_minimum_total_idle(minimum_total_idle: uint256):
     log UpdateMinimumTotalIdle(minimum_total_idle)
 
 @external
-def set_profit_max_unlock_time(new_profit_max_unlock_time: uint256):
+def setProfitMaxUnlockTime(new_profit_max_unlock_time: uint256):
     """
     @notice Set the new profit max unlock time.
     @dev The time is denominated in seconds and must be less than 1 year.
@@ -1562,9 +1562,18 @@ def accept_role_manager():
     log UpdateRoleManager(msg.sender)
 
 # VAULT STATUS VIEWS
+
 @view
 @external
-def unlocked_shares() -> uint256:
+def isShutdown() -> bool:
+    """
+    @notice Get if the vault is shutdown.
+    @return Bool representing the shutdown status
+    """
+    return self.shutdown
+@view
+@external
+def unlockedShares() -> uint256:
     """
     @notice Get the amount of shares that have been unlocked.
     @return The amount of shares that are have been unlocked.
@@ -2076,7 +2085,7 @@ def previewRedeem(shares: uint256) -> uint256:
 
 @view
 @external
-def api_version() -> String[28]:
+def apiVersion() -> String[28]:
     """
     @notice Get the API version of the vault.
     @return The API version of the vault.

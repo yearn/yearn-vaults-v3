@@ -410,7 +410,7 @@ def sign_vault_permit(chain):
         override_nonce=None,
     ):
         name = "Yearn Vault"
-        version = vault.api_version()
+        version = vault.apiVersion()
         if override_nonce:
             nonce = override_nonce
         else:
