@@ -19,6 +19,20 @@ interface IVaultFactory {
     event NewPendingGovernance(address newPendingGovernance);
     event UpdateGovernance(address newGovernance);
 
+    function shutdown() external view returns (bool);
+
+    function governance() external view returns (address);
+
+    function pending_governance() external view returns (address);
+
+    function name() external view returns (string memory);
+
+    function default_protocol_fee_config() external view returns (uint256);
+
+    function custom_protocol_fee(address) external view returns (uint16);
+
+    function use_custom_protocol_fee(address) external view returns (bool);
+
     function deploy_new_vault(
         ERC20 asset,
         string memory name,
@@ -30,8 +44,6 @@ interface IVaultFactory {
     function vault_blueprint() external view returns (address);
 
     function apiVersion() external view returns (string memory);
-
-    function governance() external view returns (address);
 
     function protocol_fee_config()
         external
