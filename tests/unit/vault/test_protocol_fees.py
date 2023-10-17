@@ -73,6 +73,7 @@ def test__report_gain_with_protocol_fees__accountant_fees(
 
     # Create a profit
     airdrop_asset(gov, asset, strategy, profit)
+    strategy.report(sender=gov)
 
     expected_accountant_fee = profit * performance_fee / MAX_BPS_ACCOUNTANT
     expected_protocol_fee = expected_accountant_fee * protocol_fee / MAX_BPS_ACCOUNTANT

@@ -233,9 +233,15 @@ def create_vault(project, gov, vault_factory):
 
 # create default liquid strategy with 0 fee
 @pytest.fixture(scope="session")
-def create_strategy(project, strategist):
+def create_strategy(project, strategist, gov):
     def create_strategy(vault):
-        return strategist.deploy(project.ERC4626LiquidStrategy, vault, vault.asset())
+        return strategist.deploy(
+            project.MockTokenizedStrategy,
+            vault.asset(),
+            "Mock Tokenized Strategy",
+            strategist,
+            gov,
+        )
 
     yield create_strategy
 

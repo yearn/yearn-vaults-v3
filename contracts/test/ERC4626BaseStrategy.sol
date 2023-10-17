@@ -15,6 +15,7 @@ abstract contract ERC4626BaseStrategy is ERC4626 {
 
     address public vault;
     uint8 private _decimals;
+    address public keeper;
 
     constructor(
         address _vault,
@@ -58,4 +59,8 @@ abstract contract ERC4626BaseStrategy is ERC4626 {
     ) internal virtual returns (uint256 amountFreed);
 
     function sweep(address _token) external {}
+
+    function report() external virtual returns (uint256, uint256) {
+        return (0, 0);
+    }
 }

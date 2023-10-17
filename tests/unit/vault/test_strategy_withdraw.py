@@ -1994,6 +1994,7 @@ def test_withdraw__with_multiple_liquid_strategies_more_assets_than_debt__withdr
 
     airdrop_asset(gov, asset, gov, fish_amount)
     asset.transfer(first_strategy, profit, sender=gov)
+    first_strategy.report(sender=gov)
 
     tx = vault.withdraw(
         shares,

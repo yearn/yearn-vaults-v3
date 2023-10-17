@@ -236,6 +236,8 @@ def test_process_report__set_reporting_role_open(
     assert event[0].status == RoleStatusChange.OPENED
 
     asset.mint(new_strategy, fish_amount, sender=gov)
+    new_strategy.report(sender=gov)
+
     tx = vault.process_report(new_strategy, sender=bunny)
     event = list(tx.decode_logs(vault.StrategyReported))
     assert len(event) == 1
@@ -267,6 +269,8 @@ def test_process_report__set_reporting_role_open_then_close__reverts(
     assert event[0].status == RoleStatusChange.OPENED
 
     asset.mint(new_strategy, fish_amount, sender=gov)
+    new_strategy.report(sender=gov)
+
     tx = vault.process_report(new_strategy, sender=bunny)
     event = list(tx.decode_logs(vault.StrategyReported))
     assert len(event) == 1
