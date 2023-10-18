@@ -5,19 +5,21 @@ import {MockTokenizedStrategy, ERC20} from "./MockTokenizedStrategy.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract YieldSource {
+    using SafeERC20 for ERC20;
+
     ERC20 public asset;
 
     constructor(address _asset) {
         asset = ERC20(_asset);
-        asset.approve(msg.sender, type(uint256).max);
+        asset.safeApprove(msg.sender, type(uint256).max);
     }
 
     function deposit(uint256 _amount) external {
-        asset.transferFrom(msg.sender, address(this), _amount);
+        asset.safeTransferFrom(msg.sender, address(this), _amount);
     }
 
     function withdraw(uint256 _amount) external {
-        asset.transfer(msg.sender, _amount);
+        asset.safeTransfer(msg.sender, _amount);
     }
 }
 
