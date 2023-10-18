@@ -29,7 +29,6 @@ contract ERC4626LossyStrategy is MockTokenizedStrategy {
     int256 public withdrawingLoss;
     uint256 public lockedFunds;
     address public vault;
-
     address public yieldSource;
 
     constructor(
@@ -41,6 +40,7 @@ contract ERC4626LossyStrategy is MockTokenizedStrategy {
     ) MockTokenizedStrategy(_asset, _name, _management, _keeper) {
         yieldSource = address(new YieldSource(_asset));
         ERC20(_asset).safeApprove(yieldSource, type(uint256).max);
+        // So we can record losses when it happens.
         strategyStorage().management = address(this);
         vault = _vault;
     }
@@ -48,6 +48,7 @@ contract ERC4626LossyStrategy is MockTokenizedStrategy {
     // used to generate losses, accepts single arg to send losses to
     function setLoss(address _target, uint256 _loss) external {
         strategyStorage().asset.safeTransferFrom(yieldSource, _target, _loss);
+        // Record the loss
         MockTokenizedStrategy(address(this)).report();
     }
 

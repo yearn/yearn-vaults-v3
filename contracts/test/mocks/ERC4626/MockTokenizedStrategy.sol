@@ -36,10 +36,6 @@ contract MockTokenizedStrategy is TokenizedStrategy {
         // Set decimals based off the `asset`.
         S.decimals = ERC20(_asset).decimals();
 
-        // Default to an instant profit unlock period
-        S.profitMaxUnlockTime = 0;
-        // set to a 0% performance fee.
-        S.performanceFee = 0;
         // Set last report to this block.
         S.lastReport = uint128(block.timestamp);
 
