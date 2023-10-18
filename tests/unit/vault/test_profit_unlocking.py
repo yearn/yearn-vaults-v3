@@ -35,6 +35,8 @@ def create_and_check_profit(
     # We create a virtual profit
     initial_debt = vault.strategies(strategy).current_debt
     asset.transfer(strategy, profit, sender=gov)
+    # Record profits at the strategy level.
+    strategy.report(sender=gov)
     tx = vault.process_report(strategy, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
 
@@ -1199,6 +1201,7 @@ def test_gain_fees_no_refunds_not_enough_buffer(
     assert accountant.fees(strategy).performance_fee == second_performance_fee
 
     asset.transfer(strategy, second_profit, sender=gov)
+    strategy.report(sender=gov)
 
     price_per_share_before_2nd_profit = vault.pricePerShare() / 10 ** vault.decimals()
     accountant_shares_before_2nd_profit = vault.balanceOf(accountant)

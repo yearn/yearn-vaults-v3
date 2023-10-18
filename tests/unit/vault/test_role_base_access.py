@@ -374,6 +374,7 @@ def test_process_report__reporting_manager(
     add_debt_to_strategy(gov, strategy, vault, 2)
     # airdrop gain to strategy
     airdrop_asset(gov, asset, strategy, 1)
+    strategy.report(sender=gov)
 
     tx = vault.process_report(strategy.address, sender=bunny)
 

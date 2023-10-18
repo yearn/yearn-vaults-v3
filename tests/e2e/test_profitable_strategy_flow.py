@@ -59,6 +59,8 @@ def test_profitable_strategy_flow(
     # we simulate profit on strategy
     total_fee = first_profit * (performance_fee / MAX_BPS_ACCOUNTANT)
     asset.transfer(strategy, first_profit, sender=whale)
+    strategy.report(sender=gov)
+
     tx = vault.process_report(strategy.address, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
     assert event[0].gain == first_profit
@@ -84,6 +86,7 @@ def test_profitable_strategy_flow(
 
     # We generate second profit
     asset.transfer(strategy, second_profit, sender=whale)
+    strategy.report(sender=gov)
     assets_before_profit = vault.totalAssets()
     tx = vault.process_report(strategy.address, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
