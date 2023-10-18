@@ -59,7 +59,9 @@ contract MockTokenizedStrategy is TokenizedStrategy {
         maxDebt = _maxDebt;
     }
 
-    function availableDepositLimit(address) public view returns (uint256) {
+    function availableDepositLimit(
+        address
+    ) public view virtual returns (uint256) {
         uint256 _totalAssets = strategyStorage().totalIdle;
         uint256 _maxDebt = maxDebt;
         return _maxDebt > _totalAssets ? _maxDebt - _totalAssets : 0;
@@ -67,15 +69,15 @@ contract MockTokenizedStrategy is TokenizedStrategy {
 
     function availableWithdrawLimit(
         address /*_owner*/
-    ) public view returns (uint256) {
+    ) public view virtual returns (uint256) {
         return type(uint256).max;
     }
 
-    function deployFunds(uint256 _amount) external {}
+    function deployFunds(uint256 _amount) external virtual {}
 
-    function freeFunds(uint256 _amount) external {}
+    function freeFunds(uint256 _amount) external virtual {}
 
-    function harvestAndReport() external returns (uint256) {
+    function harvestAndReport() external virtual returns (uint256) {
         return strategyStorage().asset.balanceOf(address(this));
     }
 }
