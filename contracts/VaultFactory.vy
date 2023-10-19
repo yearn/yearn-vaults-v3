@@ -146,7 +146,7 @@ def vault_blueprint()-> address:
 
 @view
 @external
-def api_version() -> String[28]:
+def apiVersion() -> String[28]:
     """
     @notice Get the API version of the factory.
     @return The API version of the factory.

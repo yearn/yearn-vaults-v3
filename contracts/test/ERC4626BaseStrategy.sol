@@ -15,6 +15,7 @@ abstract contract ERC4626BaseStrategy is ERC4626 {
 
     address public vault;
     uint8 private _decimals;
+    address public keeper;
 
     constructor(
         address _vault,
@@ -27,11 +28,8 @@ abstract contract ERC4626BaseStrategy is ERC4626 {
         _decimals = IERC20Metadata(address(_asset)).decimals();
 
         vault = _vault;
-        //        // using approve since initialization is only called once
-        //        IERC20(_asset).approve(_vault, type(uint256).max); // Give Vault unlimited access (might save gas)
     }
 
-    /** @dev See {IERC20Metadata-decimals}. */
     function decimals()
         public
         view
@@ -41,9 +39,6 @@ abstract contract ERC4626BaseStrategy is ERC4626 {
     {
         return _decimals;
     }
-
-    // TODO: add roles (including vault)
-    // TODO: should we force invest and freeFunds to be in deposit and withdraw functions?
 
     function invest() external virtual {}
 
@@ -58,4 +53,8 @@ abstract contract ERC4626BaseStrategy is ERC4626 {
     ) internal virtual returns (uint256 amountFreed);
 
     function sweep(address _token) external {}
+
+    function report() external virtual returns (uint256, uint256) {
+        return (0, 0);
+    }
 }

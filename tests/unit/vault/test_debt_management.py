@@ -510,7 +510,7 @@ def test_update_debt__with_faulty_strategy_that_withdraws_more_than_requested__o
     new_debt = target_debt - extra
     difference = current_debt - new_debt
 
-    airdrop_asset(gov, asset, lossy_strategy, extra)
+    airdrop_asset(gov, asset, lossy_strategy.yieldSource(), extra)
     lossy_strategy.setWithdrawingLoss(-extra, sender=gov)
 
     initial_pps = vault.pricePerShare()
@@ -526,7 +526,7 @@ def test_update_debt__with_faulty_strategy_that_withdraws_more_than_requested__o
     # assert we recorded correctly
     assert vault.pricePerShare() == initial_pps
     assert vault.strategies(lossy_strategy.address).current_debt == new_debt
-    assert asset.balanceOf(lossy_strategy) == target_debt
+    assert lossy_strategy.totalAssets() == target_debt
     assert asset.balanceOf(vault) == difference
     assert vault.totalIdle() == difference
     assert vault.totalDebt() == new_debt
@@ -546,7 +546,7 @@ def test_update_debt__with_faulty_strategy_that_withdraws_more_than_requested(
     new_debt = 0
     difference = current_debt
 
-    airdrop_asset(gov, asset, lossy_strategy, extra)
+    airdrop_asset(gov, asset, lossy_strategy.yieldSource(), extra)
     lossy_strategy.setWithdrawingLoss(-extra, sender=gov)
 
     initial_pps = vault.pricePerShare()
@@ -561,7 +561,7 @@ def test_update_debt__with_faulty_strategy_that_withdraws_more_than_requested(
 
     assert vault.pricePerShare() == initial_pps
     assert vault.strategies(lossy_strategy.address).current_debt == new_debt
-    assert asset.balanceOf(lossy_strategy) == new_debt
+    assert lossy_strategy.totalAssets() == new_debt
     assert asset.balanceOf(vault) == (vault_balance + extra)
     assert vault.totalIdle() == vault_balance
     assert vault.totalDebt() == new_debt

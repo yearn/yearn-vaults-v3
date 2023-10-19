@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.18;
 
+import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+
 interface IVaultFactory {
     event NewVault(address indexed vaultAddress, address indexed asset);
     event UpdateProtocolFeeBps(
@@ -17,8 +19,22 @@ interface IVaultFactory {
     event NewPendingGovernance(address newPendingGovernance);
     event UpdateGovernance(address newGovernance);
 
+    function shutdown() external view returns (bool);
+
+    function governance() external view returns (address);
+
+    function pending_governance() external view returns (address);
+
+    function name() external view returns (string memory);
+
+    function default_protocol_fee_config() external view returns (uint256);
+
+    function custom_protocol_fee(address) external view returns (uint16);
+
+    function use_custom_protocol_fee(address) external view returns (bool);
+
     function deploy_new_vault(
-        address asset,
+        ERC20 asset,
         string memory name,
         string memory symbol,
         address role_manager,
@@ -27,7 +43,7 @@ interface IVaultFactory {
 
     function vault_blueprint() external view returns (address);
 
-    function api_version() external view returns (string memory);
+    function apiVersion() external view returns (string memory);
 
     function protocol_fee_config()
         external

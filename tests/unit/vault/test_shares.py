@@ -457,6 +457,7 @@ def create_profit(
     # We create a virtual profit
     initial_debt = vault.strategies(strategy).current_debt
     asset.transfer(strategy, profit, sender=gov)
+    strategy.report(sender=gov)
     tx = vault.process_report(strategy, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
 

@@ -1413,7 +1413,6 @@ def test_withdraw__from_lossy_strategy_with_unrealised_losses_and_max_redeem(
     assert vault.totalIdle() == 0
     assert vault.totalDebt() == amount - amount_to_withdraw
     assert asset.balanceOf(vault) == 0
-    assert asset.balanceOf(lossy_strategy) == amount_to_lock
     assert lossy_strategy.totalAssets() == amount_to_lock
     assert asset.balanceOf(strategy) == 0
     assert liquid_strategy.totalAssets() == 0
@@ -1510,7 +1509,6 @@ def test_redeem__from_lossy_strategy_with_unrealised_losses_and_max_redeem(
     assert vault.totalIdle() == 0
     assert vault.totalDebt() == amount - amount_to_withdraw
     assert asset.balanceOf(vault) == 0
-    assert asset.balanceOf(lossy_strategy) == amount_to_lock
     assert lossy_strategy.totalAssets() == amount_to_lock
     assert asset.balanceOf(strategy) == 0
     assert liquid_strategy.totalAssets() == 0
@@ -1793,7 +1791,7 @@ def test_withdraw__half_of_strategy_assets_from_lossy_strategy_with_unrealised_l
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(liquid_strategy) == amount_per_strategy
     assert (
-        asset.balanceOf(lossy_strategy)
+        lossy_strategy.totalAssets()
         == amount_per_strategy - amount_to_lose - amount_to_lose // 2
     )  # withdrawn from strategy
     assert (
@@ -1994,6 +1992,7 @@ def test_withdraw__with_multiple_liquid_strategies_more_assets_than_debt__withdr
 
     airdrop_asset(gov, asset, gov, fish_amount)
     asset.transfer(first_strategy, profit, sender=gov)
+    first_strategy.report(sender=gov)
 
     tx = vault.withdraw(
         shares,

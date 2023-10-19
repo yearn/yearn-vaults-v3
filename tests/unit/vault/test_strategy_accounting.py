@@ -42,6 +42,8 @@ def test_process_report__with_gain_and_zero_fees(
     # add debt to strategy
     add_debt_to_strategy(gov, strategy, vault, new_debt)
     airdrop_asset(gov, asset, strategy, gain)
+    # record gain
+    strategy.report(sender=gov)
 
     strategy_params = vault.strategies(strategy.address)
     initial_debt = strategy_params.current_debt
@@ -87,6 +89,8 @@ def test_process_report__with_gain_and_zero_management_fees(
     add_debt_to_strategy(gov, strategy, vault, new_debt)
     # airdrop gain to strategy
     airdrop_asset(gov, asset, strategy, gain)
+    # record gain
+    strategy.report(sender=gov)
     # set up accountant
     set_fees_for_strategy(gov, strategy, accountant, management_fee, performance_fee)
 
@@ -145,6 +149,8 @@ def test_process_report__with_gain_and_zero_performance_fees(
     add_debt_to_strategy(gov, strategy, vault, new_debt)
     # airdrop gain to strategy
     airdrop_asset(gov, asset, strategy, gain)
+    # record gain
+    strategy.report(sender=gov)
     # set up accountant
     set_fees_for_strategy(gov, strategy, accountant, management_fee, performance_fee)
 
@@ -202,6 +208,8 @@ def test_process_report__with_gain_and_both_fees(
     add_debt_to_strategy(gov, strategy, vault, new_debt)
     # airdrop gain to strategy
     airdrop_asset(gov, asset, strategy, gain)
+    # record gain
+    strategy.report(sender=gov)
     # set up accountant
     set_fees_for_strategy(gov, strategy, accountant, management_fee, performance_fee)
 
@@ -256,6 +264,8 @@ def test_process_report__with_fees_exceeding_fee_cap(
     add_debt_to_strategy(gov, strategy, vault, new_debt)
     # airdrop gain to strategy
     airdrop_asset(gov, asset, strategy, gain)
+    # record gain
+    strategy.report(sender=gov)
     # set up accountant
     set_fees_for_strategy(gov, strategy, accountant, management_fee, performance_fee)
 

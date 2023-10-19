@@ -13,10 +13,15 @@ dependencies:
   - name: openzeppelin
     github: OpenZeppelin/openzeppelin-contracts
     version: 4.7.3
+  - name: tokenized-strategy
+    github: yearn/tokenized-strategy
+    branch: master
+    contracts_folder: src
 
 solidity:
   import_remapping:
     - "@openzeppelin/contracts=openzeppelin/v4.7.3"
+    - "@tokenized-strategy=tokenized-strategy/master"
 
 ethereum:
   local:

@@ -35,6 +35,8 @@ def create_and_check_profit(
     # We create a virtual profit
     initial_debt = vault.strategies(strategy).current_debt
     asset.transfer(strategy, profit, sender=gov)
+    # Record profits at the strategy level.
+    strategy.report(sender=gov)
     tx = vault.process_report(strategy, sender=gov)
     event = list(tx.decode_logs(vault.StrategyReported))
 
@@ -1199,6 +1201,7 @@ def test_gain_fees_no_refunds_not_enough_buffer(
     assert accountant.fees(strategy).performance_fee == second_performance_fee
 
     asset.transfer(strategy, second_profit, sender=gov)
+    strategy.report(sender=gov)
 
     price_per_share_before_2nd_profit = vault.pricePerShare() / 10 ** vault.decimals()
     accountant_shares_before_2nd_profit = vault.balanceOf(accountant)
@@ -2516,7 +2519,7 @@ def test_increase_profit_max_period__no_change(
     )
 
     # update profit max unlock time
-    vault.set_profit_max_unlock_time(WEEK * 2, sender=gov)
+    vault.setProfitMaxUnlockTime(WEEK * 2, sender=gov)
 
     time_passed = chain.pending_timestamp - timestamp
     # assure the all the amounts is what is originally would have been
@@ -2585,7 +2588,7 @@ def test_decrease_profit_max_period__no_change(
     )
 
     # update profit max unlock time
-    vault.set_profit_max_unlock_time(WEEK // 2, sender=gov)
+    vault.setProfitMaxUnlockTime(WEEK // 2, sender=gov)
 
     time_passed = chain.pending_timestamp - timestamp
     # assure the all the amounts is what is originally would have been
@@ -2655,7 +2658,7 @@ def test_increase_profit_max_period__next_report_works(
     )
 
     # update profit max unlock time
-    vault.set_profit_max_unlock_time(WEEK * 2, sender=gov)
+    vault.setProfitMaxUnlockTime(WEEK * 2, sender=gov)
 
     time_passed = chain.pending_timestamp - timestamp
     # assure the all the amounts is what is originally would have been
@@ -2760,7 +2763,7 @@ def test_decrease_profit_max_period__next_report_works(
     )
 
     # update profit max unlock time
-    vault.set_profit_max_unlock_time(WEEK // 2, sender=gov)
+    vault.setProfitMaxUnlockTime(WEEK // 2, sender=gov)
 
     time_passed = chain.pending_timestamp - timestamp
     # assure the all the amounts is what is originally would have been
@@ -2869,7 +2872,7 @@ def test_set_profit_max_period_to_zero__resets_rates(
     assert vault.profitUnlockingRate() != 0
 
     # update profit max unlock time
-    vault.set_profit_max_unlock_time(0, sender=gov)
+    vault.setProfitMaxUnlockTime(0, sender=gov)
 
     assert vault.profitMaxUnlockTime() == 0
     assert vault.balanceOf(vault.address) == 0
@@ -2924,7 +2927,7 @@ def test_set_profit_max_period_to_zero__doesnt_lock(
     vault, strategy, _ = initial_set_up(asset, gov, amount, fish)
 
     # update profit max unlock time
-    vault.set_profit_max_unlock_time(0, sender=gov)
+    vault.setProfitMaxUnlockTime(0, sender=gov)
 
     assert vault.profitMaxUnlockTime() == 0
     assert vault.balanceOf(vault.address) == 0
@@ -2989,7 +2992,7 @@ def test_set_profit_max_period_to_zero__with_fees_doesnt_lock(
     )
 
     # update profit max unlock time
-    vault.set_profit_max_unlock_time(0, sender=gov)
+    vault.setProfitMaxUnlockTime(0, sender=gov)
 
     assert vault.profitMaxUnlockTime() == 0
     assert vault.balanceOf(vault.address) == 0
@@ -3068,7 +3071,7 @@ def test_set_profit_max_period_to_zero___report_loss(
     )
 
     # update profit max unlock time
-    vault.set_profit_max_unlock_time(0, sender=gov)
+    vault.setProfitMaxUnlockTime(0, sender=gov)
 
     assert vault.profitMaxUnlockTime() == 0
     assert vault.balanceOf(vault.address) == 0

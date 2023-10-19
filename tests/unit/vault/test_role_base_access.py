@@ -331,10 +331,10 @@ def test_shutdown_vault__emergency_manager(gov, vault, bunny):
     assert event[0].account == bunny.address
     assert event[0].role == ROLES.EMERGENCY_MANAGER
 
-    assert vault.shutdown() == False
+    assert vault.isShutdown() == False
     tx = vault.shutdown_vault(sender=bunny)
 
-    assert vault.shutdown() == True
+    assert vault.isShutdown() == True
     event = list(tx.decode_logs(vault.Shutdown))
     assert len(event) == 1
     # lets ensure that we give the EMERGENCY_MANAGER DEBT_MANAGER permissions after shutdown
@@ -374,6 +374,7 @@ def test_process_report__reporting_manager(
     add_debt_to_strategy(gov, strategy, vault, 2)
     # airdrop gain to strategy
     airdrop_asset(gov, asset, strategy, 1)
+    strategy.report(sender=gov)
 
     tx = vault.process_report(strategy.address, sender=bunny)
 
@@ -456,7 +457,7 @@ def test_set_use_default_queue__queue_manager(gov, vault, strategy, bunny):
 
 def test_set_profit_unlock__no_profit_unlock_manager__reverts(bunny, vault):
     with ape.reverts("not allowed"):
-        vault.set_profit_max_unlock_time(WEEK // 2, sender=bunny)
+        vault.setProfitMaxUnlockTime(WEEK // 2, sender=bunny)
 
 
 def test_set_profit_unlock__profit_unlock_manager(gov, vault, bunny):
@@ -470,7 +471,7 @@ def test_set_profit_unlock__profit_unlock_manager(gov, vault, bunny):
 
     time = WEEK // 2
     assert vault.profitMaxUnlockTime() != time
-    vault.set_profit_max_unlock_time(time, sender=bunny)
+    vault.setProfitMaxUnlockTime(time, sender=bunny)
     assert vault.profitMaxUnlockTime() == time
 
 
@@ -487,7 +488,7 @@ def test_set_profit_unlock__to_high__reverts(gov, vault, bunny):
     current_time = vault.profitMaxUnlockTime()
 
     with ape.reverts("profit unlock time too long"):
-        vault.set_profit_max_unlock_time(time, sender=bunny)
+        vault.setProfitMaxUnlockTime(time, sender=bunny)
 
     assert vault.profitMaxUnlockTime() == current_time
 
