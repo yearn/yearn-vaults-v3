@@ -111,10 +111,6 @@ event RoleSet:
     account: indexed(address)
     role: indexed(Roles)
 
-event RoleStatusChanged:
-    role: indexed(Roles)
-    status: indexed(RoleStatusChange)
-
 # STORAGE MANAGEMENT EVENTS
 event UpdateRoleManager:
     role_manager: indexed(address)
@@ -204,10 +200,6 @@ enum Rounding:
     ROUND_DOWN
     ROUND_UP
 
-enum RoleStatusChange:
-    OPENED
-    CLOSED
-
 # IMMUTABLE #
 # Underlying token used by the vault.
 ASSET: immutable(ERC20)
@@ -224,6 +216,7 @@ default_queue: public(DynArray[address, MAX_QUEUE])
 # Should the vault use the default_queue regardless whats passed in.
 use_default_queue: public(bool)
 
+### ACCOUNTING ###
 # ERC20 - amount of shares per account
 balance_of: HashMap[address, uint256]
 # ERC20 - owner -> (spender -> amount)
@@ -231,7 +224,6 @@ allowance: public(HashMap[address, HashMap[address, uint256]])
 # Total amount of shares that are currently minted including those locked.
 # NOTE: To get the ERC20 compliant version user totalSupply().
 total_supply: public(uint256)
-
 # Total amount of assets that has been deposited in strategies.
 total_debt: uint256
 # Current assets held in the vault contract. Replacing balanceOf(this) to avoid price_per_share manipulation.
@@ -240,16 +232,18 @@ total_idle: uint256
 minimum_total_idle: public(uint256)
 # Maximum amount of tokens that the vault can accept. If totalAssets > deposit_limit, deposits will revert.
 deposit_limit: public(uint256)
+
+### PERIPHERY ###
 # Contract that charges fees and can give refunds.
 accountant: public(address)
 # Contract to control the deposit limit.
 deposit_limit_module: public(address)
 # Contract to control the withdraw limit.
 withdraw_limit_module: public(address)
+
+### ROLES ###
 # HashMap mapping addresses to their roles
 roles: public(HashMap[address, Roles])
-# HashMap mapping roles to their permissioned state. If false, the role is not open to the public.
-open_roles: public(HashMap[Roles, bool])
 # Address that can add and remove roles to addresses.
 role_manager: public(address)
 # Temporary variable to store the address of the next role_manager until the role is accepted.
@@ -1457,8 +1451,8 @@ def setProfitMaxUnlockTime(new_profit_max_unlock_time: uint256):
 # ROLE MANAGEMENT #
 @internal
 def _enforce_role(account: address, role: Roles):
-    # Make sure the sender either holds the role or it has been opened.
-    assert role in self.roles[account] or self.open_roles[role], "not allowed"
+    # Make sure the sender holds the role.
+    assert role in self.roles[account], "not allowed"
 
 @external
 def set_role(account: address, role: Roles):
@@ -1501,28 +1495,6 @@ def remove_role(account: address, role: Roles):
     self.roles[account] = self.roles[account] & ~role
 
     log RoleSet(account, self.roles[account])
-
-@external
-def set_open_role(role: Roles):
-    """
-    @notice Set a role to be open.
-    @param role The role to set.
-    """
-    assert msg.sender == self.role_manager
-    self.open_roles[role] = True
-
-    log RoleStatusChanged(role, RoleStatusChange.OPENED)
-
-@external
-def close_open_role(role: Roles):
-    """
-    @notice Close a opened role.
-    @param role The role to close.
-    """
-    assert msg.sender == self.role_manager
-    self.open_roles[role] = False
-
-    log RoleStatusChanged(role, RoleStatusChange.CLOSED)
     
 @external
 def transfer_role_manager(role_manager: address):
