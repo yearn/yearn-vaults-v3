@@ -372,7 +372,7 @@ def test__set_default_queue(create_vault, asset, gov, create_strategy):
     event_queue = list(event[0].new_default_queue)
     # Need to checksum each address to compare it correctly.
     for i in range(len(new_queue)):
-        assert Web3.toChecksumAddress(event_queue[i]) == new_queue[i]
+        assert Web3.to_checksum_address(event_queue[i]) == new_queue[i]
 
 
 def test__set_default_queue__inactive_strategy__reverts(

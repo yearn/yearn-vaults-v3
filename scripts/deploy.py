@@ -21,7 +21,7 @@ def deploy_blueprint_and_factory():
     deployer_contract = project.IDeployer.at(
         "0x8D85e7c9A4e369E53Acc8d5426aE1568198b0112"
     )
-    salt_string = "v3.0.1"
+    salt_string = "v3.0.2"
 
     # Create a SHA-256 hash object
     hash_object = hashlib.sha256()

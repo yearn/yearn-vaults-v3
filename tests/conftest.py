@@ -1,7 +1,7 @@
 import pytest
 from ape import chain
 from ape.types import ContractLog
-from eth_account.messages import encode_structured_data
+from eth_account.messages import encode_typed_data
 from utils.constants import MAX_INT, ROLES, WEEK
 import time
 import os
@@ -459,7 +459,7 @@ def sign_vault_permit(chain):
                 "deadline": deadline,
             },
         }
-        permit = encode_structured_data(data)
+        permit = encode_typed_data(full_message=data)
         return owner.sign_message(permit)
 
     return sign_vault_permit

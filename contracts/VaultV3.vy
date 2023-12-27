@@ -174,7 +174,7 @@ MAX_BPS: constant(uint256) = 10_000
 # Extended for profit locking calculations.
 MAX_BPS_EXTENDED: constant(uint256) = 1_000_000_000_000
 # The version of this vault.
-API_VERSION: constant(String[28]) = "3.0.1"
+API_VERSION: constant(String[28]) = "3.0.2"
 
 # ENUMS #
 # Each permissioned function has its own Role.
