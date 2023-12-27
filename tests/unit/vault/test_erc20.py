@@ -55,43 +55,6 @@ def test_approve__with_amount__approve(fish, fish_amount, bunny, asset, create_v
     assert vault.allowance(fish, bunny) == fish_amount
 
 
-def test_increase_allowance__with_amount__approve(
-    fish, fish_amount, bunny, asset, create_vault
-):
-    vault = create_vault(asset)
-
-    tx = vault.increaseAllowance(bunny.address, fish_amount, sender=fish)
-    event = list(tx.decode_logs(vault.Approval))
-
-    assert len(event) == 1
-    assert event[0].owner == fish
-    assert event[0].spender == bunny
-    assert event[0].value == fish_amount
-
-    assert vault.allowance(fish, bunny) == fish_amount
-
-
-def test_decrease_allowance__with_amount__approve(
-    fish, fish_amount, bunny, asset, create_vault
-):
-    vault = create_vault(asset)
-    decrease_amount = fish_amount // 2
-    final_allowance = fish_amount - decrease_amount
-
-    vault.approve(bunny.address, fish_amount, sender=fish)
-    assert vault.allowance(fish, bunny) == fish_amount
-
-    tx = vault.decreaseAllowance(bunny.address, decrease_amount, sender=fish)
-    event = list(tx.decode_logs(vault.Approval))
-
-    assert len(event) == 1
-    assert event[0].owner == fish
-    assert event[0].spender == bunny
-    assert event[0].value == final_allowance
-
-    assert vault.allowance(fish, bunny) == final_allowance
-
-
 def test_transfer_from__with_approval__transfer(
     fish, fish_amount, bunny, doggie, asset, create_vault, user_deposit
 ):

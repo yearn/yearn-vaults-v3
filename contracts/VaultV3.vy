@@ -344,20 +344,6 @@ def _approve(owner: address, spender: address, amount: uint256) -> bool:
     return True
 
 @internal
-def _increase_allowance(owner: address, spender: address, amount: uint256) -> bool:
-    new_allowance: uint256 = self.allowance[owner][spender] + amount
-    self.allowance[owner][spender] = new_allowance
-    log Approval(owner, spender, new_allowance)
-    return True
-
-@internal
-def _decrease_allowance(owner: address, spender: address, amount: uint256) -> bool:
-    new_allowance: uint256 = self.allowance[owner][spender] - amount
-    self.allowance[owner][spender] = new_allowance
-    log Approval(owner, spender, new_allowance)
-    return True
-
-@internal
 def _permit(
     owner: address, 
     spender: address, 
@@ -1852,26 +1838,6 @@ def transferFrom(sender: address, receiver: address, amount: uint256) -> bool:
     return self._transfer_from(sender, receiver, amount)
 
 ## ERC20+4626 compatibility
-@external
-def increaseAllowance(spender: address, amount: uint256) -> bool:
-    """
-    @notice Increase the allowance for a spender.
-    @param spender The address to increase the allowance for.
-    @param amount The amount to increase the allowance by.
-    @return True if the increase was successful.
-    """
-    return self._increase_allowance(msg.sender, spender, amount)
-
-@external
-def decreaseAllowance(spender: address, amount: uint256) -> bool:
-    """
-    @notice Decrease the allowance for a spender.
-    @param spender The address to decrease the allowance for.
-    @param amount The amount to decrease the allowance by.
-    @return True if the decrease was successful.
-    """
-    return self._decrease_allowance(msg.sender, spender, amount)
-
 @external
 def permit(
     owner: address, 
