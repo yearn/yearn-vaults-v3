@@ -1036,7 +1036,7 @@ def _revoke_strategy(strategy: address, force: bool=False):
 
 # DEBT MANAGEMENT #
 @internal
-def _update_debt(strategy: address, target_debt: uint256) -> uint256:
+def _update_debt(strategy: address, target_debt: uint256, max_loss: uint256) -> uint256:
     """
     The vault will re-balance the debt vs target debt. Target debt must be
     smaller or equal to strategy's max_debt. This function will compare the 
@@ -1096,8 +1096,13 @@ def _update_debt(strategy: address, target_debt: uint256) -> uint256:
         # We pull funds with {redeem} so there can be losses or rounding differences.
         withdrawn: uint256 = min(post_balance - pre_balance, current_debt)
 
+        # If we didn't get the amount we asked for and there is a max loss.
+        if withdrawn < assets_to_withdraw and max_loss < MAX_BPS:
+            # Make sure the loss is within the allowed range.
+            assert assets_to_withdraw - withdrawn <= assets_to_withdraw * max_loss / MAX_BPS, "too much loss"
+
         # If we got too much make sure not to increase PPS.
-        if withdrawn > assets_to_withdraw:
+        elif withdrawn > assets_to_withdraw:
             assets_to_withdraw = withdrawn
 
         # Update storage.
@@ -1711,15 +1716,20 @@ def update_max_debt_for_strategy(strategy: address, new_max_debt: uint256):
 
 @external
 @nonreentrant("lock")
-def update_debt(strategy: address, target_debt: uint256) -> uint256:
+def update_debt(
+    strategy: address, 
+    target_debt: uint256, 
+    max_loss: uint256 = MAX_BPS
+) -> uint256:
     """
     @notice Update the debt for a strategy.
     @param strategy The strategy to update the debt for.
     @param target_debt The target debt for the strategy.
+    @param max_loss Optional to check realized losses on debt decreases.
     @return The amount of debt added or removed.
     """
     self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
-    return self._update_debt(strategy, target_debt)
+    return self._update_debt(strategy, target_debt, max_loss)
 
 ## EMERGENCY MANAGEMENT ##
 @external

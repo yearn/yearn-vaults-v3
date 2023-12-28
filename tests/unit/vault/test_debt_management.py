@@ -207,26 +207,6 @@ def test_update_debt__with_new_debt_greater_than_max_desired_debt(
     assert vault.totalDebt() == initial_debt + difference
 
 
-# def test_update_debt__with_new_debt_less_than_min_desired_debt__reverts(
-#     gov, asset, vault, strategy, add_debt_to_strategy
-# ):
-#     vault_balance = asset.balanceOf(vault)
-#     current_debt = vault_balance // 2
-#     new_debt = vault_balance
-#     min_desired_debt = vault_balance * 2
-#
-#     # set existing debt
-#     add_debt_to_strategy(gov, strategy, vault, current_debt)
-#
-#     # set new max debt lower than min debt
-#     vault.update_max_debt_for_strategy(strategy.address, new_debt, sender=gov)
-#     strategy.setMinDebt(min_desired_debt, sender=gov)
-#
-#     with ape.reverts("new debt less than min debt"):
-#         vault.update_debt(strategy.address, sender=gov)
-#
-
-
 @pytest.mark.parametrize("minimum_total_idle", [0, 10**21])
 def test_set_minimum_total_idle__with_minimum_total_idle(
     gov, vault, minimum_total_idle
@@ -495,6 +475,51 @@ def test_update_debt__with_lossy_strategy_that_withdraws_less_than_requested(
     assert vault.totalDebt() == new_debt
 
 
+def test_update_debt__with_lossy_strategy_that_withdraws_less_than_requested__max_loss(
+    gov, asset, vault, lossy_strategy, add_debt_to_strategy
+):
+    vault_balance = asset.balanceOf(vault)
+
+    add_debt_to_strategy(gov, lossy_strategy, vault, vault_balance)
+
+    initial_idle = vault.totalIdle()
+    initial_debt = vault.totalDebt()
+    current_debt = vault.strategies(lossy_strategy.address).current_debt
+    loss = current_debt // 10
+    new_debt = 0
+    difference = current_debt - loss
+
+    lossy_strategy.setWithdrawingLoss(loss, sender=gov)
+
+    initial_pps = vault.pricePerShare()
+
+    # With 0 max loss should revert.
+    with ape.reverts("too much loss"):
+        vault.update_debt(lossy_strategy.address, 0, 0, sender=gov)
+
+    # Up to the loss percent still reverts
+    with ape.reverts("too much loss"):
+        vault.update_debt(lossy_strategy.address, 0, 999, sender=gov)
+
+    # Over the loss percent will succeed and account correctly.
+    tx = vault.update_debt(lossy_strategy.address, 0, 1_000, sender=gov)
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    # Should have recorded the loss
+    assert len(event) == 1
+    assert event[0].strategy == lossy_strategy.address
+    assert event[0].current_debt == current_debt
+    assert event[0].new_debt == new_debt
+
+    # assert we got back 90% of requested and it recorded the loss.
+    assert vault.pricePerShare() < initial_pps
+    assert vault.strategies(lossy_strategy.address).current_debt == new_debt
+    assert asset.balanceOf(lossy_strategy) == new_debt
+    assert asset.balanceOf(vault) == (vault_balance - loss)
+    assert vault.totalIdle() == initial_idle + difference
+    assert vault.totalDebt() == new_debt
+
+
 def test_update_debt__with_faulty_strategy_that_withdraws_more_than_requested__only_half_withdrawn(
     gov, asset, vault, lossy_strategy, add_debt_to_strategy, airdrop_asset
 ):
@@ -624,6 +649,59 @@ def test_update_debt__with_lossy_strategy_that_withdraws_less_than_requested_wit
     airdrop_asset(gov, asset, vault, fish_amount)
 
     tx = vault.update_debt(lossy_strategy.address, 0, sender=gov)
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 1
+    assert event[0].strategy == lossy_strategy.address
+    assert event[0].current_debt == current_debt
+    assert event[0].new_debt == new_debt
+
+    # assert we only got back half of what was requested and the vault recorded it correctly
+    assert vault.pricePerShare() < initial_pps
+    assert vault.strategies(lossy_strategy.address).current_debt == new_debt
+    assert asset.balanceOf(lossy_strategy) == new_debt
+    assert asset.balanceOf(vault) == (vault_balance - loss + fish_amount)
+    assert vault.totalIdle() == initial_idle + difference
+    assert vault.totalDebt() == new_debt
+
+
+def test_update_debt__with_lossy_strategy_that_withdraws_less_than_requested_with_airdrop_and_max_loss(
+    gov,
+    asset,
+    vault,
+    lossy_strategy,
+    add_debt_to_strategy,
+    airdrop_asset,
+    fish_amount,
+):
+    vault_balance = asset.balanceOf(vault)
+
+    add_debt_to_strategy(gov, lossy_strategy, vault, vault_balance)
+
+    initial_idle = vault.totalIdle()
+    initial_debt = vault.totalDebt()
+    current_debt = vault.strategies(lossy_strategy.address).current_debt
+    loss = current_debt // 10
+    new_debt = 0
+    difference = current_debt - loss
+
+    lossy_strategy.setWithdrawingLoss(loss, sender=gov)
+
+    initial_pps = vault.pricePerShare()
+
+    # airdrop some asset to the vault
+    airdrop_asset(gov, asset, vault, fish_amount)
+
+    # With 0 max loss should revert.
+    with ape.reverts("too much loss"):
+        vault.update_debt(lossy_strategy.address, 0, 0, sender=gov)
+
+    # Up to the loss percent still reverts
+    with ape.reverts("too much loss"):
+        vault.update_debt(lossy_strategy.address, 0, 999, sender=gov)
+
+    # At the amount doesn't revert
+    tx = vault.update_debt(lossy_strategy.address, 0, 1_000, sender=gov)
     event = list(tx.decode_logs(vault.DebtUpdated))
 
     assert len(event) == 1

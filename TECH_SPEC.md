@@ -163,7 +163,7 @@ This responsibility is taken by callers with DEBT_MANAGER role
 
 This role can increase or decrease strategies specific debt.
 
-The vault sends and receives funds to/from strategies. The function updateDebt(strategy, target_debt) will set the current_debt of the strategy to target_debt (if possible)
+The vault sends and receives funds to/from strategies. The function update_debt(strategy, target_debt, max_loss) will set the current_debt of the strategy to target_debt (if possible)
 
 If the strategy currently has less debt than the target_debt, the vault will send funds to it.
 
