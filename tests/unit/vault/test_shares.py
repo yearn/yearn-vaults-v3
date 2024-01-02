@@ -433,9 +433,16 @@ def test_redeem__with_delegation_and_insufficient_allowance__reverts(
 
 
 @pytest.mark.parametrize("deposit_limit", [0, 10**18, MAX_INT])
-def test_set_deposit_limit__with_deposit_limit(project, gov, asset, deposit_limit):
-    # TODO unpermissioned set deposit limit test
-    vault = gov.deploy(project.VaultV3, asset, "VaultV3", "AV", gov, WEEK)
+def test_set_deposit_limit__with_deposit_limit(
+    project, create_vault, gov, asset, deposit_limit
+):
+    vault = create_vault(
+        asset=asset,
+        governance=gov,
+        max_profit_locking_time=WEEK,
+        vault_name="VaultV3",
+        vault_symbol="AV",
+    )
     vault.set_role(gov, ROLES.DEPOSIT_LIMIT_MANAGER, sender=gov)
     tx = vault.set_deposit_limit(deposit_limit, sender=gov)
     event = list(tx.decode_logs(vault.UpdateDepositLimit))
