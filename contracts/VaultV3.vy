@@ -1211,29 +1211,20 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # For Accountant fee assessment.
     total_fees: uint256 = 0
     total_refunds: uint256 = 0
-    # For Protocol fee assessment.
-    protocol_fees: uint256 = 0
-    protocol_fee_recipient: address = empty(address)
 
     accountant: address = self.accountant
     # If accountant is not set, fees and refunds remain unchanged.
     if accountant != empty(address):
         total_fees, total_refunds = IAccountant(accountant).report(strategy, gain, loss)
 
-        # Protocol fees will be 0 if accountant fees are 0.
-        if total_fees > 0:
-            protocol_fee_bps: uint16 = 0
-            # Get the config for this vault.
-            protocol_fee_bps, protocol_fee_recipient = IFactory(self.factory).protocol_fee_config()
-
-            if(protocol_fee_bps > 0):
-                # Protocol fees are a percent of the fees the accountant is charging.
-                protocol_fees = total_fees * convert(protocol_fee_bps, uint256) / MAX_BPS
+    # For Protocol fee assessment.
+    protocol_fee_bps: uint16 = 0
+    protocol_fee_recipient: address = empty(address)
 
     # `shares_to_burn` is derived from amounts that would reduce the vaults PPS.
     # NOTE: this needs to be done before any pps changes
     shares_to_burn: uint256 = 0
-    accountant_fees_shares: uint256 = 0
+    total_fees_shares: uint256 = 0
     protocol_fees_shares: uint256 = 0
     # Only need to burn shares if there is a loss or fees.
     if loss + total_fees > 0:
@@ -1242,10 +1233,16 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
         # Vault calculates the amount of shares to mint as fees before changing totalAssets / totalSupply.
         if total_fees > 0:
-            # Accountant fees are total fees - protocol fees.
-            accountant_fees_shares = self._convert_to_shares(total_fees - protocol_fees, Rounding.ROUND_DOWN)
-            if protocol_fees > 0:
-              protocol_fees_shares = self._convert_to_shares(protocol_fees, Rounding.ROUND_DOWN)
+            # Get the total amount shares to issue for the fees.
+            total_fees_shares = self._convert_to_shares(total_fees, Rounding.ROUND_DOWN)
+
+            # Get the config for this vault.
+            protocol_fee_bps, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
+
+            # If there is a protocol fee.
+            if protocol_fee_bps > 0:
+                # Get the percent of fees to go to protocol fees.
+                protocol_fees_shares = total_fees_shares * convert(protocol_fee_bps, uint256) / MAX_BPS
 
     # Shares to lock is any amounts that would otherwise increase the vaults PPS.
     newly_locked_shares: uint256 = 0
@@ -1295,8 +1292,9 @@ def _process_report(strategy: address) -> (uint256, uint256):
         previously_locked_shares -= (shares_to_burn - shares_not_to_lock)
 
     # Issue shares for fees that were calculated above if applicable.
-    if accountant_fees_shares > 0:
-        self._issue_shares(accountant_fees_shares, accountant)
+    if total_fees_shares > 0:
+        # Accountant fees are (total_fees - protocol_fees).
+        self._issue_shares(total_fees_shares - protocol_fees_shares, accountant)
 
     if protocol_fees_shares > 0:
         self._issue_shares(protocol_fees_shares, protocol_fee_recipient)
@@ -1329,17 +1327,16 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Record the report of profit timestamp.
     self.strategies[strategy].last_report = block.timestamp
 
-    # We have to recalculate the fees paid for cases with an overall loss or now profit locking
+    # We have to recalculate the fees paid for cases with an overall loss or no profit locking
     if loss + total_fees > gain + total_refunds or profit_max_unlock_time == 0:
-        protocol_fees = self._convert_to_assets(protocol_fees_shares, Rounding.ROUND_DOWN)
-        total_fees = self._convert_to_assets(protocol_fees_shares + accountant_fees_shares, Rounding.ROUND_DOWN)
+        total_fees = self._convert_to_assets(total_fees_shares, Rounding.ROUND_DOWN)
 
     log StrategyReported(
         strategy,
         gain,
         loss,
-        self.strategies[strategy].current_debt,
-        protocol_fees,
+        unsafe_sub(unsafe_add(current_debt, gain), loss),
+        total_fees * convert(protocol_fee_bps, uint256) / MAX_BPS,
         total_fees,
         total_refunds
     )
