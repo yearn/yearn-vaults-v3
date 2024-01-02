@@ -41,7 +41,7 @@ interface IVaultFactory {
         uint256 profit_max_unlock_time
     ) external returns (address);
 
-    function vault_blueprint() external view returns (address);
+    function vault_original() external view returns (address);
 
     function apiVersion() external view returns (string memory);
 
