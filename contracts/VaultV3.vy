@@ -1311,14 +1311,18 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Record the report of profit timestamp.
     self.strategies[strategy].last_report = block.timestamp
 
-    # We have to recalculate the fees paid for cases with an overall loss.
+    # We have to recalculate the fees paid for cases with an overall loss or now profit locking
+    if loss + total_fees > gain + total_refunds or profit_max_unlock_time == 0:
+        protocol_fees = self._convert_to_assets(protocol_fees_shares, Rounding.ROUND_DOWN)
+        total_fees = self._convert_to_assets(protocol_fees_shares + accountant_fees_shares, Rounding.ROUND_DOWN)
+
     log StrategyReported(
         strategy,
         gain,
         loss,
         self.strategies[strategy].current_debt,
-        self._convert_to_assets(protocol_fees_shares, Rounding.ROUND_DOWN),
-        self._convert_to_assets(protocol_fees_shares + accountant_fees_shares, Rounding.ROUND_DOWN),
+        protocol_fees,
+        total_fees,
         total_refunds
     )
 
