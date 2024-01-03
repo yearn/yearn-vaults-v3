@@ -1241,7 +1241,8 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Record any reported gains.
     if gain > 0:
         # NOTE: this will increase total_assets
-        self.strategies[strategy].current_debt += gain
+        current_debt = unsafe_add(current_debt, gain)
+        self.strategies[strategy].current_debt = current_debt
         self.total_debt += gain
 
     profit_max_unlock_time: uint256 = self.profit_max_unlock_time
@@ -1251,7 +1252,8 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     # Strategy is reporting a loss
     if loss > 0:
-        self.strategies[strategy].current_debt -= loss
+        current_debt = unsafe_sub(current_debt, loss)
+        self.strategies[strategy].current_debt = current_debt
         self.total_debt -= loss
 
     # NOTE: should be precise (no new unlocked shares due to above's burn of shares)
@@ -1317,7 +1319,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         strategy,
         gain,
         loss,
-        unsafe_sub(unsafe_add(current_debt, gain), loss),
+        current_debt,
         total_fees * convert(protocol_fee_bps, uint256) / MAX_BPS,
         total_fees,
         total_refunds
