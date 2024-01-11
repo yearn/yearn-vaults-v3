@@ -33,7 +33,7 @@ from vyper.interfaces import ERC20
 
 interface IVault:
     def initialize(
-        asset: ERC20, 
+        asset: address, 
         name: String[64], 
         symbol: String[32], 
         role_manager: address, 
@@ -109,7 +109,7 @@ def __init__(name: String[64], vault_original: address, governance: address):
 
 @external
 def deploy_new_vault(
-    asset: ERC20, 
+    asset: address, 
     name: String[64], 
     symbol: String[32], 
     role_manager: address, 
@@ -131,7 +131,7 @@ def deploy_new_vault(
     vault_address: address = create_minimal_proxy_to(
             VAULT_ORIGINAL, 
             value=0,
-            salt=keccak256(_abi_encode(msg.sender, asset.address, name, symbol))
+            salt=keccak256(_abi_encode(msg.sender, asset, name, symbol))
         )
 
     IVault(vault_address).initialize(
@@ -142,7 +142,7 @@ def deploy_new_vault(
         profit_max_unlock_time, 
     )
         
-    log NewVault(vault_address, asset.address)
+    log NewVault(vault_address, asset)
     return vault_address
 
 @view

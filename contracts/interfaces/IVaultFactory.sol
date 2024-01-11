@@ -34,7 +34,7 @@ interface IVaultFactory {
     function use_custom_protocol_fee(address) external view returns (bool);
 
     function deploy_new_vault(
-        ERC20 asset,
+        address asset,
         string memory name,
         string memory symbol,
         address role_manager,

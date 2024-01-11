@@ -202,7 +202,7 @@ enum Rounding:
 
 # STORAGE #
 # Underlying token used by the vault.
-ASSET: ERC20
+asset: public(address)
 # Based off the `asset` decimals.
 decimals: public(uint256)
 # Deployer contract used to retrieve the protocol fee config.
@@ -272,12 +272,12 @@ PERMIT_TYPE_HASH: constant(bytes32) = keccak256("Permit(address owner,address sp
 # Constructor
 @external
 def __init__():
-    # Set `ASSET` so it cannot be re-initialized.
-    self.ASSET = ERC20(self)
+    # Set `asset` so it cannot be re-initialized.
+    self.asset = self
     
 @external
 def initialize(
-    asset: ERC20, 
+    asset: address, 
     name: String[64], 
     symbol: String[32], 
     role_manager: address, 
@@ -297,11 +297,11 @@ def initialize(
     @param profit_max_unlock_time
         The amount of time that the profit will be locked for
     """
-    assert self.ASSET.address == empty(address), "initialized"
-    assert asset.address != empty(address), "ZERO ADDRESS"
+    assert self.asset == empty(address), "initialized"
+    assert asset != empty(address), "ZERO ADDRESS"
 
-    self.ASSET = asset
-    decimals: uint256 = convert(ERC20Detailed(asset.address).decimals(), uint256)
+    self.asset = asset
+    decimals: uint256 = convert(ERC20Detailed(asset).decimals(), uint256)
     assert decimals < 256 # dev: see VVE-2020-0001
     self.decimals = decimals
     
@@ -686,7 +686,7 @@ def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
     assert assets <= self._max_deposit(recipient), "exceed deposit limit"
  
     # Transfer the tokens to the vault first.
-    self._erc20_safe_transfer_from(self.ASSET.address, msg.sender, self, assets)
+    self._erc20_safe_transfer_from(self.asset, msg.sender, self, assets)
     # Record the change in total assets.
     self.total_idle += assets
     
@@ -713,7 +713,7 @@ def _mint(sender: address, recipient: address, shares: uint256) -> uint256:
     assert assets <= self._max_deposit(recipient), "exceed deposit limit"
 
     # Transfer the tokens to the vault first.
-    self._erc20_safe_transfer_from(self.ASSET.address, msg.sender, self, assets)
+    self._erc20_safe_transfer_from(self.asset, msg.sender, self, assets)
     # Record the change in total assets.
     self.total_idle += assets
     
@@ -814,7 +814,7 @@ def _redeem(
 
     # load to memory to save gas
     current_total_idle: uint256 = self.total_idle
-    asset: ERC20 = self.ASSET
+    _asset: address = self.asset
 
     # If there are not enough assets in the Vault contract, we try to free
     # funds from strategies.
@@ -838,7 +838,7 @@ def _redeem(
         assets_to_withdraw: uint256 = 0
 
         # To compare against real withdrawals from strategies
-        previous_balance: uint256 = asset.balanceOf(self)
+        previous_balance: uint256 = ERC20(_asset).balanceOf(self)
 
         for strategy in _strategies:
             # Make sure we have a valid strategy.
@@ -902,7 +902,7 @@ def _redeem(
             
             # WITHDRAW FROM STRATEGY
             self._withdraw_from_strategy(strategy, assets_to_withdraw)
-            post_balance: uint256 = asset.balanceOf(self)
+            post_balance: uint256 = ERC20(_asset).balanceOf(self)
             
             # Always check withdrawn against the real amounts.
             withdrawn: uint256 = post_balance - previous_balance
@@ -961,7 +961,7 @@ def _redeem(
     # Commit memory to storage.
     self.total_idle = current_total_idle - requested_assets
     # Transfer the requested amount to the receiver.
-    self._erc20_safe_transfer(asset.address, receiver, requested_assets)
+    self._erc20_safe_transfer(_asset, receiver, requested_assets)
 
     log Withdraw(sender, receiver, owner, requested_assets, shares)
     return requested_assets
@@ -970,7 +970,7 @@ def _redeem(
 @internal
 def _add_strategy(new_strategy: address):
     assert new_strategy not in [self, empty(address)], "strategy cannot be zero address"
-    assert IStrategy(new_strategy).asset() == self.ASSET.address, "invalid asset"
+    assert IStrategy(new_strategy).asset() == self.asset, "invalid asset"
     assert self.strategies[new_strategy].activation == 0, "strategy already active"
 
     # Add the new strategy to the mapping.
@@ -1039,8 +1039,6 @@ def _update_debt(strategy: address, target_debt: uint256, max_loss: uint256) -> 
     new_debt: uint256 = target_debt
     # How much the strategy currently has.
     current_debt: uint256 = self.strategies[strategy].current_debt
-    # Cache for repeated use.
-    asset: ERC20 = self.ASSET
 
     # If the vault is shutdown we can only pull funds.
     if self.shutdown:
@@ -1078,10 +1076,13 @@ def _update_debt(strategy: address, target_debt: uint256, max_loss: uint256) -> 
         unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_to_withdraw)
         assert unrealised_losses_share == 0, "strategy has unrealised losses"
         
+        # Cache for repeated use.
+        _asset: address = self.asset
+
         # Always check the actual amount withdrawn.
-        pre_balance: uint256 = asset.balanceOf(self)
+        pre_balance: uint256 = ERC20(_asset).balanceOf(self)
         self._withdraw_from_strategy(strategy, assets_to_withdraw)
-        post_balance: uint256 = asset.balanceOf(self)
+        post_balance: uint256 = ERC20(_asset).balanceOf(self)
         
         # making sure we are changing idle according to the real result no matter what. 
         # We pull funds with {redeem} so there can be losses or rounding differences.
@@ -1131,16 +1132,19 @@ def _update_debt(strategy: address, target_debt: uint256, max_loss: uint256) -> 
 
         # Can't Deposit 0.
         if assets_to_deposit > 0:
+            # Cache for repeated use.
+            _asset: address = self.asset
+
             # Approve the strategy to pull only what we are giving it.
-            self._erc20_safe_approve(asset.address, strategy, assets_to_deposit)
+            self._erc20_safe_approve(_asset, strategy, assets_to_deposit)
 
             # Always update based on actual amounts deposited.
-            pre_balance: uint256 = asset.balanceOf(self)
+            pre_balance: uint256 = ERC20(_asset).balanceOf(self)
             IStrategy(strategy).deposit(assets_to_deposit, self)
-            post_balance: uint256 = asset.balanceOf(self)
+            post_balance: uint256 = ERC20(_asset).balanceOf(self)
 
             # Make sure our approval is always back to 0.
-            self._erc20_safe_approve(asset.address, strategy, 0)
+            self._erc20_safe_approve(_asset, strategy, 0)
 
             # Making sure we are changing according to the real result no 
             # matter what. This will spend more gas but makes it more robust.
@@ -1245,12 +1249,12 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Shares to lock is any amounts that would otherwise increase the vaults PPS.
     newly_locked_shares: uint256 = 0
     if total_refunds > 0:
-        # Load `ASSET` to memory.
-        asset: ERC20 = self.ASSET
+        # Load `asset` to memory.
+        _asset: address = self.asset
         # Make sure we have enough approval and enough asset to pull.
-        total_refunds = min(total_refunds, min(asset.balanceOf(accountant), asset.allowance(accountant, self)))
+        total_refunds = min(total_refunds, min(ERC20(_asset).balanceOf(accountant), ERC20(_asset).allowance(accountant, self)))
         # Transfer the refunded amount of asset to the vault.
-        self._erc20_safe_transfer_from(asset.address, accountant, self, total_refunds)
+        self._erc20_safe_transfer_from(_asset, accountant, self, total_refunds)
         # Update storage to increase total assets.
         self.total_idle += total_refunds
 
@@ -1621,7 +1625,7 @@ def buy_debt(strategy: address, amount: uint256):
 
     assert shares > 0, "cannot buy zero"
 
-    self._erc20_safe_transfer_from(self.ASSET.address, msg.sender, self, _amount)
+    self._erc20_safe_transfer_from(self.asset, msg.sender, self, _amount)
 
     # Lower strategy debt
     self.strategies[strategy].current_debt -= _amount
@@ -1878,15 +1882,6 @@ def totalSupply() -> uint256:
     @return The total supply of shares.
     """
     return self._total_supply()
-
-@view
-@external
-def asset() -> address:
-    """
-    @notice Get the address of the asset.
-    @return The address of the asset.
-    """
-    return self.ASSET.address
 
 @view
 @external
