@@ -1300,10 +1300,10 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
 
     else:
-        # NOTE: only setting this to the current timestamp will turn in the desired effect, 
+        # NOTE: only setting this to the 0 will turn in the desired effect, 
         # no need to update profit_unlocking_rate
-        self.full_profit_unlock_date = block.timestamp
-
+        self.full_profit_unlock_date = 0
+    
     # Record the report of profit timestamp.
     self.strategies[strategy].last_report = block.timestamp
 
