@@ -221,8 +221,7 @@ balance_of: HashMap[address, uint256]
 # ERC20 - owner -> (spender -> amount)
 allowance: public(HashMap[address, HashMap[address, uint256]])
 # Total amount of shares that are currently minted including those locked.
-# NOTE: To get the ERC20 compliant version user totalSupply().
-total_supply: public(uint256)
+total_supply: uint256
 # Total amount of assets that has been deposited in strategies.
 total_debt: uint256
 # Current assets held in the vault contract. Replacing balanceOf(this) to avoid price_per_share manipulation.
@@ -428,13 +427,12 @@ def _burn_unlocked_shares():
     # Get the amount of shares that have unlocked
     unlocked_shares: uint256 = self._unlocked_shares()
 
+    # Update last profit time no matter what.
+    self.last_profit_update = block.timestamp
+
     # IF 0 there's nothing to do.
     if unlocked_shares == 0:
         return
-
-    # Only do an SSTORE if necessary
-    if self.full_profit_unlock_date > block.timestamp:
-        self.last_profit_update = block.timestamp
 
     # Burn the shares unlocked.
     self._burn_shares(unlocked_shares, self)
@@ -1318,13 +1316,11 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self.profit_unlocking_rate = total_locked_shares * MAX_BPS_EXTENDED / new_profit_locking_period
         # Calculate how long until the full amount of shares is unlocked.
         self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
-        # Update the last profitable report timestamp.
-        self.last_profit_update = block.timestamp
 
     else:
-        # NOTE: only setting this to 0 will turn in the desired effect, no need 
-        # to update last_profit_update or full_profit_unlock_date
-        self.profit_unlocking_rate = 0
+        # NOTE: only setting this to the current timestamp will turn in the desired effect, 
+        # no need to update profit_unlocking_rate
+        self.full_profit_unlock_date = block.timestamp
 
     # Record the report of profit timestamp.
     self.strategies[strategy].last_report = block.timestamp
