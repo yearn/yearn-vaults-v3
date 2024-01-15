@@ -1167,9 +1167,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Make sure we have a valid strategy.
     assert self.strategies[strategy].activation != 0, "inactive strategy"
 
-    # Burn shares that have been unlocked since the last update
-    self._burn_unlocked_shares()
-
     # Vault assesses profits using 4626 compliant interface. 
     # NOTE: It is important that a strategies `convertToAssets` implementation
     # cannot be manipulated or else the vault could report incorrect gains/losses.
@@ -1199,24 +1196,30 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if accountant != empty(address):
         total_fees, total_refunds = IAccountant(accountant).report(strategy, gain, loss)
 
+        if total_refunds > 0:
+            # Make sure we have enough approval and enough asset to pull.
+            total_refunds = min(total_refunds, min(ASSET.balanceOf(accountant), ASSET.allowance(accountant, self)))
+
     # For Protocol fee assessment.
     protocol_fee_bps: uint16 = 0
     protocol_fee_recipient: address = empty(address)
 
     # `shares_to_burn` is derived from amounts that would reduce the vaults PPS.
     # NOTE: this needs to be done before any pps changes
-    shares_to_burn: uint256 = 0
+    # Burn shares that have been unlocked since the last update
+    self._burn_unlocked_shares()
     total_fees_shares: uint256 = 0
     protocol_fees_shares: uint256 = 0
+    shares_to_burn: uint256 = 0
     # Only need to burn shares if there is a loss or fees.
     if loss + total_fees > 0:
-        # The amount of shares we will want to burn to offset losses and fees.
+        # The amount of shares we will want to burn to offset losses.
         shares_to_burn += self._convert_to_shares(loss + total_fees, Rounding.ROUND_UP)
 
         # Vault calculates the amount of shares to mint as fees before changing totalAssets / totalSupply.
         if total_fees > 0:
             # Get the total amount shares to issue for the fees.
-            total_fees_shares = self._convert_to_shares(total_fees, Rounding.ROUND_DOWN)
+            total_fees_shares = shares_to_burn * total_fees / (loss + total_fees)
 
             # Get the config for this vault.
             protocol_fee_bps, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
@@ -1227,10 +1230,27 @@ def _process_report(strategy: address) -> (uint256, uint256):
                 protocol_fees_shares = total_fees_shares * convert(protocol_fee_bps, uint256) / MAX_BPS
 
     # Shares to lock is any amounts that would otherwise increase the vaults PPS.
-    newly_locked_shares: uint256 = 0
+    shares_to_lock: uint256 = 0
+    profit_max_unlock_time: uint256 = self.profit_max_unlock_time
+    # Mint anything we are locking to the vault.
+    if gain + total_refunds > 0 and profit_max_unlock_time != 0:
+        shares_to_lock = self._convert_to_shares(gain + total_refunds, Rounding.ROUND_DOWN)
+        
+    total_locked_shares: uint256 = self.balance_of[self]
+    # Either burn or mint but not both.
+    if shares_to_burn > shares_to_lock:
+        # Net burning shares.
+        shares_to_burn = min(shares_to_burn - shares_to_lock, total_locked_shares)
+        self._burn_shares(shares_to_burn, self)
+        shares_to_lock = 0
+
+    elif shares_to_lock > shares_to_burn:
+        # Net issuing of shares.
+        shares_to_lock = unsafe_sub(shares_to_lock, shares_to_burn)
+        self._issue_shares(shares_to_lock, self)
+
+
     if total_refunds > 0:
-        # Make sure we have enough approval and enough asset to pull.
-        total_refunds = min(total_refunds, min(ASSET.balanceOf(accountant), ASSET.allowance(accountant, self)))
         # Transfer the refunded amount of asset to the vault.
         self._erc20_safe_transfer_from(ASSET.address, accountant, self, total_refunds)
         # Update storage to increase total assets.
@@ -1243,35 +1263,11 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self.strategies[strategy].current_debt = current_debt
         self.total_debt += gain
 
-    profit_max_unlock_time: uint256 = self.profit_max_unlock_time
-    # Mint anything we are locking to the vault.
-    if gain + total_refunds > 0 and profit_max_unlock_time != 0:
-        newly_locked_shares = self._issue_shares_for_amount(gain + total_refunds, self)
-
     # Strategy is reporting a loss
     if loss > 0:
         current_debt = unsafe_sub(current_debt, loss)
         self.strategies[strategy].current_debt = current_debt
         self.total_debt -= loss
-
-    # NOTE: should be precise (no new unlocked shares due to above's burn of shares)
-    # newly_locked_shares have already been minted / transferred to the vault, so they need to be subtracted
-    # no risk of underflow because they have just been minted.
-    previously_locked_shares: uint256 = self.balance_of[self] - newly_locked_shares
-
-    # Now that pps has updated, we can burn the shares we intended to burn as a result of losses/fees.
-    # NOTE: If a value reduction (losses / fees) has occurred, prioritize burning locked profit to avoid
-    # negative impact on price per share. Price per share is reduced only if losses exceed locked value.
-    if shares_to_burn > 0:
-        # Cant burn more than the vault owns.
-        shares_to_burn = min(shares_to_burn, previously_locked_shares + newly_locked_shares)
-        self._burn_shares(shares_to_burn, self)
-
-        # We burn first the newly locked shares, then the previously locked shares.
-        shares_not_to_lock: uint256 = min(shares_to_burn, newly_locked_shares)
-        # Reduce the amounts to lock by how much we burned
-        newly_locked_shares -= shares_not_to_lock
-        previously_locked_shares -= (shares_to_burn - shares_not_to_lock)
 
     # Issue shares for fees that were calculated above if applicable.
     if total_fees_shares > 0:
@@ -1282,7 +1278,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self._issue_shares(protocol_fees_shares, protocol_fee_recipient)
 
     # Update unlocking rate and time to fully unlocked.
-    total_locked_shares: uint256 = previously_locked_shares + newly_locked_shares
+    total_locked_shares = self.balance_of[self]
     if total_locked_shares > 0:
         previously_locked_time: uint256 = 0
         _full_profit_unlock_date: uint256 = self.full_profit_unlock_date
@@ -1290,15 +1286,16 @@ def _process_report(strategy: address) -> (uint256, uint256):
         if _full_profit_unlock_date > block.timestamp: 
             # There will only be previously locked shares if time remains.
             # We calculate this here since it will not occur every time we lock shares.
-            previously_locked_time = previously_locked_shares * (_full_profit_unlock_date - block.timestamp)
+            previously_locked_time = (total_locked_shares - shares_to_lock) * (_full_profit_unlock_date - block.timestamp)
 
         # new_profit_locking_period is a weighted average between the remaining time of the previously locked shares and the profit_max_unlock_time
-        new_profit_locking_period: uint256 = (previously_locked_time + newly_locked_shares * profit_max_unlock_time) / total_locked_shares
+        new_profit_locking_period: uint256 = (previously_locked_time + shares_to_lock * profit_max_unlock_time) / total_locked_shares
         # Calculate how many shares unlock per second.
         self.profit_unlocking_rate = total_locked_shares * MAX_BPS_EXTENDED / new_profit_locking_period
         # Calculate how long until the full amount of shares is unlocked.
         self.full_profit_unlock_date = block.timestamp + new_profit_locking_period
-
+        # Update the last profitable report timestamp.
+        self.last_profit_update = block.timestamp
     else:
         # NOTE: only setting this to the 0 will turn in the desired effect, 
         # no need to update profit_unlocking_rate
