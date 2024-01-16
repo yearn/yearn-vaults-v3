@@ -409,25 +409,6 @@ def _total_supply() -> uint256:
     # Need to account for the shares issued to the vault that have unlocked.
     return self.total_supply - self._unlocked_shares()
 
-@internal
-def _burn_unlocked_shares():
-    """
-    Burns shares that have been unlocked since last update. 
-    In case the full unlocking period has passed, it stops the unlocking.
-    """
-    # Get the amount of shares that have unlocked
-    unlocked_shares: uint256 = self._unlocked_shares()
-
-    # Update last profit time no matter what.
-    self.last_profit_update = block.timestamp
-
-    # IF 0 there's nothing to do.
-    if unlocked_shares == 0:
-        return
-
-    # Burn the shares unlocked.
-    self._burn_shares(unlocked_shares, self)
-
 @view
 @internal
 def _total_assets() -> uint256:
@@ -1203,6 +1184,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # `shares_to_burn` is derived from amounts that would reduce the vaults PPS.
     # NOTE: this needs to be done before any pps changes
     shares_to_burn: uint256 = 0
+    # Total fees to charge in shares.
     total_fees_shares: uint256 = 0
     # For Protocol fee assessment.
     protocol_fee_bps: uint16 = 0
@@ -1210,10 +1192,10 @@ def _process_report(strategy: address) -> (uint256, uint256):
     protocol_fee_recipient: address = empty(address)
     # Only need to burn shares if there is a loss or fees.
     if loss + total_fees > 0:
-        # The amount of shares we will want to burn to offset losses.
+        # The amount of shares we will want to burn to offset losses and fees.
         shares_to_burn = self._convert_to_shares(loss + total_fees, Rounding.ROUND_UP)
 
-        # Vault calculates the amount of shares to mint as fees before changing totalAssets / totalSupply.
+        # If we have fees then get the proportional amount of shares.
         if total_fees > 0:
             # Get the total amount shares to issue for the fees.
             total_fees_shares = shares_to_burn * total_fees / (loss + total_fees)
@@ -1253,6 +1235,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     # Adjust the amount to lock for this period.
     if shares_to_lock > shares_to_burn:
+        # Don't lock fees or losses.
         shares_to_lock -= shares_to_burn
     else:
         shares_to_burn = 0
