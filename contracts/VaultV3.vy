@@ -1200,21 +1200,18 @@ def _process_report(strategy: address) -> (uint256, uint256):
             # Make sure we have enough approval and enough asset to pull.
             total_refunds = min(total_refunds, min(ASSET.balanceOf(accountant), ASSET.allowance(accountant, self)))
 
-    # For Protocol fee assessment.
-    protocol_fee_bps: uint16 = 0
-    protocol_fee_recipient: address = empty(address)
-
     # `shares_to_burn` is derived from amounts that would reduce the vaults PPS.
     # NOTE: this needs to be done before any pps changes
-    # Burn shares that have been unlocked since the last update
-    self._burn_unlocked_shares()
-    total_fees_shares: uint256 = 0
-    protocol_fees_shares: uint256 = 0
     shares_to_burn: uint256 = 0
+    total_fees_shares: uint256 = 0
+    # For Protocol fee assessment.
+    protocol_fee_bps: uint16 = 0
+    protocol_fees_shares: uint256 = 0
+    protocol_fee_recipient: address = empty(address)
     # Only need to burn shares if there is a loss or fees.
     if loss + total_fees > 0:
         # The amount of shares we will want to burn to offset losses.
-        shares_to_burn += self._convert_to_shares(loss + total_fees, Rounding.ROUND_UP)
+        shares_to_burn = self._convert_to_shares(loss + total_fees, Rounding.ROUND_UP)
 
         # Vault calculates the amount of shares to mint as fees before changing totalAssets / totalSupply.
         if total_fees > 0:
@@ -1235,21 +1232,32 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Mint anything we are locking to the vault.
     if gain + total_refunds > 0 and profit_max_unlock_time != 0:
         shares_to_lock = self._convert_to_shares(gain + total_refunds, Rounding.ROUND_DOWN)
-        
+
+    # The total current supply including locked shares.
+    total_supply: uint256 = self.total_supply
+    # The total shares the vault currently owns.
     total_locked_shares: uint256 = self.balance_of[self]
-    # Either burn or mint but not both.
-    if shares_to_burn > shares_to_lock:
-        # Net burning shares.
-        shares_to_burn = min(shares_to_burn - shares_to_lock, total_locked_shares)
-        self._burn_shares(shares_to_burn, self)
-        shares_to_lock = 0
+    # Get the expected end amount of shares after all accounting.
+    ending_supply: uint256 = total_supply + shares_to_lock - shares_to_burn - self._unlocked_shares()
 
-    elif shares_to_lock > shares_to_burn:
-        # Net issuing of shares.
-        shares_to_lock = unsafe_sub(shares_to_lock, shares_to_burn)
-        self._issue_shares(shares_to_lock, self)
+    # If we will end with more tokens than we have now.
+    if ending_supply > total_supply:
+        # Issue the difference.
+        self._issue_shares(unsafe_sub(ending_supply, total_supply), self)
 
+    # Else we need to burn shares.
+    elif total_supply > ending_supply:
+        # Can't burn more than the vault owns.
+        to_burn: uint256 = min(unsafe_sub(total_supply, ending_supply), total_locked_shares)
+        self._burn_shares(to_burn, self)
 
+    # Adjust the amount to lock for this period.
+    if shares_to_lock > shares_to_burn:
+        shares_to_lock -= shares_to_burn
+    else:
+        shares_to_burn = 0
+
+    # Pull refunds
     if total_refunds > 0:
         # Transfer the refunded amount of asset to the vault.
         self._erc20_safe_transfer_from(ASSET.address, accountant, self, total_refunds)
