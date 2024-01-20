@@ -1160,6 +1160,8 @@ def _process_report(strategy: address) -> (uint256, uint256):
     gain: uint256 = 0
     loss: uint256 = 0
 
+    ### Asses Gain or Loss ###
+
     # Compare reported assets vs. the current debt.
     if total_assets > current_debt:
         # We have a gain.
@@ -1167,13 +1169,14 @@ def _process_report(strategy: address) -> (uint256, uint256):
     else:
         # We have a loss.
         loss = unsafe_sub(current_debt, total_assets)
+    
+    ### Asses Fees and Refunds ###
 
     # For Accountant fee assessment.
     total_fees: uint256 = 0
     total_refunds: uint256 = 0
-
-    accountant: address = self.accountant
     # If accountant is not set, fees and refunds remain unchanged.
+    accountant: address = self.accountant
     if accountant != empty(address):
         total_fees, total_refunds = IAccountant(accountant).report(strategy, gain, loss)
 
@@ -1181,26 +1184,26 @@ def _process_report(strategy: address) -> (uint256, uint256):
             # Make sure we have enough approval and enough asset to pull.
             total_refunds = min(total_refunds, min(ASSET.balanceOf(accountant), ASSET.allowance(accountant, self)))
 
-    # `shares_to_burn` is derived from amounts that would reduce the vaults PPS.
-    # NOTE: this needs to be done before any pps changes
-    shares_to_burn: uint256 = 0
     # Total fees to charge in shares.
     total_fees_shares: uint256 = 0
     # For Protocol fee assessment.
     protocol_fee_bps: uint16 = 0
     protocol_fees_shares: uint256 = 0
     protocol_fee_recipient: address = empty(address)
+    # `shares_to_burn` is derived from amounts that would reduce the vaults PPS.
+    # NOTE: this needs to be done before any pps changes
+    shares_to_burn: uint256 = 0
     # Only need to burn shares if there is a loss or fees.
     if loss + total_fees > 0:
         # The amount of shares we will want to burn to offset losses and fees.
         shares_to_burn = self._convert_to_shares(loss + total_fees, Rounding.ROUND_UP)
 
-        # If we have fees then get the proportional amount of shares.
+        # If we have fees then get the proportional amount of shares to issue.
         if total_fees > 0:
             # Get the total amount shares to issue for the fees.
             total_fees_shares = shares_to_burn * total_fees / (loss + total_fees)
 
-            # Get the config for this vault.
+            # Get the protocol fee config for this vault.
             protocol_fee_bps, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
 
             # If there is a protocol fee.
@@ -1208,21 +1211,23 @@ def _process_report(strategy: address) -> (uint256, uint256):
                 # Get the percent of fees to go to protocol fees.
                 protocol_fees_shares = total_fees_shares * convert(protocol_fee_bps, uint256) / MAX_BPS
 
-    # Shares to lock is any amounts that would otherwise increase the vaults PPS.
+
+    # Shares to lock is any amount that would otherwise increase the vaults PPS.
     shares_to_lock: uint256 = 0
     profit_max_unlock_time: uint256 = self.profit_max_unlock_time
-    # Mint anything we are locking to the vault.
+    # Get the amount we will lock to avoid a PPS increase.
     if gain + total_refunds > 0 and profit_max_unlock_time != 0:
         shares_to_lock = self._convert_to_shares(gain + total_refunds, Rounding.ROUND_DOWN)
 
     # The total current supply including locked shares.
     total_supply: uint256 = self.total_supply
-    # The total shares the vault currently owns.
+    # The total shares the vault currently owns. Both locked and unlocked.
     total_locked_shares: uint256 = self.balance_of[self]
-    # Get the expected end amount of shares after all accounting.
+
+    # Get the desired end amount of shares after all accounting.
     ending_supply: uint256 = total_supply + shares_to_lock - shares_to_burn - self._unlocked_shares()
 
-    # If we will end with more tokens than we have now.
+    # If we will end with more shares than we have now.
     if ending_supply > total_supply:
         # Issue the difference.
         self._issue_shares(unsafe_sub(ending_supply, total_supply), self)
@@ -1236,7 +1241,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     # Adjust the amount to lock for this period.
     if shares_to_lock > shares_to_burn:
         # Don't lock fees or losses.
-        shares_to_lock -= shares_to_burn
+        shares_to_lock = unsafe_sub(shares_to_lock, shares_to_burn)
     else:
         shares_to_burn = 0
 
@@ -1254,8 +1259,8 @@ def _process_report(strategy: address) -> (uint256, uint256):
         self.strategies[strategy].current_debt = current_debt
         self.total_debt += gain
 
-    # Strategy is reporting a loss
-    if loss > 0:
+    # Or record any reported loss
+    elif loss > 0:
         current_debt = unsafe_sub(current_debt, loss)
         self.strategies[strategy].current_debt = current_debt
         self.total_debt -= loss
@@ -1265,8 +1270,9 @@ def _process_report(strategy: address) -> (uint256, uint256):
         # Accountant fees are (total_fees - protocol_fees).
         self._issue_shares(total_fees_shares - protocol_fees_shares, accountant)
 
-    if protocol_fees_shares > 0:
-        self._issue_shares(protocol_fees_shares, protocol_fee_recipient)
+        # If we also have protocol fees.
+        if protocol_fees_shares > 0:
+            self._issue_shares(protocol_fees_shares, protocol_fee_recipient)
 
     # Update unlocking rate and time to fully unlocked.
     total_locked_shares = self.balance_of[self]
@@ -1304,7 +1310,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         gain,
         loss,
         current_debt,
-        total_fees * convert(protocol_fee_bps, uint256) / MAX_BPS,
+        total_fees * convert(protocol_fee_bps, uint256) / MAX_BPS, # Protocol Fees
         total_fees,
         total_refunds
     )
