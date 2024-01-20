@@ -58,7 +58,7 @@ contract MockTokenizedStrategy is TokenizedStrategy {
     function availableDepositLimit(
         address
     ) public view virtual returns (uint256) {
-        uint256 _totalAssets = strategyStorage().totalIdle;
+        uint256 _totalAssets = totalAssets();
         uint256 _maxDebt = maxDebt;
         return _maxDebt > _totalAssets ? _maxDebt - _totalAssets : 0;
     }
