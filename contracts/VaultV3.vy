@@ -777,22 +777,23 @@ def _redeem(
     receiver: address, 
     owner: address,
     assets: uint256,
-    shares_to_burn: uint256, 
+    shares: uint256, 
     max_loss: uint256,
     strategies: DynArray[address, MAX_QUEUE]
 ) -> uint256:
     """
     This will attempt to free up the full amount of assets equivalent to
-    `shares_to_burn` and transfer them to the `receiver`. If the vault does
+    `shares` and transfer them to the `receiver`. If the vault does
     not have enough idle funds it will go through any strategies provided by
-    either the withdrawer or the queue_manager to free up enough funds to 
+    either the withdrawer or the default_queue to free up enough funds to 
     service the request.
 
     The vault will attempt to account for any unrealized losses taken on from
     strategies since their respective last reports.
 
     Any losses realized during the withdraw from a strategy will be passed on
-    to the user that is redeeming their vault shares.
+    to the user that is redeeming their vault shares unless it exceeds the given
+    `max_loss`.
     """
     assert receiver != empty(address), "ZERO ADDRESS"
     assert max_loss <= MAX_BPS, "max loss"
@@ -801,14 +802,12 @@ def _redeem(
     if self.withdraw_limit_module != empty(address):
         assert assets <= self._max_withdraw(owner, max_loss, strategies), "exceed withdraw limit"
 
-    shares: uint256 = shares_to_burn
-    shares_balance: uint256 = self.balance_of[owner]
-
+    assert assets > 0, "no assets to withdraw"
     assert shares > 0, "no shares to redeem"
-    assert shares_balance >= shares, "insufficient shares to redeem"
+    assert self.balance_of[owner] >= shares, "insufficient shares to redeem"
     
     if sender != owner:
-        self._spend_allowance(owner, sender, shares_to_burn)
+        self._spend_allowance(owner, sender, shares)
 
     # The amount of the underlying token to withdraw.
     requested_assets: uint256 = assets
@@ -852,7 +851,7 @@ def _redeem(
             assets_to_withdraw = min(assets_needed, current_debt)
 
             # Cache max_withdraw now for use if unrealized loss > 0
-            # Use maxRedeem and convert since we use redeem.
+            # Use maxRedeem and convert it since we use redeem.
             max_withdraw: uint256 = IStrategy(strategy).convertToAssets(
                 IStrategy(strategy).maxRedeem(self)
             )
@@ -905,7 +904,7 @@ def _redeem(
             self._withdraw_from_strategy(strategy, assets_to_withdraw)
             post_balance: uint256 = ERC20(_asset).balanceOf(self)
             
-            # Always check withdrawn against the real amounts.
+            # Always check against the real amounts.
             withdrawn: uint256 = post_balance - previous_balance
             loss: uint256 = 0
             # Check if we redeemed too much.
