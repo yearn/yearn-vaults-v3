@@ -729,8 +729,11 @@ def _mint(sender: address, recipient: address, shares: uint256) -> uint256:
 def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256) -> uint256:
     """
     Returns the share of losses that a user would take if withdrawing from this strategy
+    This accounts for losses that have been realized at the strategy level but not yet
+    realized at the vault level.
+
     e.g. if the strategy has unrealised losses for 10% of its current debt and the user 
-    wants to withdraw 1000 tokens, the losses that he will take are 100 token
+    wants to withdraw 1_000 tokens, the losses that they will take is 100 token
     """
     # Minimum of how much debt the debt should be worth.
     strategy_current_debt: uint256 = self.strategies[strategy].current_debt
@@ -746,12 +749,12 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
     # but will only receive assets_to_withdraw.
     # NOTE: If there are unrealised losses, the user will take his share.
     numerator: uint256 = assets_needed * strategy_assets
-    losses_user_share: uint256 = assets_needed - numerator / strategy_current_debt
+    users_share_of_loss: uint256 = assets_needed - numerator / strategy_current_debt
     # Always round up.
     if numerator % strategy_current_debt != 0:
-        losses_user_share += 1
+        users_share_of_loss += 1
 
-    return losses_user_share
+    return users_share_of_loss
 
 @internal
 def _withdraw_from_strategy(strategy: address, assets_to_withdraw: uint256):
@@ -796,14 +799,14 @@ def _redeem(
     `max_loss`.
     """
     assert receiver != empty(address), "ZERO ADDRESS"
+    assert shares > 0, "no shares to redeem"
+    assert assets > 0, "no assets to withdraw"
     assert max_loss <= MAX_BPS, "max loss"
-
+    
     # If there is a withdraw limit module, check the max.
     if self.withdraw_limit_module != empty(address):
         assert assets <= self._max_withdraw(owner, max_loss, strategies), "exceed withdraw limit"
 
-    assert assets > 0, "no assets to withdraw"
-    assert shares > 0, "no shares to redeem"
     assert self.balance_of[owner] >= shares, "insufficient shares to redeem"
     
     if sender != owner:
@@ -1460,8 +1463,12 @@ def setProfitMaxUnlockTime(new_profit_max_unlock_time: uint256):
 
     # If setting to 0 we need to reset any locked values.
     if (new_profit_max_unlock_time == 0):
-        # Burn any shares the vault still has.
-        self._burn_shares(self.balance_of[self], self)
+
+        share_balance: uint256 = self.balance_of[self]
+        if share_balance > 0:
+            # Burn any shares the vault still has.
+            self._burn_shares(share_balance, self)
+
         # Reset unlocking variables to 0.
         self.profit_unlocking_rate = 0
         self.full_profit_unlock_date = 0
