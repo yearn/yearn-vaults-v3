@@ -206,7 +206,7 @@ asset: public(address)
 # Based off the `asset` decimals.
 decimals: public(uint256)
 # Deployer contract used to retrieve the protocol fee config.
-FACTORY: public(address)
+factory: address
 
 # HashMap that records all the strategies that are allowed to receive assets from the vault.
 strategies: public(HashMap[address, StrategyParams])
@@ -305,7 +305,8 @@ def initialize(
     assert decimals < 256 # dev: see VVE-2020-0001
     self.decimals = decimals
     
-    self.FACTORY = msg.sender
+    # Set the factory as the deployer address.
+    self.factory = msg.sender
 
     # Must be less than one year for report cycles
     assert profit_max_unlock_time <= 31_556_952 # dev: profit unlock time too long
@@ -1223,7 +1224,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         if total_fees > 0:
             protocol_fee_bps: uint16 = 0
             # Get the config for this vault.
-            protocol_fee_bps, protocol_fee_recipient = IFactory(self.FACTORY).protocol_fee_config()
+            protocol_fee_bps, protocol_fee_recipient = IFactory(self.factory).protocol_fee_config()
 
             if(protocol_fee_bps > 0):
                 # Protocol fees are a percent of the fees the accountant is charging.
@@ -2029,6 +2030,16 @@ def previewRedeem(shares: uint256) -> uint256:
     @return The amount of assets that would be withdrawn.
     """
     return self._convert_to_assets(shares, Rounding.ROUND_DOWN)
+
+@view
+@external
+def FACTORY() -> address:
+    """
+    @notice Address of the factory that deployed the vault.
+    @dev Is used to retrieve the protocol fees.
+    @return Address of the vault factory.
+    """
+    return self.factory
 
 @view
 @external
