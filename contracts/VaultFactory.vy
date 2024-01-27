@@ -8,11 +8,9 @@
     This vault Factory can be used by anyone wishing to deploy their own
     ERC4626 compliant Yearn V3 Vault of the same API version.
 
-    The factory uses the Blueprint (ERC-5202) standard to handle the
-    deployment of any new vaults off of the immutable address stored 
-    at `VAULT_BLUEPRINT`. This allows the vaults to be deployed and
-    initialized fully on-chain with their init byte code, thus not 
-    requiring any delegatecall patterns or post deployment initialization.
+    The factory clones new vaults from its specific `VAULT_ORIGINAL`
+    immutable address set on creation of the factory.
+    
     The deployments are done through create2 with a specific `salt` 
     that is derived from a combination of the deployer's address,
     the underlying asset used, as well as the name and symbol specified.
@@ -32,6 +30,15 @@
 """
 
 from vyper.interfaces import ERC20
+
+interface IVault:
+    def initialize(
+        asset: address, 
+        name: String[64], 
+        symbol: String[32], 
+        role_manager: address, 
+        profit_max_unlock_time: uint256
+    ): nonpayable
 
 event NewVault:
     vault_address: indexed(address)
@@ -74,7 +81,7 @@ API_VERSION: constant(String[28]) = "3.0.2"
 MAX_FEE_BPS: constant(uint16) = 5_000 # 50%
 
 # The address that all newly deployed vaults are based from.
-VAULT_BLUEPRINT: immutable(address)
+VAULT_ORIGINAL: immutable(address)
 
 # State of the Factory. If True no new vaults can be deployed.
 shutdown: public(bool)
@@ -95,21 +102,21 @@ custom_protocol_fee: public(HashMap[address, uint16])
 use_custom_protocol_fee: public(HashMap[address, bool])
 
 @external
-def __init__(name: String[64], vault_blueprint: address, governance: address):
+def __init__(name: String[64], vault_original: address, governance: address):
     self.name = name
-    VAULT_BLUEPRINT = vault_blueprint
+    VAULT_ORIGINAL = vault_original
     self.governance = governance
 
 @external
 def deploy_new_vault(
-    asset: ERC20, 
+    asset: address, 
     name: String[64], 
     symbol: String[32], 
     role_manager: address, 
     profit_max_unlock_time: uint256
 ) -> address:
     """
-    @notice Deploys a new vault base on the bLueprint.
+    @notice Deploys a new clone of the original vault.
     @param asset The asset to be used for the vault.
     @param name The name of the new vault.
     @param symbol The symbol of the new vault.
@@ -120,29 +127,32 @@ def deploy_new_vault(
     # Make sure the factory is not shutdown.
     assert not self.shutdown, "shutdown"
 
-    # Deploy the new vault using the blueprint.
-    vault_address: address = create_from_blueprint(
-            VAULT_BLUEPRINT, 
-            asset, 
-            name, 
-            symbol, 
-            role_manager, 
-            profit_max_unlock_time, 
-            code_offset=3, 
-            salt=keccak256(_abi_encode(msg.sender, asset.address, name, symbol))
+    # Clone a new version of the vault using create2.
+    vault_address: address = create_minimal_proxy_to(
+            VAULT_ORIGINAL, 
+            value=0,
+            salt=keccak256(_abi_encode(msg.sender, asset, name, symbol))
         )
+
+    IVault(vault_address).initialize(
+        asset, 
+        name, 
+        symbol, 
+        role_manager, 
+        profit_max_unlock_time, 
+    )
         
-    log NewVault(vault_address, asset.address)
+    log NewVault(vault_address, asset)
     return vault_address
 
 @view
 @external
-def vault_blueprint()-> address:
+def vault_original()-> address:
     """
-    @notice Get the address of the vault blueprint
-    @return The address of the vault blueprint
+    @notice Get the address of the vault to clone from
+    @return The address of the original vault.
     """
-    return VAULT_BLUEPRINT
+    return VAULT_ORIGINAL
 
 @view
 @external

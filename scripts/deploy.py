@@ -10,7 +10,7 @@ from copy import deepcopy
 deployer = accounts.load("")
 
 
-def deploy_blueprint_and_factory():
+def deploy_original_and_factory():
     print("Deploying Vault Factory on ChainID", chain.chain_id)
 
     if input("Do you want to continue? ") == "n":
@@ -35,43 +35,26 @@ def deploy_blueprint_and_factory():
     print(f"Salt we are using {salt}")
     print("Init balance:", deployer.balance / 1e18)
 
-    # generate and deploy blueprint
-    vault_copy = deepcopy(vault)
-    blueprint_bytecode = b"\xFE\x71\x00" + HexBytes(
-        vault_copy.contract_type.deployment_bytecode.bytecode
-    )
-    len_bytes = len(blueprint_bytecode).to_bytes(2, "big")
-    blueprint_constructor = vault_copy.constructor.encode_input(
-        ZERO_ADDRESS, "", "", ZERO_ADDRESS, 0
+    print(f"Deploying Original...")
+
+    original_deploy_bytecode = vault.contract_type.deployment_bytecode.bytecode
+
+    original_tx = deployer_contract.deploy(
+        original_deploy_bytecode, salt, sender=deployer
     )
 
-    # ERC5202
-    blueprint_deploy_bytecode = HexBytes(
-        b"\x61"
-        + len_bytes
-        + b"\x3d\x81\x60\x0a\x3d\x39\xf3"
-        + blueprint_bytecode
-        + blueprint_constructor
-    )
+    original_event = list(original_tx.decode_logs(deployer_contract.Deployed))
 
-    print(f"Deploying BluePrint...")
+    original_address = original_event[0].addr
 
-    blueprint_tx = deployer_contract.deploy(
-        blueprint_deploy_bytecode, salt, sender=deployer
-    )
-
-    blueprint_event = list(blueprint_tx.decode_logs(deployer_contract.Deployed))
-
-    blueprint_address = blueprint_event[0].addr
-
-    print(f"Deployed the vault Blueprint to {blueprint_address}")
+    print(f"Deployed the vault original to {original_address}")
 
     # deploy factory
     print(f"Deploying factory...")
 
     factory_constructor = vault_factory.constructor.encode_input(
-        "Yearn v3.0.1 Vault Factory",
-        blueprint_address,
+        "Yearn v3.0.2 Vault Factory",
+        original_address,
         "0x33333333D5eFb92f19a5F94a43456b3cec2797AE",
     )
 
@@ -92,4 +75,4 @@ def deploy_blueprint_and_factory():
 
 
 def main():
-    deploy_blueprint_and_factory()
+    deploy_original_and_factory()
