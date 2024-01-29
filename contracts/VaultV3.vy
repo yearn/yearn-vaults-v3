@@ -1186,6 +1186,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         # We have a loss.
         loss = unsafe_sub(current_debt, total_assets)
     
+    _asset: address = self.asset
     ### Asses Fees and Refunds ###
 
     # For Accountant fee assessment.
@@ -1198,7 +1199,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
         if total_refunds > 0:
             # Make sure we have enough approval and enough asset to pull.
-            total_refunds = min(total_refunds, min(ASSET.balanceOf(accountant), ASSET.allowance(accountant, self)))
+            total_refunds = min(total_refunds, min(ERC20(_asset).balanceOf(accountant), ERC20(_asset).allowance(accountant, self)))
 
     # Total fees to charge in shares.
     total_fees_shares: uint256 = 0
@@ -1220,7 +1221,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
             total_fees_shares = shares_to_burn * total_fees / (loss + total_fees)
 
             # Get the protocol fee config for this vault.
-            protocol_fee_bps, protocol_fee_recipient = IFactory(FACTORY).protocol_fee_config()
+            protocol_fee_bps, protocol_fee_recipient = IFactory(self.factory).protocol_fee_config()
 
             # If there is a protocol fee.
             if protocol_fee_bps > 0:
@@ -1239,10 +1240,9 @@ def _process_report(strategy: address) -> (uint256, uint256):
     total_supply: uint256 = self.total_supply
     # The total shares the vault currently owns. Both locked and unlocked.
     total_locked_shares: uint256 = self.balance_of[self]
-
     # Get the desired end amount of shares after all accounting.
     ending_supply: uint256 = total_supply + shares_to_lock - shares_to_burn - self._unlocked_shares()
-
+    
     # If we will end with more shares than we have now.
     if ending_supply > total_supply:
         # Issue the difference.
