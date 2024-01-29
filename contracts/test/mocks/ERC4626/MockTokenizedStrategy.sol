@@ -7,19 +7,6 @@ contract MockTokenizedStrategy is TokenizedStrategy {
     uint256 public minDebt;
     uint256 public maxDebt = type(uint256).max;
 
-    // Private variables and functions used in this mock.
-    bytes32 public constant BASE_STRATEGY_STORAGE =
-        bytes32(uint256(keccak256("yearn.base.strategy.storage")) - 1);
-
-    function strategyStorage() internal pure returns (StrategyData storage S) {
-        // Since STORAGE_SLOT is a constant, we have to put a variable
-        // on the stack to access it from an inline assembly block.
-        bytes32 slot = BASE_STRATEGY_STORAGE;
-        assembly {
-            S.slot := slot
-        }
-    }
-
     constructor(
         address _asset,
         string memory _name,
@@ -27,7 +14,7 @@ contract MockTokenizedStrategy is TokenizedStrategy {
         address _keeper
     ) {
         // Cache storage pointer
-        StrategyData storage S = strategyStorage();
+        StrategyData storage S = _strategyStorage();
 
         // Set the strategy's underlying asset
         S.asset = ERC20(_asset);
@@ -58,7 +45,7 @@ contract MockTokenizedStrategy is TokenizedStrategy {
     function availableDepositLimit(
         address
     ) public view virtual returns (uint256) {
-        uint256 _totalAssets = strategyStorage().totalAssets;
+        uint256 _totalAssets = _strategyStorage().totalAssets;
         uint256 _maxDebt = maxDebt;
         return _maxDebt > _totalAssets ? _maxDebt - _totalAssets : 0;
     }
@@ -74,6 +61,6 @@ contract MockTokenizedStrategy is TokenizedStrategy {
     function freeFunds(uint256 _amount) external virtual {}
 
     function harvestAndReport() external virtual returns (uint256) {
-        return strategyStorage().asset.balanceOf(address(this));
+        return _strategyStorage().asset.balanceOf(address(this));
     }
 }
