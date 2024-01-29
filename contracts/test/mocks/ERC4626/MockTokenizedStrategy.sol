@@ -42,7 +42,6 @@ contract MockTokenizedStrategy is TokenizedStrategy {
         maxDebt = _maxDebt;
     }
 
-
     function availableDepositLimit(
         address
     ) public view virtual returns (uint256) {
