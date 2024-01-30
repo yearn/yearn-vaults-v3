@@ -2013,7 +2013,7 @@ def maxRedeem(
     """
     return min(
         # Convert to shares is rounding up so we check against the full balance.
-        self._convert_to_shares(self._max_withdraw(owner, max_loss, strategies), Rounding.ROUND_UP),
+        self._convert_to_shares(self._max_withdraw(owner, max_loss, strategies), Rounding.ROUND_DOWN),
         self.balance_of[owner]
     )
 
