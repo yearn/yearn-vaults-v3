@@ -969,7 +969,7 @@ def _redeem(
 
 ## STRATEGY MANAGEMENT ##
 @internal
-def _add_strategy(new_strategy: address):
+def _add_strategy(new_strategy: address, add_to_queue: bool):
     assert new_strategy not in [self, empty(address)], "strategy cannot be zero address"
     assert IStrategy(new_strategy).asset() == self.asset, "invalid asset"
     assert self.strategies[new_strategy].activation == 0, "strategy already active"
@@ -982,8 +982,8 @@ def _add_strategy(new_strategy: address):
         max_debt: 0
     })
 
-    # If the default queue has space, add the strategy.
-    if len(self.default_queue) < MAX_QUEUE:
+    # If we are adding to the queue and the default queue has space, add the strategy.
+    if add_to_queue and len(self.default_queue) < MAX_QUEUE:
         self.default_queue.append(new_strategy)        
         
     log StrategyChanged(new_strategy, StrategyChangeType.ADDED)
@@ -1645,13 +1645,13 @@ def buy_debt(strategy: address, amount: uint256):
 
 ## STRATEGY MANAGEMENT ##
 @external
-def add_strategy(new_strategy: address):
+def add_strategy(new_strategy: address, add_to_queue: bool=True):
     """
     @notice Add a new strategy.
     @param new_strategy The new strategy to add.
     """
     self._enforce_role(msg.sender, Roles.ADD_STRATEGY_MANAGER)
-    self._add_strategy(new_strategy)
+    self._add_strategy(new_strategy, add_to_queue)
 
 @external
 def revoke_strategy(strategy: address):
