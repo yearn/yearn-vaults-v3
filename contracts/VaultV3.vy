@@ -2012,7 +2012,7 @@ def maxRedeem(
     @return The maximum amount of shares that can be redeemed.
     """
     return min(
-        # Convert to shares is rounding up so we check against the full balance.
+        # Min of the shares equivalent of max_withdraw or the full balance
         self._convert_to_shares(self._max_withdraw(owner, max_loss, strategies), Rounding.ROUND_DOWN),
         self.balance_of[owner]
     )
