@@ -1,12 +1,14 @@
 [profile.default]
-src = 'src'
+src = 'contracts'
+test = 'foundry_test'     
 out = 'out'
 libs = ['lib']
 solc = "0.8.18"
 
 remappings = [
     'forge-std/=lib/forge-std/src/',
-    '@openzeppelin/=lib/openzeppelin-contracts/',
+    'erc4626-tests/=lib/erc4626-tests/',
+    '@openzeppelin/contracts=contracts/.cache/openzeppelin/v4.9.5/',
 ]
 fs_permissions = [{ access = "read", path = "./"}]
 
