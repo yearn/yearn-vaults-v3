@@ -1807,7 +1807,7 @@ def test_redeem__half_of_strategy_assets_from_locked_lossy_strategy_with_unreali
     asset,
     create_vault,
     create_strategy,
-    create_locked_strategy,
+    create_lossy_strategy,
     user_deposit,
     add_strategy_to_vault,
     add_debt_to_strategy,
@@ -1822,7 +1822,7 @@ def test_redeem__half_of_strategy_assets_from_locked_lossy_strategy_with_unreali
     )  # withdraw a quarter deposit (half of strategy debt)
     shares = amount
     liquid_strategy = create_strategy(vault)
-    lossy_strategy = create_locked_strategy(vault)
+    lossy_strategy = create_lossy_strategy(vault)
     strategies = [lossy_strategy, liquid_strategy]
     max_loss = 10_000
 
@@ -1840,9 +1840,9 @@ def test_redeem__half_of_strategy_assets_from_locked_lossy_strategy_with_unreali
         add_debt_to_strategy(gov, strategy, vault, amount_per_strategy)
 
     # lose half of assets in lossy strategy
-    asset.transfer(gov, amount_to_lose, sender=lossy_strategy)
+    lossy_strategy.setLoss(gov, amount_to_lose, sender=lossy_strategy)
     # Lock half the remaining funds.
-    lossy_strategy.setLockedFunds(amount_to_lock, DAY, sender=gov)
+    lossy_strategy.setLockedFunds(amount_to_lock, sender=gov)
 
     tx = vault.redeem(
         amount_to_withdraw,
@@ -1861,7 +1861,7 @@ def test_redeem__half_of_strategy_assets_from_locked_lossy_strategy_with_unreali
 
     event = list(tx.decode_logs(vault.Withdraw))
 
-    assert len(event) >= 1
+    assert len(event) > 1
     n = len(event) - 1
     assert event[n].sender == fish
     assert event[n].receiver == fish
@@ -1889,7 +1889,7 @@ def test_redeem__half_of_strategy_assets_from_locked_lossy_strategy_with_unreali
     assert asset.balanceOf(vault) == 0
     assert asset.balanceOf(liquid_strategy) == amount_per_strategy - expected_liquid_out
     assert (
-        asset.balanceOf(lossy_strategy)
+        asset.balanceOf(lossy_strategy.yieldSource())
         == amount_per_strategy - amount_to_lose - expected_locked_out
     )  # withdrawn from strategy
     assert (
