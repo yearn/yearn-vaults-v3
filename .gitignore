@@ -17,3 +17,5 @@ venv/
 .vscode
 yarn.lock
 env
+cache/
+out/
