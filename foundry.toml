@@ -1,19 +1,19 @@
 [profile.default]
 src = 'contracts'
-test = 'foundry_test'     
+test = 'foundry_tests'     
 out = 'out'
 libs = ['lib']
-solc = "0.8.18"
 
 remappings = [
     'forge-std/=lib/forge-std/src/',
     'erc4626-tests/=lib/erc4626-tests/',
+    "@tokenized-strategy=contracts/.cache/tokenized-strategy/dev_302",
     '@openzeppelin/contracts=contracts/.cache/openzeppelin/v4.9.5/',
 ]
 fs_permissions = [{ access = "read", path = "./"}]
 
 [fuzz]
-runs = 10_00
+runs = 10_0
 max_test_rejects = 1_000_000
 
 [invariant]

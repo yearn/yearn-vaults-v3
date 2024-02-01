@@ -1,7 +1,8 @@
 pyenv.cfg
 vyper_git_commithash.txt
 bin/
-
+cache/
+out/
 share/
 build/
 include/
