@@ -12,8 +12,7 @@ import {IVaultFactory} from "../../contracts/interfaces/IVaultFactory.sol";
 
 import {VyperDeployer} from "./VyperDeployer.sol";
 
-contract Setup is ExtendedTest  {
-
+contract Setup is ExtendedTest {
     IVault public vault;
     ERC20Mock public asset;
     IVaultFactory public vaultFactory;
@@ -42,22 +41,14 @@ contract Setup is ExtendedTest  {
 
     function setupFactory() public returns (IVaultFactory _factory) {
         address original = vyperDeployer.deployContract(
-                "contracts/",
-                "VaultV3"
+            "contracts/",
+            "VaultV3"
         );
 
-        bytes memory args = abi.encode(
-            "Test vault Factory",
-            original,
-            daddy
-        );
+        bytes memory args = abi.encode("Test vault Factory", original, daddy);
 
         _factory = IVaultFactory(
-            vyperDeployer.deployContract(
-                "contracts/",
-                "VaultFactory",
-                args
-            )
+            vyperDeployer.deployContract("contracts/", "VaultFactory", args)
         );
     }
 

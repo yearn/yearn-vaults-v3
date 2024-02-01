@@ -23,7 +23,7 @@ contract VyperDeployer {
     /// @notice Initializes cheat codes in order to use ffi to compile Vyper contracts
     _CheatCodes cheatCodes = _CheatCodes(HEVM_ADDRESS);
 
-     /**
+    /**
      * @dev Compiles a Vyper contract and returns the address that the contract
      * was deployed to. If the deployment fails, an error is thrown.
      * @param path The directory path of the Vyper contract.
@@ -32,9 +32,10 @@ contract VyperDeployer {
      * For example, the file name for "Token.vy" is "Token".
      * @return deployedAddress The address that the contract was deployed to.
      */
-    function deployContract(string memory path, string memory fileName)
-        public
-        returns (address) {
+    function deployContract(
+        string memory path,
+        string memory fileName
+    ) public returns (address) {
         ///@notice create a list of strings with the commands necessary to compile Vyper contracts
         string[] memory cmds = new string[](2);
         cmds[0] = "vyper";
@@ -42,7 +43,7 @@ contract VyperDeployer {
 
         ///@notice compile the Vyper contract and return the bytecode
         bytes memory bytecode = cheatCodes.ffi(cmds);
-        
+
         ///@notice deploy the bytecode with the create instruction
         address deployedAddress;
         assembly {

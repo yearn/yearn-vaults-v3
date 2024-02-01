@@ -19,11 +19,6 @@ contract VaultERC4626StdTest is ERC4626Test, Setup {
     // NOTE: The following tests are relaxed to consider only smaller values (of type uint120),
     // since the maxWithdraw(), and maxRedeem() functions fail with large values (due to overflow).
 
-    function test_totalAssets(Init memory init) public override {
-        init = clamp(init, type(uint120).max);
-        super.test_totalAssets(init);
-    }
-
     function test_maxWithdraw(Init memory init) public override {
         init = clamp(init, type(uint120).max);
         super.test_maxWithdraw(init);
@@ -34,7 +29,10 @@ contract VaultERC4626StdTest is ERC4626Test, Setup {
         super.test_maxRedeem(init);
     }
 
-    function clamp(Init memory init, uint max) internal pure returns (Init memory) {
+    function clamp(
+        Init memory init,
+        uint max
+    ) internal pure returns (Init memory) {
         for (uint i = 0; i < N; i++) {
             init.share[i] = init.share[i] % max;
             init.asset[i] = init.asset[i] % max;
@@ -42,5 +40,4 @@ contract VaultERC4626StdTest is ERC4626Test, Setup {
         init.yield = init.yield % int(max);
         return init;
     }
-    
 }
