@@ -22,6 +22,8 @@ contract Setup is ExtendedTest  {
     address public daddy = address(69);
     address public vaultManagement = address(2);
 
+    uint256 public maxFuzzAmount = 1e30;
+
     function setUp() public virtual {
         vyperDeployer = new VyperDeployer();
 
@@ -75,7 +77,7 @@ contract Setup is ExtendedTest  {
         _vault.set_role(vaultManagement, Roles.ALL);
 
         vm.prank(vaultManagement);
-        _vault.set_deposit_limit(1e30);
+        _vault.set_deposit_limit(type(uint256).max);
 
         return _vault;
     }
