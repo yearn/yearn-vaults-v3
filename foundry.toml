@@ -1,0 +1,21 @@
+[profile.default]
+src = 'src'
+out = 'out'
+libs = ['lib']
+solc = "0.8.18"
+
+remappings = [
+    'forge-std/=lib/forge-std/src/',
+    '@openzeppelin/=lib/openzeppelin-contracts/',
+]
+fs_permissions = [{ access = "read", path = "./"}]
+
+[fuzz]
+runs = 10_00
+max_test_rejects = 1_000_000
+
+[invariant]
+runs = 100
+depth = 100
+
+# See more config options https://github.com/gakonst/foundry/tree/master/config
