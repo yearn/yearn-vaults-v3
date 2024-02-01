@@ -63,4 +63,4 @@ jobs:
           version: nightly
 
       - name: Foundry tests
-        run: forge test -vvv --match-contract VaultERC4626StdTest --ffi
+        run: forge test -vvv

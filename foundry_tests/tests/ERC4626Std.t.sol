@@ -3,7 +3,7 @@ pragma solidity 0.8.18;
 
 import "erc4626-tests/ERC4626.test.sol";
 
-import {Setup} from "./utils/Setup.sol";
+import {Setup} from "../utils/Setup.sol";
 
 // SEE https://github.com/a16z/erc4626-tests
 contract VaultERC4626StdTest is ERC4626Test, Setup {
@@ -42,4 +42,5 @@ contract VaultERC4626StdTest is ERC4626Test, Setup {
         init.yield = init.yield % int(max);
         return init;
     }
+    
 }
