@@ -20,7 +20,7 @@ abstract contract ERC4626BaseStrategy is ERC4626 {
     constructor(
         address _vault,
         address _asset
-    ) ERC4626(IERC20Metadata(address(_asset))) {
+    ) ERC4626(IERC20(address(_asset))) {
         _initialize(_vault, _asset);
     }
 
@@ -30,13 +30,7 @@ abstract contract ERC4626BaseStrategy is ERC4626 {
         vault = _vault;
     }
 
-    function decimals()
-        public
-        view
-        virtual
-        override(ERC20, IERC20Metadata)
-        returns (uint8)
-    {
+    function decimals() public view virtual override returns (uint8) {
         return _decimals;
     }
 

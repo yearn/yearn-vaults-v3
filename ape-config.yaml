@@ -9,7 +9,7 @@ default_ecosystem: ethereum
 dependencies:
   - name: openzeppelin
     github: OpenZeppelin/openzeppelin-contracts
-    ref: 4.7.3
+    ref: 4.9.5
   - name: tokenized-strategy
     github: yearn/tokenized-strategy
     ref: dev_302
@@ -17,7 +17,7 @@ dependencies:
 
 solidity:
   import_remapping:
-    - "@openzeppelin/contracts=openzeppelin/v4.7.3"
+    - "@openzeppelin/contracts=openzeppelin/v4.9.5"
     - "@tokenized-strategy=tokenized-strategy/dev_302"
 
 ethereum:
