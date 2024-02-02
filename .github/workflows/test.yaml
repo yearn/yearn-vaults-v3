@@ -31,7 +31,7 @@ jobs:
       run: ape compile --force --size
 
     - name: Install Foundry
-      uses: foundry-rs/foundry-toolchain@v1.0.10
+      uses: foundry-rs/foundry-toolchain@v1
 
     - name: output current installation
       run: pip freeze
