@@ -223,10 +223,11 @@ def create_vault(project, gov, vault_factory):
 
 # create default liquid strategy with 0 fee
 @pytest.fixture(scope="session")
-def create_strategy(project, strategist, gov):
+def create_strategy(project, strategist, gov, vault_factory):
     def create_strategy(vault):
         return strategist.deploy(
             project.MockTokenizedStrategy,
+            vault_factory.address,
             vault.asset(),
             "Mock Tokenized Strategy",
             strategist,
