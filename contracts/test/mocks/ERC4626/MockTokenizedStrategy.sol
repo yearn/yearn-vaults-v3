@@ -8,11 +8,12 @@ contract MockTokenizedStrategy is TokenizedStrategy {
     uint256 public maxDebt = type(uint256).max;
 
     constructor(
+        address _factory,
         address _asset,
         string memory _name,
         address _management,
         address _keeper
-    ) {
+    ) TokenizedStrategy(_factory) {
         // Cache storage pointer
         StrategyData storage S = _strategyStorage();
 

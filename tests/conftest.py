@@ -247,10 +247,11 @@ def create_locked_strategy(project, strategist):
 
 # create lossy strategy with 0 fee
 @pytest.fixture(scope="session")
-def create_lossy_strategy(project, strategist, gov):
+def create_lossy_strategy(project, strategist, gov, vault_factory):
     def create_lossy_strategy(vault):
         return strategist.deploy(
             project.ERC4626LossyStrategy,
+            vault_factory.address,
             vault.asset(),
             "Mock Tokenized Strategy",
             strategist,

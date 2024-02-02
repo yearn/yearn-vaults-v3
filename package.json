@@ -11,8 +11,8 @@
         "solhint-plugin-yearn": "pandadefi/solhint-plugin-yearn"
     },
     "scripts": {
-        "format": "prettier --write 'contracts/**/*.(sol|json)' 'foundry_tests/**/*.(sol|json)'",
-        "format:check": "prettier --check 'contracts/**/*.*(sol|json)' 'foundry_tests/**/*.(sol|json)'",
+        "format": "prettier --write 'contracts/**/*.(sol|json)' 'foundry/**/*.(sol|json)'",
+        "format:check": "prettier --check 'contracts/**/*.*(sol|json)' 'foundry/**/*.(sol|json)'",
         "lint": "solhint 'contracts/**/*.sol' 'foundry_tests/**/*.sol'"
     }
 }
