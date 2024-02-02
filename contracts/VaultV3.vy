@@ -204,7 +204,7 @@ enum Rounding:
 # Underlying token used by the vault.
 asset: public(address)
 # Based off the `asset` decimals.
-decimals: public(uint256)
+decimals: public(uint8)
 # Deployer contract used to retrieve the protocol fee config.
 factory: address
 
@@ -302,7 +302,7 @@ def initialize(
     self.asset = asset
     decimals: uint256 = convert(ERC20Detailed(asset).decimals(), uint256)
     assert decimals < 256 # dev: see VVE-2020-0001
-    self.decimals = decimals
+    self.decimals = convert(decimals, uint8)
     
     # Set the factory as the deployer address.
     self.factory = msg.sender
@@ -1570,7 +1570,7 @@ def pricePerShare() -> uint256:
         exact precision should use convertToAssets or convertToShares instead.
     @return The price per share.
     """
-    return self._convert_to_assets(10 ** self.decimals, Rounding.ROUND_DOWN)
+    return self._convert_to_assets(10 ** convert(self.decimals, uint256), Rounding.ROUND_DOWN)
 
 @view
 @external
