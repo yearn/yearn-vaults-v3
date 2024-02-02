@@ -32,15 +32,13 @@ jobs:
       run: ape compile --force --size
 
     - name: Install Foundry
-      uses: foundry-rs/foundry-toolchain@v1
-      with:
-        version: nightly
+      uses: foundry-rs/foundry-toolchain@v1.0.10
 
     - name: output current installation
       run: pip freeze
 
     - name: Run Ape tests
-      run: ape test -s
+      run: ape test
       timeout-minutes: 15
       env:
         TOKENS_TO_TEST: ${{ matrix.tokens_to_test }}
