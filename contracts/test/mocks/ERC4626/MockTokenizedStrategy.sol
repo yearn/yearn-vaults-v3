@@ -24,7 +24,7 @@ contract MockTokenizedStrategy is TokenizedStrategy {
         S.decimals = ERC20(_asset).decimals();
 
         // Set last report to this block.
-        S.lastReport = uint128(block.timestamp);
+        S.lastReport = uint96(block.timestamp);
 
         // Set the default management address. Can't be 0.
         require(_management != address(0), "ZERO ADDRESS");
