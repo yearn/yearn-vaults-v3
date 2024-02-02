@@ -214,6 +214,8 @@ def create_vault(project, gov, vault_factory):
         # set vault deposit
         vault.set_deposit_limit(deposit_limit, sender=gov)
 
+        chain.provider._make_request("anvil_setBalance", [vault.address, 10**18])
+
         return vault
 
     yield create_vault
@@ -548,6 +550,10 @@ def initial_set_up(
             if accountant_mint:
                 airdrop_asset(gov, asset, accountant, accountant_mint)
 
+            chain.provider._make_request(
+                "anvil_setBalance", [accountant.address, 10**18]
+            )
+
         # Deposit assets to vault and get strategy ready
         user_deposit(user, vault, asset, debt_amount)
         add_strategy_to_vault(gov, strategy, vault)
@@ -598,6 +604,10 @@ def initial_set_up_lossy(
             )
             if accountant_mint:
                 airdrop_asset(gov, asset, accountant, accountant_mint)
+
+            chain.provider._make_request(
+                "anvil_setBalance", [accountant.address, 10**18]
+            )
 
         # Deposit assets to vault and get strategy ready
         user_deposit(user, vault, asset, debt_amount)
