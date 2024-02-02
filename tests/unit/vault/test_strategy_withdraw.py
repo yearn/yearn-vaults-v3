@@ -1,4 +1,5 @@
 import ape
+from ape import chain
 import pytest
 from utils import checks
 from utils.constants import DAY, ROLES
@@ -1840,6 +1841,7 @@ def test_redeem__half_of_strategy_assets_from_locked_lossy_strategy_with_unreali
         add_debt_to_strategy(gov, strategy, vault, amount_per_strategy)
 
     # lose half of assets in lossy strategy
+    chain.provider._make_request("anvil_setBalance", [lossy_strategy.address, 10**18])
     lossy_strategy.setLoss(gov, amount_to_lose, sender=lossy_strategy)
     # Lock half the remaining funds.
     lossy_strategy.setLockedFunds(amount_to_lock, sender=gov)
@@ -1938,6 +1940,7 @@ def test_redeem__half_of_strategy_assets_from_locked_lossy_strategy_with_unreali
         add_debt_to_strategy(gov, strategy, vault, amount_per_strategy)
 
     # lose half of assets in lossy strategy
+    chain.provider._make_request("anvil_setBalance", [lossy_strategy.address, 10**18])
     asset.transfer(gov, amount_to_lose, sender=lossy_strategy)
     # Lock half the remaining funds.
     lossy_strategy.setLockedFunds(amount_to_lock, DAY, sender=gov)

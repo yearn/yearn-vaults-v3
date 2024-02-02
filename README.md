@@ -18,7 +18,6 @@ You will need:
  - [Foundry](https://book.getfoundry.sh/getting-started/installation)
  - Linux or macOS
  - Windows: Install Windows Subsystem Linux (WSL) with Python 3.8 or later
- - [Hardhat](https://hardhat.org/) installed globally
 
 ## Installation
 
@@ -72,5 +71,3 @@ forge test
 ### To make a contribution please follow the [guidelines](https://github.com/yearn/yearn-vaults-v3/bloc/master/CONTRIBUTING.md)
 
 See the ApeWorx [documentation](https://docs.apeworx.io/ape/stable/) and [github](https://github.com/ApeWorX/ape) for more information.
-
-You will need hardhat to run the test `yarn`

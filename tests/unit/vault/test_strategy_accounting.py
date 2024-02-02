@@ -602,6 +602,7 @@ def test_process_report__with_loss_and_refunds__not_enough_allowance(
     refund_ratio = 10_000
 
     accountant = deploy_faulty_accountant(vault)
+    chain.provider._make_request("anvil_setBalance", [accountant.address, 10**18])
     # set up accountant with not enough funds
     actual_refund = loss // 2
     asset.mint(accountant, loss, sender=gov)

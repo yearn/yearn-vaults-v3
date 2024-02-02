@@ -3,9 +3,14 @@ name: yearn-v3
 plugins:
   - name: solidity
   - name: vyper
-  - name: hardhat
+  - name: foundry
 
 default_ecosystem: ethereum
+
+foundry:
+  base_fee: 0
+  priority_fee: 0
+
 dependencies:
   - name: openzeppelin
     github: OpenZeppelin/openzeppelin-contracts
@@ -22,4 +27,4 @@ solidity:
 
 ethereum:
   local:
-    default_provider: hardhat
+    default_provider: foundry

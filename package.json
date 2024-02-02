@@ -2,7 +2,6 @@
     "name": "yearn-vaults-v3",
     "devDependencies": {
         "@openzeppelin/contracts": "^4.7.3",
-        "hardhat": "^2.12.2",
         "prettier": "^2.6.0",
         "prettier-plugin-solidity": "^1.0.0-beta.19",
         "pretty-quick": "^3.1.3",
@@ -12,8 +11,8 @@
         "solhint-plugin-yearn": "pandadefi/solhint-plugin-yearn"
     },
     "scripts": {
-        "format": "prettier --write 'contracts/**/*.(sol|json)' 'foundry_tests/**/*.(sol|json)'",
-        "format:check": "prettier --check 'contracts/**/*.*(sol|json)' 'foundry_tests/**/*.(sol|json)'",
+        "format": "prettier --write 'contracts/**/*.(sol|json)' 'foundry/**/*.(sol|json)'",
+        "format:check": "prettier --check 'contracts/**/*.*(sol|json)' 'foundry/**/*.(sol|json)'",
         "lint": "solhint 'contracts/**/*.sol' 'foundry_tests/**/*.sol'"
     }
 }
