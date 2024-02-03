@@ -14,7 +14,8 @@ This repository runs on [ApeWorx](https://www.apeworx.io/). A python based devel
 
 You will need:
  - Python 3.8 or later
- - Vyper 0.3.7
+ - [Vyper 0.3.7](https://docs.vyperlang.org/en/stable/installing-vyper.html)
+ - [Foundry](https://book.getfoundry.sh/getting-started/installation)
  - Linux or macOS
  - Windows: Install Windows Subsystem Linux (WSL) with Python 3.8 or later
  - [Hardhat](https://hardhat.org/) installed globally
@@ -24,7 +25,7 @@ You will need:
 Fork the repository and clone onto your local device 
 
 ```
-git clone https://github.com/user/yearn-vaults-v3
+git clone --recursive https://github.com/user/yearn-vaults-v3
 cd yearn-vaults-v3
 ```
 
@@ -59,6 +60,14 @@ and test smart contracts with:
 ```
 ape test
 ```
+
+To run the Foundry tests
+ 
+NOTE: You will need to first compile with Ape before running foundry tests.
+```
+forge test
+```
+
 
 ### To make a contribution please follow the [guidelines](https://github.com/yearn/yearn-vaults-v3/bloc/master/CONTRIBUTING.md)
 

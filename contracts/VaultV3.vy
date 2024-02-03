@@ -564,8 +564,11 @@ def _max_deposit(receiver: address) -> uint256:
         return IDepositLimitModule(deposit_limit_module).available_deposit_limit(receiver)
     
     # Else use the standard flow.
-    _total_assets: uint256 = self._total_assets()
     _deposit_limit: uint256 = self.deposit_limit
+    if (_deposit_limit == max_value(uint256)):
+        return _deposit_limit
+
+    _total_assets: uint256 = self._total_assets()
     if (_total_assets >= _deposit_limit):
         return 0
 

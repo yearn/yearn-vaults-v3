@@ -15,6 +15,6 @@
     "not-rely-on-time": "off",
     "private-vars-leading-underscore": "warn",
     "reason-string": ["warn", { "maxLength": 64 }],
-    "yearn/underscore-function-args": "error"
+    "yearn/underscore-function-args": "off"
   }
 }

@@ -32,12 +32,13 @@ contract ERC4626LossyStrategy is MockTokenizedStrategy {
     address public yieldSource;
 
     constructor(
+        address _factory,
         address _asset,
         string memory _name,
         address _management,
         address _keeper,
         address _vault
-    ) MockTokenizedStrategy(_asset, _name, _management, _keeper) {
+    ) MockTokenizedStrategy(_factory, _asset, _name, _management, _keeper) {
         yieldSource = address(new YieldSource(_asset));
         ERC20(_asset).safeApprove(yieldSource, type(uint256).max);
         // So we can record losses when it happens.
