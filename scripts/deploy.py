@@ -2,6 +2,7 @@ from ape import project, accounts, Contract, chain, networks
 from hexbytes import HexBytes
 import hashlib
 
+
 def deploy_original_and_factory():
     print("Deploying Vault Factory on ChainID", chain.chain_id)
 
