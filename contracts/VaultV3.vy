@@ -5,7 +5,7 @@
 @license GNU AGPLv3
 @author yearn.finance
 @notice
-    The Yearn VaultV3 is designed as an non-opinionated system to distribute funds of 
+    The Yearn VaultV3 is designed as a non-opinionated system to distribute funds of 
     depositors for a specific `asset` into different opportunities (aka Strategies)
     and manage accounting in a robust way.
 
@@ -28,26 +28,26 @@
     initial deposit.
 
     The vault is built to be customized by the management to be able to fit their
-    specific desired needs Including the customization of strategies, accountants, 
+    specific desired needs. Including the customization of strategies, accountants, 
     ownership etc.
 """
+
+# INTERFACES #
 
 from vyper.interfaces import ERC20
 from vyper.interfaces import ERC20Detailed
 
-# INTERFACES #
 interface IStrategy:
     def asset() -> address: view
     def balanceOf(owner: address) -> uint256: view
-    def maxDeposit(receiver: address) -> uint256: view
-    def redeem(shares: uint256, receiver: address, owner: address) -> uint256: nonpayable
-    def deposit(assets: uint256, receiver: address) -> uint256: nonpayable
-    def totalAssets() -> (uint256): view
     def convertToAssets(shares: uint256) -> uint256: view
     def convertToShares(assets: uint256) -> uint256: view
     def previewWithdraw(assets: uint256) -> uint256: view
+    def maxDeposit(receiver: address) -> uint256: view
+    def deposit(assets: uint256, receiver: address) -> uint256: nonpayable
     def maxRedeem(owner: address) -> uint256: view
-
+    def redeem(shares: uint256, receiver: address, owner: address) -> uint256: nonpayable
+    
 interface IAccountant:
     def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
 
@@ -300,6 +300,7 @@ def initialize(
     assert asset != empty(address), "ZERO ADDRESS"
 
     self.asset = asset
+    # Get the decimals for the vault to use.
     decimals: uint256 = convert(ERC20Detailed(asset).decimals(), uint256)
     assert decimals < 256 # dev: see VVE-2020-0001
     self.decimals = convert(decimals, uint8)
@@ -394,7 +395,7 @@ def _burn_shares(shares: uint256, owner: address):
 def _unlocked_shares() -> uint256:
     """
     Returns the amount of shares that have been unlocked.
-    To avoid sudden price_per_share spikes, profits must be processed 
+    To avoid sudden price_per_share spikes, profits can be processed 
     through an unlocking period. The mechanism involves shares to be 
     minted to the vault which are unlocked gradually over time. Shares 
     that have been locked are gradually unlocked over profit_max_unlock_time.
@@ -1191,7 +1192,9 @@ def _process_report(strategy: address) -> (uint256, uint256):
         # We have a loss.
         loss = unsafe_sub(current_debt, total_assets)
     
+    # Cache `asset` for repeated use.
     _asset: address = self.asset
+
     ### Asses Fees and Refunds ###
 
     # For Accountant fee assessment.

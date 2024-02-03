@@ -68,6 +68,16 @@ NOTE: You will need to first compile with Ape before running foundry tests.
 forge test
 ```
 
+## Deployment
+
+Deployments of the Vault Factory are done using create2 to be at a deterministic address on any EVM chain.
+
+Check the [docs](https://docs.yearn.fi/developers/v3/overview) for the most updated deployment address.
+
+Deployments on new chains can be done permissionlessly by anyone using the included script.
+```
+ape run scripts/deploy.py --network YOUR_RPC_URL
+```
 
 ### To make a contribution please follow the [guidelines](https://github.com/yearn/yearn-vaults-v3/bloc/master/CONTRIBUTING.md)
 

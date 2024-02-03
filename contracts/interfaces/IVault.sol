@@ -54,8 +54,6 @@ interface IVault is IERC4626 {
 
     function use_default_queue() external view returns (bool);
 
-    function total_supply() external view returns (uint256);
-
     function minimum_total_idle() external view returns (uint256);
 
     function deposit_limit() external view returns (uint256);
