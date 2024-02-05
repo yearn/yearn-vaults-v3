@@ -163,7 +163,7 @@ This responsibility is taken by callers with DEBT_MANAGER role
 
 This role can increase or decrease strategies specific debt.
 
-The vault sends and receives funds to/from strategies. The function updateDebt(strategy, target_debt) will set the current_debt of the strategy to target_debt (if possible)
+The vault sends and receives funds to/from strategies. The function update_debt(strategy, target_debt, max_loss) (max_loss defaults to 100%) will set the current_debt of the strategy to target_debt (if possible)
 
 If the strategy currently has less debt than the target_debt, the vault will send funds to it.
 
@@ -224,15 +224,15 @@ Strategies are completely independent smart contracts that can be implemented fo
 
 In any case, to be compatible with the vault, they need to implement the following functions, which are a subset of ERC4626 vaults: 
 - asset(): view returning underlying asset
-- totalAssets(): view returning current amount of assets. It can include rewards valued in `asset` ¡
 - maxDeposit(address): view returning the amount max that the strategy can take safely
 - deposit(assets, receiver): deposits `assets` amount of tokens into the strategy. it can be restricted to vault only or be open
+- maxRedeem(owner): return the max amount of shares that `owner` can redeem.
 - redeem(shares, receiver, owner): redeems `shares` of the strategy for the underlying asset.
 - balanceOf(address): return the number of shares of the strategy that the address has
 - convertToAssets(shares): Converts `shares` into the corresponding amount of asset.
 - convertToShares(assets): Converts `assets` into the corresponding amount of shares.
 - previewWithdraw(assets): Converts `assets` into the corresponding amount of shares rounding up.
-- maxRedeem(owner): return the max amount of shares that `owner` can redeem.
+
 
 This means that the vault can deposit into any ERC4626 vault but also that a non-compliant strategy can be implemented provided that these functions have been implemented (even in a non ERC4626 compliant way). 
 

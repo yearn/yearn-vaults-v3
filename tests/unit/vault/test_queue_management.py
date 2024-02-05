@@ -230,7 +230,6 @@ def test_withdraw__queue__with_inactive_strategy__reverts(
         )
 
 
-# TODO: Add test to check removal and adding strategies works.
 def test__add_strategy__adds_to_queue(create_vault, asset, gov, create_strategy):
     vault = create_vault(asset)
 
@@ -245,6 +244,23 @@ def test__add_strategy__adds_to_queue(create_vault, asset, gov, create_strategy)
     vault.add_strategy(strategy_two.address, sender=gov)
 
     assert vault.get_default_queue() == [strategy_one.address, strategy_two.address]
+
+
+def test__add_strategy__dont_add_to_queue(create_vault, asset, gov, create_strategy):
+    vault = create_vault(asset)
+
+    assert vault.get_default_queue() == []
+
+    strategy_one = create_strategy(vault)
+    vault.add_strategy(strategy_one.address, False, sender=gov)
+
+    assert vault.get_default_queue() == []
+    assert vault.strategies(strategy_one)["activation"] != 0
+
+    strategy_two = create_strategy(vault)
+    vault.add_strategy(strategy_two.address, False, sender=gov)
+
+    assert vault.get_default_queue() == []
 
 
 def test__add_eleven_strategies__adds_ten_to_queue(
@@ -292,6 +308,23 @@ def test__revoke_strategy__removes_strategy_from_queue(
     vault.revoke_strategy(strategy_one.address, sender=gov)
 
     assert vault.strategies(strategy_one.address)["activation"] == 0
+    assert vault.get_default_queue() == []
+
+
+def test__revoke_strategy_not_in_queue(create_vault, asset, gov, create_strategy):
+    vault = create_vault(asset)
+
+    assert vault.get_default_queue() == []
+
+    strategy_one = create_strategy(vault)
+    vault.add_strategy(strategy_one.address, False, sender=gov)
+
+    assert vault.get_default_queue() == []
+    assert vault.strategies(strategy_one)["activation"] != 0
+
+    vault.revoke_strategy(strategy_one.address, sender=gov)
+
+    assert vault.strategies(strategy_one)["activation"] == 0
     assert vault.get_default_queue() == []
 
 
@@ -372,7 +405,7 @@ def test__set_default_queue(create_vault, asset, gov, create_strategy):
     event_queue = list(event[0].new_default_queue)
     # Need to checksum each address to compare it correctly.
     for i in range(len(new_queue)):
-        assert Web3.toChecksumAddress(event_queue[i]) == new_queue[i]
+        assert Web3.to_checksum_address(event_queue[i]) == new_queue[i]
 
 
 def test__set_default_queue__inactive_strategy__reverts(

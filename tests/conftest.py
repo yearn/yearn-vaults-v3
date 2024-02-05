@@ -1,7 +1,7 @@
 import pytest
 from ape import chain
 from ape.types import ContractLog
-from eth_account.messages import encode_structured_data
+from eth_account.messages import encode_typed_data
 from utils.constants import MAX_INT, ROLES, WEEK
 import time
 import os
@@ -139,29 +139,17 @@ def create_token(project, gov):
 
 
 @pytest.fixture(scope="session")
-def vault_blueprint(project, gov):
-    blueprint_bytecode = b"\xFE\x71\x00" + HexBytes(
-        project.VaultV3.contract_type.deployment_bytecode.bytecode
-    )  # ERC5202
-    len_bytes = len(blueprint_bytecode).to_bytes(2, "big")
-    deploy_bytecode = HexBytes(
-        b"\x61" + len_bytes + b"\x3d\x81\x60\x0a\x3d\x39\xf3" + blueprint_bytecode
-    )
-
-    c = w3.eth.contract(abi=[], bytecode=deploy_bytecode)
-    deploy_transaction = c.constructor()
-    tx_info = {"from": gov.address, "value": 0, "gasPrice": 0}
-    tx_hash = deploy_transaction.transact(tx_info)
-
-    return w3.eth.get_transaction_receipt(tx_hash)["contractAddress"]
+def vault_original(project, gov):
+    vault = gov.deploy(project.VaultV3)
+    return vault.address
 
 
 @pytest.fixture(scope="session")
-def vault_factory(project, gov, vault_blueprint):
+def vault_factory(project, gov, vault_original):
     return gov.deploy(
         project.VaultFactory,
-        "Vault V3 Factory 3.0.1-beta",
-        vault_blueprint,
+        "Vault V3 Factory test",
+        vault_original,
         gov.address,
     )
 
@@ -233,10 +221,11 @@ def create_vault(project, gov, vault_factory):
 
 # create default liquid strategy with 0 fee
 @pytest.fixture(scope="session")
-def create_strategy(project, strategist, gov):
+def create_strategy(project, strategist, gov, vault_factory):
     def create_strategy(vault):
         return strategist.deploy(
             project.MockTokenizedStrategy,
+            vault_factory.address,
             vault.asset(),
             "Mock Tokenized Strategy",
             strategist,
@@ -257,10 +246,11 @@ def create_locked_strategy(project, strategist):
 
 # create lossy strategy with 0 fee
 @pytest.fixture(scope="session")
-def create_lossy_strategy(project, strategist, gov):
+def create_lossy_strategy(project, strategist, gov, vault_factory):
     def create_lossy_strategy(vault):
         return strategist.deploy(
             project.ERC4626LossyStrategy,
+            vault_factory.address,
             vault.asset(),
             "Mock Tokenized Strategy",
             strategist,
@@ -459,7 +449,7 @@ def sign_vault_permit(chain):
                 "deadline": deadline,
             },
         }
-        permit = encode_structured_data(data)
+        permit = encode_typed_data(full_message=data)
         return owner.sign_message(permit)
 
     return sign_vault_permit

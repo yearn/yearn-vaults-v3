@@ -3002,9 +3002,15 @@ def test_set_profit_max_period_to_zero__with_fees_doesnt_lock(
     expected_fees_shares = first_profit * performance_fee / MAX_BPS_ACCOUNTANT
     first_price_per_share = vault.pricePerShare()
 
+    expected_fee_amount = (
+        expected_fees_shares
+        * (amount + first_profit)
+        // (amount + expected_fees_shares)
+    )
+
     # Fees will immediately unlock as well when not locking.
     create_and_check_profit(
-        asset, strategy, gov, vault, first_profit, by_pass_fees=True
+        asset, strategy, gov, vault, first_profit, total_fees=expected_fee_amount
     )
 
     # All profits should have been unlocked

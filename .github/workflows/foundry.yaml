@@ -1,0 +1,65 @@
+name: Foundry tests
+
+on:
+    push:
+      branches:
+      - master
+    pull_request:
+  
+concurrency:
+  group: ${{github.workflow}}-${{github.ref}}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+        architecture:
+          - "x64"
+        python-version:
+          - "3.10"
+        node_version:
+          - 16
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: ${{ matrix.architecture }}
+
+      - name: Install Ape
+        uses: ApeWorX/github-action@v2.0
+        with:
+          python-version: '3.10'
+    
+      - name: install vyper
+        run: pip install git+https://github.com/vyperlang/vyper
+
+      - name: Compile contracts
+        # Compile Ape contracts to get dependencies
+        run: ape compile --force --size
+
+      - name: Install Vyper
+        run: pip install vyper==0.3.7
+
+      - name: Use Node.js ${{ matrix.node_version }}
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node_version }}
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Foundry tests
+        run: forge test -vvv

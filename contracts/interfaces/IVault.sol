@@ -23,7 +23,6 @@ interface IVault is IERC4626 {
     );
     // ROLE UPDATES
     event RoleSet(address indexed account, uint256 role);
-    event RoleStatusChanged(uint256 role, uint256 status);
     event UpdateRoleManager(address indexed role_manager);
 
     event UpdateAccountant(address indexed accountant);
@@ -55,8 +54,6 @@ interface IVault is IERC4626 {
 
     function use_default_queue() external view returns (bool);
 
-    function total_supply() external view returns (uint256);
-
     function minimum_total_idle() external view returns (uint256);
 
     function deposit_limit() external view returns (uint256);
@@ -69,8 +66,6 @@ interface IVault is IERC4626 {
 
     function roles(address) external view returns (uint256);
 
-    function open_roles(uint256) external view returns (bool);
-
     function role_manager() external view returns (address);
 
     function future_role_manager() external view returns (address);
@@ -78,6 +73,14 @@ interface IVault is IERC4626 {
     function isShutdown() external view returns (bool);
 
     function nonces(address) external view returns (uint256);
+
+    function initialize(
+        address,
+        string memory,
+        string memory,
+        address,
+        uint256
+    ) external;
 
     function set_accountant(address new_accountant) external;
 
@@ -106,10 +109,6 @@ interface IVault is IERC4626 {
     function add_role(address account, uint256 role) external;
 
     function remove_role(address account, uint256 role) external;
-
-    function set_open_role(uint256 role) external;
-
-    function close_open_role(uint256 role) external;
 
     function transfer_role_manager(address role_manager) external;
 
@@ -141,6 +140,12 @@ interface IVault is IERC4626 {
     function update_debt(
         address strategy,
         uint256 target_debt
+    ) external returns (uint256);
+
+    function update_debt(
+        address strategy,
+        uint256 target_debt,
+        uint256 max_loss
     ) external returns (uint256);
 
     function shutdown_vault() external;
@@ -219,16 +224,6 @@ interface IVault is IERC4626 {
     ) external view returns (uint256);
 
     //// NON-STANDARD ERC-20 FUNCTIONS \\\\
-
-    function increaseAllowance(
-        address spender,
-        uint256 amount
-    ) external returns (bool);
-
-    function decreaseAllowance(
-        address spender,
-        uint256 amount
-    ) external returns (bool);
 
     function DOMAIN_SEPARATOR() external view returns (bytes32);
 

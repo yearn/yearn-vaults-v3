@@ -1,27 +1,25 @@
 from ape import project, accounts, Contract, chain, networks
-from ape.utils import ZERO_ADDRESS
-from web3 import Web3, HTTPProvider
 from hexbytes import HexBytes
-import os
 import hashlib
-from copy import deepcopy
-
-# Add the wallet to use here.
-deployer = accounts.load("")
 
 
-def deploy_blueprint_and_factory():
+def deploy_original_and_factory():
     print("Deploying Vault Factory on ChainID", chain.chain_id)
 
     if input("Do you want to continue? ") == "n":
         return
 
+    deployer = input("Name of account to use? ")
+    deployer = accounts.load(deployer)
+
     vault_factory = project.VaultFactory
     vault = project.VaultV3
+
     deployer_contract = project.IDeployer.at(
-        "0x8D85e7c9A4e369E53Acc8d5426aE1568198b0112"
+        "0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed"
     )
-    salt_string = "v3.0.1"
+
+    salt_string = "v3.0.2"
 
     # Create a SHA-256 hash object
     hash_object = hashlib.sha256()
@@ -34,44 +32,28 @@ def deploy_blueprint_and_factory():
 
     print(f"Salt we are using {salt}")
     print("Init balance:", deployer.balance / 1e18)
+    print("------------------")
+    print(f"Deploying Original...")
 
-    # generate and deploy blueprint
-    vault_copy = deepcopy(vault)
-    blueprint_bytecode = b"\xFE\x71\x00" + HexBytes(
-        vault_copy.contract_type.deployment_bytecode.bytecode
-    )
-    len_bytes = len(blueprint_bytecode).to_bytes(2, "big")
-    blueprint_constructor = vault_copy.constructor.encode_input(
-        ZERO_ADDRESS, "", "", ZERO_ADDRESS, 0
+    original_deploy_bytecode = vault.contract_type.deployment_bytecode.bytecode
+
+    original_tx = deployer_contract.deployCreate2(
+        salt, original_deploy_bytecode, sender=deployer
     )
 
-    # ERC5202
-    blueprint_deploy_bytecode = HexBytes(
-        b"\x61"
-        + len_bytes
-        + b"\x3d\x81\x60\x0a\x3d\x39\xf3"
-        + blueprint_bytecode
-        + blueprint_constructor
-    )
+    original_event = list(original_tx.decode_logs(deployer_contract.ContractCreation))
 
-    print(f"Deploying BluePrint...")
+    original_address = original_event[0].newContract
 
-    blueprint_tx = deployer_contract.deploy(
-        blueprint_deploy_bytecode, salt, sender=deployer
-    )
-
-    blueprint_event = list(blueprint_tx.decode_logs(deployer_contract.Deployed))
-
-    blueprint_address = blueprint_event[0].addr
-
-    print(f"Deployed the vault Blueprint to {blueprint_address}")
+    print(f"Deployed the vault original to {original_address}")
+    print("------------------")
 
     # deploy factory
     print(f"Deploying factory...")
 
     factory_constructor = vault_factory.constructor.encode_input(
-        "Yearn v3.0.1 Vault Factory",
-        blueprint_address,
+        "Yearn v3.0.2 Vault Factory",
+        original_address,
         "0x33333333D5eFb92f19a5F94a43456b3cec2797AE",
     )
 
@@ -80,16 +62,18 @@ def deploy_blueprint_and_factory():
         + factory_constructor
     )
 
-    factory_tx = deployer_contract.deploy(
-        factory_deploy_bytecode, salt, sender=deployer
+    factory_tx = deployer_contract.deployCreate2(
+        salt, factory_deploy_bytecode, sender=deployer
     )
 
-    factory_event = list(factory_tx.decode_logs(deployer_contract.Deployed))
+    factory_event = list(factory_tx.decode_logs(deployer_contract.ContractCreation))
 
-    factory_address = factory_event[0].addr
+    factory_address = factory_event[0].newContract
 
     print(f"Deployed Vault Factory to {factory_address}")
+    print("------------------")
+    print(f"Encoded Constructor to use for verifaction {factory_constructor.hex()[2:]}")
 
 
 def main():
-    deploy_blueprint_and_factory()
+    deploy_original_and_factory()

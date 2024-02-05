@@ -32,22 +32,23 @@ contract ERC4626LossyStrategy is MockTokenizedStrategy {
     address public yieldSource;
 
     constructor(
+        address _factory,
         address _asset,
         string memory _name,
         address _management,
         address _keeper,
         address _vault
-    ) MockTokenizedStrategy(_asset, _name, _management, _keeper) {
+    ) MockTokenizedStrategy(_factory, _asset, _name, _management, _keeper) {
         yieldSource = address(new YieldSource(_asset));
         ERC20(_asset).safeApprove(yieldSource, type(uint256).max);
         // So we can record losses when it happens.
-        strategyStorage().management = address(this);
+        _strategyStorage().management = address(this);
         vault = _vault;
     }
 
     // used to generate losses, accepts single arg to send losses to
     function setLoss(address _target, uint256 _loss) external {
-        strategyStorage().asset.safeTransferFrom(yieldSource, _target, _loss);
+        _strategyStorage().asset.safeTransferFrom(yieldSource, _target, _loss);
         // Record the loss
         MockTokenizedStrategy(address(this)).report();
     }
@@ -71,7 +72,7 @@ contract ERC4626LossyStrategy is MockTokenizedStrategy {
 
         if (withdrawingLoss < 0) {
             // Over withdraw to the vault
-            strategyStorage().asset.safeTransfer(
+            _strategyStorage().asset.safeTransfer(
                 vault,
                 uint256(-withdrawingLoss)
             );
@@ -80,16 +81,16 @@ contract ERC4626LossyStrategy is MockTokenizedStrategy {
 
     function harvestAndReport() external override returns (uint256) {
         return
-            strategyStorage().asset.balanceOf(address(this)) +
-            strategyStorage().asset.balanceOf(yieldSource);
+            _strategyStorage().asset.balanceOf(address(this)) +
+            _strategyStorage().asset.balanceOf(yieldSource);
     }
 
     function availableWithdrawLimit(
         address
     ) public view override returns (uint256) {
         return
-            strategyStorage().asset.balanceOf(address(this)) +
-            strategyStorage().asset.balanceOf(yieldSource) -
+            _strategyStorage().asset.balanceOf(address(this)) +
+            _strategyStorage().asset.balanceOf(yieldSource) -
             lockedFunds;
     }
 }

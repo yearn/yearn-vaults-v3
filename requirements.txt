@@ -1,2 +1,3 @@
 black==22.3.0
-eth-ape==0.6.3
+eth-ape>=0.7.0
+vyper==0.3.7

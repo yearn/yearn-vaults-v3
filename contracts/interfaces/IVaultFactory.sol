@@ -34,14 +34,14 @@ interface IVaultFactory {
     function use_custom_protocol_fee(address) external view returns (bool);
 
     function deploy_new_vault(
-        ERC20 asset,
+        address asset,
         string memory name,
         string memory symbol,
         address role_manager,
         uint256 profit_max_unlock_time
     ) external returns (address);
 
-    function vault_blueprint() external view returns (address);
+    function vault_original() external view returns (address);
 
     function apiVersion() external view returns (string memory);
 

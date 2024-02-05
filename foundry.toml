@@ -1,0 +1,26 @@
+[profile.default]
+src = 'contracts'
+test = 'foundry_tests'     
+out = 'out'
+libs = ['lib']
+
+remappings = [
+    'forge-std/=lib/forge-std/src/',
+    'erc4626-tests/=lib/erc4626-tests/',
+    "@tokenized-strategy=contracts/.cache/tokenized-strategy/master",
+    '@openzeppelin/contracts=contracts/.cache/openzeppelin/v4.9.5/',
+]
+fs_permissions = [{ access = "read", path = "./"}]
+
+match_path = "foundry_tests/tests/*"
+ffi = true
+
+[fuzz]
+runs = 250
+max_test_rejects = 1_000_000
+
+[invariant]
+runs = 100
+depth = 100
+
+# See more config options https://github.com/gakonst/foundry/tree/master/config
