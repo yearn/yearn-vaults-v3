@@ -1515,7 +1515,7 @@ def test_loss_no_fees_with_refunds_with_buffer(
 
     management_fee = 0
     performance_fee = 0
-    refund_ratio = 10_000
+    refund_ratio = 5_000
 
     vault, strategy, accountant = initial_set_up_lossy(
         asset,
@@ -1590,8 +1590,11 @@ def test_loss_no_fees_with_refunds_with_buffer(
         - vault.convertToShares(first_loss),
     )
 
-    increase_time_and_check_profit_buffer(chain, vault)
-    assert_price_per_share(vault, 3.0)
+    # The full profit from the first report should be fully unlocked in the same time
+    # period as initially set
+    increase_time_and_check_profit_buffer(chain, vault, secs=WEEK // 2)
+
+    assert_price_per_share(vault, 2.0)
 
     check_vault_totals(
         vault,
@@ -1610,7 +1613,7 @@ def test_loss_no_fees_with_refunds_with_buffer(
         total_assets=amount + first_profit - first_loss + total_refunds * 2,
         total_supply=amount,
     )
-    assert_price_per_share(vault, 3.0)
+    assert_price_per_share(vault, 2.0)
     assert vault.strategies(strategy).current_debt == 0
 
     # Fish redeems shares
@@ -1627,8 +1630,10 @@ def test_loss_no_fees_with_refunds_with_buffer(
     assert (
         asset.balanceOf(fish)
         == fish_amount
+        + first_profit
         + first_profit * refund_ratio / MAX_BPS_ACCOUNTANT
         + first_loss * refund_ratio / MAX_BPS_ACCOUNTANT
+        - first_loss
     )
 
     # Accountant redeems shares

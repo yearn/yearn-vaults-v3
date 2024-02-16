@@ -1267,7 +1267,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         # Don't lock fees or losses.
         shares_to_lock = unsafe_sub(shares_to_lock, shares_to_burn)
     else:
-        shares_to_burn = 0
+        shares_to_lock = 0
 
     # Pull refunds
     if total_refunds > 0:
