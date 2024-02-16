@@ -301,9 +301,7 @@ def initialize(
 
     self.asset = asset
     # Get the decimals for the vault to use.
-    decimals: uint256 = convert(ERC20Detailed(asset).decimals(), uint256)
-    assert decimals < 256 # dev: see VVE-2020-0001
-    self.decimals = convert(decimals, uint8)
+    self.decimals = ERC20Detailed(asset).decimals()
     
     # Set the factory as the deployer address.
     self.factory = msg.sender
@@ -376,7 +374,7 @@ def _permit(
         )
     )
     assert ecrecover(
-        digest, convert(v, uint256), convert(r, uint256), convert(s, uint256)
+        digest, v, r, s
     ) == owner, "invalid signature"
 
     self.allowance[owner][spender] = amount
