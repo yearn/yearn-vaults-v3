@@ -298,6 +298,7 @@ def initialize(
     """
     assert self.asset == empty(address), "initialized"
     assert asset != empty(address), "ZERO ADDRESS"
+    assert role_manager != empty(address), "ZERO ADDRESS"
 
     self.asset = asset
     # Get the decimals for the vault to use.
