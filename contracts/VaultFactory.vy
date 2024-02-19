@@ -29,8 +29,6 @@
     fee recipient.
 """
 
-from vyper.interfaces import ERC20
-
 interface IVault:
     def initialize(
         asset: address, 
