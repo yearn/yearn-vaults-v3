@@ -515,13 +515,7 @@ def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
         new_shares = amount
     elif total_assets > amount:
         new_shares = amount * total_supply / (total_assets - amount)
-    else:
-        # If total_supply > 0 but amount = totalAssets we want to revert because
-        # after first deposit, getting here would mean that the rest of the shares
-        # would be diluted to a price_per_share of 0. Issuing shares would then mean
-        # either the new depositor or the previous depositors will loose money.
-        assert total_assets > amount, "amount too high"
-  
+
     # We don't make the function revert
     if new_shares == 0:
        return 0
