@@ -163,18 +163,19 @@ def apiVersion() -> String[28]:
 
 @view
 @external
-def protocol_fee_config() -> PFConfig:
+def protocol_fee_config(vault: address = msg.sender) -> PFConfig:
     """
     @notice Called during vault and strategy reports 
     to retrieve the protocol fee to charge and address
     to receive the fees.
+    @param vault Address of the vault that would be reporting.
     @return The protocol fee config for the msg sender.
     """
     # If there is a custom protocol fee set we return it.
-    if self.use_custom_protocol_fee[msg.sender]:
+    if self.use_custom_protocol_fee[vault]:
         # Always use the default fee recipient even with custom fees.
         return PFConfig({
-            fee_bps: self.custom_protocol_fee[msg.sender],
+            fee_bps: self.custom_protocol_fee[vault],
             fee_recipient: self.default_protocol_fee_config.fee_recipient
         })
     else:

@@ -177,7 +177,7 @@ def test_set_deposit_limit_with_limit_module__override(gov, vault, bunny):
 
     deposit_limit = 1
     deposit_limit_module = bunny
-    
+
     vault.set_deposit_limit_module(deposit_limit_module, sender=gov)
 
     assert vault.deposit_limit_module() == deposit_limit_module
@@ -272,6 +272,7 @@ def test_set_deposit_limit_module_with_limit__override(gov, vault, bunny):
 
     assert len(event) == 1
     assert event[0].deposit_limit == MAX_INT
+
 
 def test_set_withdraw_limit_module__no_withdraw_limit_manager__reverts(bunny, vault):
     withdraw_limit_module = bunny
