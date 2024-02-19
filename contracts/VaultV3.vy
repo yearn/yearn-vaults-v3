@@ -1378,32 +1378,55 @@ def set_use_default_queue(use_default_queue: bool):
     log UpdateUseDefaultQueue(use_default_queue)
 
 @external
-def set_deposit_limit(deposit_limit: uint256):
+def set_deposit_limit(deposit_limit: uint256, override: bool = False):
     """
     @notice Set the new deposit limit.
     @dev Can not be changed if a deposit_limit_module
-    is set or if shutdown.
+    is set unless the override flag is true or if shutdown.
     @param deposit_limit The new deposit limit.
+    @param override If a `deposit_limit_module` already set should be overridden.
     """
     assert self.shutdown == False # Dev: shutdown
     self._enforce_role(msg.sender, Roles.DEPOSIT_LIMIT_MANAGER)
-    assert self.deposit_limit_module == empty(address), "using module"
+
+    # If we are overriding the deposit limit module.
+    if override:
+        # Make sure it is set to address 0 if not already.
+        if self.deposit_limit_module != empty(address):
+
+            self.deposit_limit_module = empty(address)
+            log UpdateDepositLimitModule(empty(address))
+    else:  
+        # Make sure the deposit_limit has been set to uint max.
+        assert self.deposit_limit_module == empty(address), "using module"
 
     self.deposit_limit = deposit_limit
 
     log UpdateDepositLimit(deposit_limit)
 
 @external
-def set_deposit_limit_module(deposit_limit_module: address):
+def set_deposit_limit_module(deposit_limit_module: address, override: bool = False):
     """
     @notice Set a contract to handle the deposit limit.
     @dev The default `deposit_limit` will need to be set to
-    max uint256 since the module will override it.
+    max uint256 since the module will override it or the override flag
+    must be set to true to set it to max in 1 tx..
     @param deposit_limit_module Address of the module.
+    @param override If a `deposit_limit` already set should be overridden.
     """
     assert self.shutdown == False # Dev: shutdown
     self._enforce_role(msg.sender, Roles.DEPOSIT_LIMIT_MANAGER)
-    assert self.deposit_limit == max_value(uint256), "using deposit limit"
+
+    # If we are overriding the deposit limit
+    if override:
+        # Make sure it is max uint256 if not already.
+        if self.deposit_limit != max_value(uint256):
+
+            self.deposit_limit = max_value(uint256)
+            log UpdateDepositLimit(max_value(uint256))
+    else:
+        # Make sure the deposit_limit has been set to uint max.
+        assert self.deposit_limit == max_value(uint256), "using deposit limit"
 
     self.deposit_limit_module = deposit_limit_module
 
