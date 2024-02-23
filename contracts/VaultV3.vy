@@ -779,8 +779,9 @@ def _redeem(
     assert max_loss <= MAX_BPS, "max loss"
     
     # If there is a withdraw limit module, check the max.
-    if self.withdraw_limit_module != empty(address):
-        assert assets <= self._max_withdraw(owner, max_loss, strategies), "exceed withdraw limit"
+    withdraw_limit_module: address = self.withdraw_limit_module
+    if withdraw_limit_module != empty(address):
+        assert assets <= IWithdrawLimitModule(withdraw_limit_module).available_withdraw_limit(owner, max_loss, strategies), "exceed withdraw limit"
 
     assert self.balance_of[owner] >= shares, "insufficient shares to redeem"
     
