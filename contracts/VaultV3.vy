@@ -618,12 +618,15 @@ def _max_withdraw(
                 IStrategy(strategy).maxRedeem(self)
             )
 
+            loss_discount: uint256 = 0
             # Adjust accordingly if there is a max withdraw limit.
             if strategy_limit < to_withdraw - unrealised_loss:
                 # lower unrealised loss to the proportional to the limit.
                 unrealised_loss = unrealised_loss * strategy_limit / to_withdraw
                 # Still count the unrealised loss as withdrawable.
                 to_withdraw = strategy_limit + unrealised_loss
+                # Don't count the unrealised_loss for max_loss check.
+                loss_discount = unrealised_loss
 
             # If 0 move on to the next strategy.
             if to_withdraw == 0:
@@ -632,7 +635,7 @@ def _max_withdraw(
             # If there would be a loss with a non-maximum `max_loss` value.
             if unrealised_loss > 0 and max_loss < MAX_BPS:
                 # Check if the loss is greater than the allowed range.
-                if loss + unrealised_loss > (have + to_withdraw) * max_loss / MAX_BPS:
+                if loss + unrealised_loss > (have + to_withdraw - loss_discount) * max_loss / MAX_BPS:
                     # If so use the amounts up till now.
                     break
 
