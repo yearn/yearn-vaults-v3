@@ -1353,7 +1353,9 @@ def set_accountant(new_accountant: address):
 def set_default_queue(new_default_queue: DynArray[address, MAX_QUEUE]):
     """
     @notice Set the new default queue array.
-    @dev Will check each strategy to make sure it is active.
+    @dev Will check each strategy to make sure it is active. But will not
+        check that the same strategy is not added twice. maxRedeem and maxWithdraw
+        return values may be inaccurate if a strategy is added twice.
     @param new_default_queue The new default queue array.
     """
     self._enforce_role(msg.sender, Roles.QUEUE_MANAGER)
@@ -2005,6 +2007,8 @@ def maxWithdraw(
     """
     @notice Get the maximum amount of assets that can be withdrawn.
     @dev Complies to normal 4626 interface and takes custom params.
+    NOTE: Passing in a incorrectly ordered queue may result in
+     incorrect returns values.
     @param owner The address that owns the shares.
     @param max_loss Custom max_loss if any.
     @param strategies Custom strategies queue if any.
@@ -2022,6 +2026,8 @@ def maxRedeem(
     """
     @notice Get the maximum amount of shares that can be redeemed.
     @dev Complies to normal 4626 interface and takes custom params.
+    NOTE: Passing in a incorrectly ordered queue may result in
+     incorrect returns values.
     @param owner The address that owns the shares.
     @param max_loss Custom max_loss if any.
     @param strategies Custom strategies queue if any.
