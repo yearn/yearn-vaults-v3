@@ -29,8 +29,6 @@
     fee recipient.
 """
 
-from vyper.interfaces import ERC20
-
 interface IVault:
     def initialize(
         asset: address, 
@@ -165,18 +163,19 @@ def apiVersion() -> String[28]:
 
 @view
 @external
-def protocol_fee_config() -> PFConfig:
+def protocol_fee_config(vault: address = msg.sender) -> PFConfig:
     """
     @notice Called during vault and strategy reports 
     to retrieve the protocol fee to charge and address
     to receive the fees.
+    @param vault Address of the vault that would be reporting.
     @return The protocol fee config for the msg sender.
     """
     # If there is a custom protocol fee set we return it.
-    if self.use_custom_protocol_fee[msg.sender]:
+    if self.use_custom_protocol_fee[vault]:
         # Always use the default fee recipient even with custom fees.
         return PFConfig({
-            fee_bps: self.custom_protocol_fee[msg.sender],
+            fee_bps: self.custom_protocol_fee[vault],
             fee_recipient: self.default_protocol_fee_config.fee_recipient
         })
     else:
@@ -193,14 +192,19 @@ def set_protocol_fee_bps(new_protocol_fee_bps: uint16):
     """
     assert msg.sender == self.governance, "not governance"
     assert new_protocol_fee_bps <= MAX_FEE_BPS, "fee too high"
-    assert self.default_protocol_fee_config.fee_recipient != empty(address), "no recipient"
+
+    # Cache the current default protocol fee.
+    default_config: PFConfig = self.default_protocol_fee_config
+    assert default_config.fee_recipient != empty(address), "no recipient"
+
+    # Set the new fee
+    self.default_protocol_fee_config.fee_bps = new_protocol_fee_bps
 
     log UpdateProtocolFeeBps(
-        self.default_protocol_fee_config.fee_bps, 
+        default_config.fee_bps, 
         new_protocol_fee_bps
     )
 
-    self.default_protocol_fee_config.fee_bps = new_protocol_fee_bps
 
 @external
 def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
@@ -212,12 +216,15 @@ def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
     assert msg.sender == self.governance, "not governance"
     assert new_protocol_fee_recipient != empty(address), "zero address"
 
+    old_recipient: address = self.default_protocol_fee_config.fee_recipient
+
+    self.default_protocol_fee_config.fee_recipient = new_protocol_fee_recipient
+
     log UpdateProtocolFeeRecipient(
-        self.default_protocol_fee_config.fee_recipient,
+        old_recipient,
         new_protocol_fee_recipient
     )
     
-    self.default_protocol_fee_config.fee_recipient = new_protocol_fee_recipient
 
 @external
 def set_custom_protocol_fee_bps(vault: address, new_custom_protocol_fee: uint16):

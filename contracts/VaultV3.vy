@@ -298,12 +298,11 @@ def initialize(
     """
     assert self.asset == empty(address), "initialized"
     assert asset != empty(address), "ZERO ADDRESS"
+    assert role_manager != empty(address), "ZERO ADDRESS"
 
     self.asset = asset
     # Get the decimals for the vault to use.
-    decimals: uint256 = convert(ERC20Detailed(asset).decimals(), uint256)
-    assert decimals < 256 # dev: see VVE-2020-0001
-    self.decimals = convert(decimals, uint8)
+    self.decimals = ERC20Detailed(asset).decimals()
     
     # Set the factory as the deployer address.
     self.factory = msg.sender
@@ -376,7 +375,7 @@ def _permit(
         )
     )
     assert ecrecover(
-        digest, convert(v, uint256), convert(r, uint256), convert(s, uint256)
+        digest, v, r, s
     ) == owner, "invalid signature"
 
     self.allowance[owner][spender] = amount
@@ -516,13 +515,7 @@ def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
         new_shares = amount
     elif total_assets > amount:
         new_shares = amount * total_supply / (total_assets - amount)
-    else:
-        # If total_supply > 0 but amount = totalAssets we want to revert because
-        # after first deposit, getting here would mean that the rest of the shares
-        # would be diluted to a price_per_share of 0. Issuing shares would then mean
-        # either the new depositor or the previous depositors will loose money.
-        assert total_assets > amount, "amount too high"
-  
+
     # We don't make the function revert
     if new_shares == 0:
        return 0
@@ -626,12 +619,15 @@ def _max_withdraw(
             )
 
             # Adjust accordingly if there is a max withdraw limit.
-            if strategy_limit < to_withdraw - unrealised_loss:
-                # lower unrealised loss to the proportional to the limit.
-                unrealised_loss = unrealised_loss * strategy_limit / to_withdraw
+            realizable_withdraw: uint256 = to_withdraw - unrealised_loss
+            if strategy_limit < realizable_withdraw:
+                if unrealised_loss != 0:
+                    # lower unrealised loss proportional to the limit.
+                    unrealised_loss = unrealised_loss * strategy_limit / realizable_withdraw
+
                 # Still count the unrealised loss as withdrawable.
                 to_withdraw = strategy_limit + unrealised_loss
-
+                
             # If 0 move on to the next strategy.
             if to_withdraw == 0:
                 continue
@@ -728,8 +724,7 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
     if strategy_assets >= strategy_current_debt or strategy_current_debt == 0:
         return 0
 
-    # Users will withdraw assets_to_withdraw divided by loss ratio (strategy_assets / strategy_current_debt - 1),
-    # but will only receive assets_to_withdraw.
+    # Users will withdraw assets_needed divided by loss ratio (strategy_assets / strategy_current_debt - 1).
     # NOTE: If there are unrealised losses, the user will take his share.
     numerator: uint256 = assets_needed * strategy_assets
     users_share_of_loss: uint256 = assets_needed - numerator / strategy_current_debt
@@ -787,8 +782,9 @@ def _redeem(
     assert max_loss <= MAX_BPS, "max loss"
     
     # If there is a withdraw limit module, check the max.
-    if self.withdraw_limit_module != empty(address):
-        assert assets <= self._max_withdraw(owner, max_loss, strategies), "exceed withdraw limit"
+    withdraw_limit_module: address = self.withdraw_limit_module
+    if withdraw_limit_module != empty(address):
+        assert assets <= IWithdrawLimitModule(withdraw_limit_module).available_withdraw_limit(owner, max_loss, strategies), "exceed withdraw limit"
 
     assert self.balance_of[owner] >= shares, "insufficient shares to redeem"
     
@@ -1267,7 +1263,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         # Don't lock fees or losses.
         shares_to_lock = unsafe_sub(shares_to_lock, shares_to_burn)
     else:
-        shares_to_burn = 0
+        shares_to_lock = 0
 
     # Pull refunds
     if total_refunds > 0:
@@ -1357,7 +1353,9 @@ def set_accountant(new_accountant: address):
 def set_default_queue(new_default_queue: DynArray[address, MAX_QUEUE]):
     """
     @notice Set the new default queue array.
-    @dev Will check each strategy to make sure it is active.
+    @dev Will check each strategy to make sure it is active. But will not
+        check that the same strategy is not added twice. maxRedeem and maxWithdraw
+        return values may be inaccurate if a strategy is added twice.
     @param new_default_queue The new default queue array.
     """
     self._enforce_role(msg.sender, Roles.QUEUE_MANAGER)
@@ -1385,32 +1383,55 @@ def set_use_default_queue(use_default_queue: bool):
     log UpdateUseDefaultQueue(use_default_queue)
 
 @external
-def set_deposit_limit(deposit_limit: uint256):
+def set_deposit_limit(deposit_limit: uint256, override: bool = False):
     """
     @notice Set the new deposit limit.
     @dev Can not be changed if a deposit_limit_module
-    is set or if shutdown.
+    is set unless the override flag is true or if shutdown.
     @param deposit_limit The new deposit limit.
+    @param override If a `deposit_limit_module` already set should be overridden.
     """
     assert self.shutdown == False # Dev: shutdown
     self._enforce_role(msg.sender, Roles.DEPOSIT_LIMIT_MANAGER)
-    assert self.deposit_limit_module == empty(address), "using module"
+
+    # If we are overriding the deposit limit module.
+    if override:
+        # Make sure it is set to address 0 if not already.
+        if self.deposit_limit_module != empty(address):
+
+            self.deposit_limit_module = empty(address)
+            log UpdateDepositLimitModule(empty(address))
+    else:  
+        # Make sure the deposit_limit_module has been set to address(0).
+        assert self.deposit_limit_module == empty(address), "using module"
 
     self.deposit_limit = deposit_limit
 
     log UpdateDepositLimit(deposit_limit)
 
 @external
-def set_deposit_limit_module(deposit_limit_module: address):
+def set_deposit_limit_module(deposit_limit_module: address, override: bool = False):
     """
     @notice Set a contract to handle the deposit limit.
     @dev The default `deposit_limit` will need to be set to
-    max uint256 since the module will override it.
+    max uint256 since the module will override it or the override flag
+    must be set to true to set it to max in 1 tx..
     @param deposit_limit_module Address of the module.
+    @param override If a `deposit_limit` already set should be overridden.
     """
     assert self.shutdown == False # Dev: shutdown
     self._enforce_role(msg.sender, Roles.DEPOSIT_LIMIT_MANAGER)
-    assert self.deposit_limit == max_value(uint256), "using deposit limit"
+
+    # If we are overriding the deposit limit
+    if override:
+        # Make sure it is max uint256 if not already.
+        if self.deposit_limit != max_value(uint256):
+
+            self.deposit_limit = max_value(uint256)
+            log UpdateDepositLimit(max_value(uint256))
+    else:
+        # Make sure the deposit_limit has been set to uint max.
+        assert self.deposit_limit == max_value(uint256), "using deposit limit"
 
     self.deposit_limit_module = deposit_limit_module
 
@@ -1986,6 +2007,8 @@ def maxWithdraw(
     """
     @notice Get the maximum amount of assets that can be withdrawn.
     @dev Complies to normal 4626 interface and takes custom params.
+    NOTE: Passing in a incorrectly ordered queue may result in
+     incorrect returns values.
     @param owner The address that owns the shares.
     @param max_loss Custom max_loss if any.
     @param strategies Custom strategies queue if any.
@@ -2003,6 +2026,8 @@ def maxRedeem(
     """
     @notice Get the maximum amount of shares that can be redeemed.
     @dev Complies to normal 4626 interface and takes custom params.
+    NOTE: Passing in a incorrectly ordered queue may result in
+     incorrect returns values.
     @param owner The address that owns the shares.
     @param max_loss Custom max_loss if any.
     @param strategies Custom strategies queue if any.

@@ -48,6 +48,8 @@ def test__set_custom_protocol_fee(gov, vault_factory, create_vault, asset):
         == gov.address
     )
     assert vault_factory.protocol_fee_config(sender=vault.address).fee_bps == 0
+    assert vault_factory.protocol_fee_config(vault.address).fee_recipient == gov.address
+    assert vault_factory.protocol_fee_config(vault.address).fee_bps == 0
 
     new_fee = int(20)
     # Set custom fee for new vault.
@@ -68,6 +70,8 @@ def test__set_custom_protocol_fee(gov, vault_factory, create_vault, asset):
         == gov.address
     )
     assert vault_factory.protocol_fee_config(sender=vault.address).fee_bps == new_fee
+    assert vault_factory.protocol_fee_config(vault.address).fee_recipient == gov.address
+    assert vault_factory.protocol_fee_config(vault.address).fee_bps == new_fee
 
     # Make sure the default is not changed.
     assert vault_factory.protocol_fee_config().fee_recipient == gov.address
@@ -99,6 +103,8 @@ def test__remove_custom_protocol_fee(gov, vault_factory, create_vault, asset):
         == gov.address
     )
     assert vault_factory.protocol_fee_config(sender=vault.address).fee_bps == new_fee
+    assert vault_factory.protocol_fee_config(vault.address).fee_recipient == gov.address
+    assert vault_factory.protocol_fee_config(vault.address).fee_bps == new_fee
 
     # Now remove the custom fee config
     tx = vault_factory.remove_custom_protocol_fee(vault.address, sender=gov)
@@ -116,6 +122,8 @@ def test__remove_custom_protocol_fee(gov, vault_factory, create_vault, asset):
     assert (
         vault_factory.protocol_fee_config(sender=vault.address).fee_bps == generic_fee
     )
+    assert vault_factory.protocol_fee_config(vault.address).fee_recipient == gov.address
+    assert vault_factory.protocol_fee_config(vault.address).fee_bps == generic_fee
 
     assert vault_factory.use_custom_protocol_fee(vault.address) == False
     assert vault_factory.custom_protocol_fee(vault.address) == 0
