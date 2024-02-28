@@ -1402,7 +1402,7 @@ def set_deposit_limit(deposit_limit: uint256, override: bool = False):
             self.deposit_limit_module = empty(address)
             log UpdateDepositLimitModule(empty(address))
     else:  
-        # Make sure the deposit_limit has been set to uint max.
+        # Make sure the deposit_limit_module has been set to address(0).
         assert self.deposit_limit_module == empty(address), "using module"
 
     self.deposit_limit = deposit_limit
