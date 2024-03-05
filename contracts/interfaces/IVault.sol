@@ -90,8 +90,18 @@ interface IVault is IERC4626 {
 
     function set_deposit_limit(uint256 deposit_limit) external;
 
+    function set_deposit_limit(
+        uint256 deposit_limit,
+        bool should_override
+    ) external;
+
     function set_deposit_limit_module(
         address new_deposit_limit_module
+    ) external;
+
+    function set_deposit_limit_module(
+        address new_deposit_limit_module,
+        bool should_override
     ) external;
 
     function set_withdraw_limit_module(

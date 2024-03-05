@@ -50,6 +50,10 @@ interface IVaultFactory {
         view
         returns (uint16 fee_bps, address fee_recipient);
 
+    function protocol_fee_config(
+        address vault
+    ) external view returns (uint16 fee_bps, address fee_recipient);
+
     function set_protocol_fee_bps(uint16 new_protocol_fee_bps) external;
 
     function set_protocol_fee_recipient(

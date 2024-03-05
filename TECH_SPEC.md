@@ -183,7 +183,7 @@ The DEPOSIT_LIMIT_MANAGER is in charge of setting the deposit_limit or a deposit
 
 On deployment deposit_limit defaults to 0 and will need to be increased to make the vault functional
 
-The deposit_limit will have to be set to MAX_UINT256 in order to set a deposit_limit_module, and the module will have to be address 0 to adjust the deposit_limit.
+The deposit_limit will have to be set to MAX_UINT256 in order to set a deposit_limit_module, and the module will have to be address 0 to adjust the deposit_limit. Or the DEPOSIT_LIMIT_MANAGER can use the option `override` flags to do this in one step.
 
 #### Setting the withdraw limit module
 The WITHDRAW_LIMIT_MANAGER is in charge of setting the withdraw_limit_module for the vault
