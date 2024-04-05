@@ -80,9 +80,9 @@ contract Ownable {
 abstract contract ERC20Basic {
     uint256 public _totalSupply;
 
-    function totalSupply() public virtual returns (uint256);
+    function totalSupply() public view virtual returns (uint256);
 
-    function balanceOf(address who) public virtual returns (uint256);
+    function balanceOf(address who) public view virtual returns (uint256);
 
     function transfer(address to, uint256 value) public virtual;
 
@@ -97,7 +97,7 @@ abstract contract ERC20 is ERC20Basic {
     function allowance(
         address owner,
         address spender
-    ) public virtual returns (uint256);
+    ) public view virtual returns (uint256);
 
     function transferFrom(
         address from,
@@ -181,7 +181,7 @@ abstract contract BasicToken is Ownable, ERC20Basic {
      */
     function balanceOf(
         address _owner
-    ) public virtual override returns (uint256 balance) {
+    ) public view virtual override returns (uint256 balance) {
         return balances[_owner];
     }
 }
@@ -261,7 +261,7 @@ abstract contract StandardToken is BasicToken, ERC20 {
     function allowance(
         address _owner,
         address _spender
-    ) public virtual override returns (uint256 remaining) {
+    ) public view virtual override returns (uint256 remaining) {
         return allowed[_owner][_spender];
     }
 }
@@ -315,7 +315,7 @@ abstract contract BlackList is Ownable, BasicToken {
         return isBlackListed[_maker];
     }
 
-    function getOwner() external returns (address) {
+    function getOwner() external view returns (address) {
         return owner;
     }
 
@@ -442,7 +442,7 @@ contract TetherToken is Pausable, StandardToken, BlackList {
     // Forward ERC20 methods to upgraded contract if this one is deprecated
     function balanceOf(
         address who
-    ) public virtual override(BasicToken, ERC20Basic) returns (uint256) {
+    ) public view virtual override(BasicToken, ERC20Basic) returns (uint256) {
         if (deprecated) {
             return UpgradedStandardToken(upgradedAddress).balanceOf(who);
         } else {
@@ -471,7 +471,7 @@ contract TetherToken is Pausable, StandardToken, BlackList {
     function allowance(
         address _owner,
         address _spender
-    ) public virtual override returns (uint256 remaining) {
+    ) public view virtual override returns (uint256 remaining) {
         if (deprecated) {
             return StandardToken(upgradedAddress).allowance(_owner, _spender);
         } else {
@@ -487,7 +487,7 @@ contract TetherToken is Pausable, StandardToken, BlackList {
     }
 
     // deprecate current contract if favour of a new one
-    function totalSupply() public virtual override returns (uint256) {
+    function totalSupply() public view virtual override returns (uint256) {
         if (deprecated) {
             return StandardToken(upgradedAddress).totalSupply();
         } else {
