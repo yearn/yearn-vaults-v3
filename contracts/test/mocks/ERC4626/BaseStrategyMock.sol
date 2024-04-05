@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity 0.8.18;
+pragma solidity >=0.8.18;
 
 import {ERC4626BaseStrategy, IERC20} from "../../ERC4626BaseStrategy.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
