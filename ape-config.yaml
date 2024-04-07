@@ -16,6 +16,7 @@ dependencies:
     contracts_folder: src
 
 solidity:
+  version: 0.8.18
   import_remapping:
     - "@openzeppelin/contracts=openzeppelin/v4.9.5"
     - "@tokenized-strategy=tokenized-strategy/v3.0.2"

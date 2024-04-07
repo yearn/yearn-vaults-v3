@@ -2,6 +2,7 @@
 src = 'contracts'
 test = 'foundry_tests'     
 out = 'out'
+solc = "0.8.18"
 libs = ['lib']
 
 remappings = [
@@ -12,7 +13,8 @@ remappings = [
 ]
 fs_permissions = [{ access = "read", path = "./"}]
 
-match_path = "foundry_tests/tests/*"
+match_contract = "VaultERC4626StdTest"
+#match_path = "./foundry_tests/tests/*"
 ffi = true
 
 [fuzz]

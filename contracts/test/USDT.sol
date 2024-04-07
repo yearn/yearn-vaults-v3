@@ -2,7 +2,7 @@
  *Submitted for verification at Etherscan.io on 2017-11-28
  */
 
-pragma solidity ^0.4.17;
+pragma solidity >=0.8.18;
 
 /**
  * @title SafeMath
@@ -49,7 +49,7 @@ contract Ownable {
      * @dev The Ownable constructor sets the original `owner` of the contract to the sender
      * account.
      */
-    function Ownable() public {
+    constructor() {
         owner = msg.sender;
     }
 
@@ -65,7 +65,7 @@ contract Ownable {
      * @dev Allows the current owner to transfer control of the contract to a newOwner.
      * @param newOwner The address to transfer ownership to.
      */
-    function transferOwnership(address newOwner) public onlyOwner {
+    function transferOwnership(address newOwner) public virtual onlyOwner {
         if (newOwner != address(0)) {
             owner = newOwner;
         }
@@ -77,14 +77,14 @@ contract Ownable {
  * @dev Simpler version of ERC20 interface
  * @dev see https://github.com/ethereum/EIPs/issues/20
  */
-contract ERC20Basic {
+abstract contract ERC20Basic {
     uint256 public _totalSupply;
 
-    function totalSupply() public constant returns (uint256);
+    function totalSupply() public view virtual returns (uint256);
 
-    function balanceOf(address who) public constant returns (uint256);
+    function balanceOf(address who) public view virtual returns (uint256);
 
-    function transfer(address to, uint256 value) public;
+    function transfer(address to, uint256 value) public virtual;
 
     event Transfer(address indexed from, address indexed to, uint256 value);
 }
@@ -93,15 +93,19 @@ contract ERC20Basic {
  * @title ERC20 interface
  * @dev see https://github.com/ethereum/EIPs/issues/20
  */
-contract ERC20 is ERC20Basic {
+abstract contract ERC20 is ERC20Basic {
     function allowance(
         address owner,
         address spender
-    ) public constant returns (uint256);
+    ) public view virtual returns (uint256);
 
-    function transferFrom(address from, address to, uint256 value) public;
+    function transferFrom(
+        address from,
+        address to,
+        uint256 value
+    ) public virtual;
 
-    function approve(address spender, uint256 value) public;
+    function approve(address spender, uint256 value) public virtual;
 
     event Approval(
         address indexed owner,
@@ -114,7 +118,7 @@ contract ERC20 is ERC20Basic {
  * @title Basic token
  * @dev Basic version of StandardToken, with no allowances.
  */
-contract BasicToken is Ownable, ERC20Basic {
+abstract contract BasicToken is Ownable, ERC20Basic {
     using SafeMath for uint256;
 
     mapping(address => uint256) public balances;
@@ -138,24 +142,24 @@ contract BasicToken is Ownable, ERC20Basic {
      */
 
     // Test easiest code
-    function transfer_2(address _to, uint256 _value) {
+    function transfer_2(address _to, uint256 _value) public virtual {
         balances[msg.sender] = balances[msg.sender].sub(_value);
         balances[_to] = balances[_to].add(_value);
-        Transfer(msg.sender, _to, _value);
+        emit Transfer(msg.sender, _to, _value);
     }
 
     // Check vars
     function transfer_3(
         address _to,
         uint256 _value
-    ) public onlyPayloadSize(2 * 32) {
-        Transfer(msg.sender, _to, _value);
+    ) public virtual onlyPayloadSize(2 * 32) {
+        emit Transfer(msg.sender, _to, _value);
     }
 
     function transfer(
         address _to,
         uint256 _value
-    ) public onlyPayloadSize(2 * 32) {
+    ) public virtual override onlyPayloadSize(2 * 32) {
         uint256 fee = (_value.mul(basisPointsRate)).div(10000);
         if (fee > maximumFee) {
             fee = maximumFee;
@@ -165,19 +169,19 @@ contract BasicToken is Ownable, ERC20Basic {
         balances[_to] = balances[_to].add(sendAmount);
         if (fee > 0) {
             balances[owner] = balances[owner].add(fee);
-            Transfer(msg.sender, owner, fee);
+            emit Transfer(msg.sender, owner, fee);
         }
-        Transfer(msg.sender, _to, sendAmount);
+        emit Transfer(msg.sender, _to, sendAmount);
     }
 
     /**
      * @dev Gets the balance of the specified address.
      * @param _owner The address to query the the balance of.
-     * @return An uint representing the amount owned by the passed address.
+     * @return balance An uint representing the amount owned by the passed address.
      */
     function balanceOf(
         address _owner
-    ) public constant returns (uint256 balance) {
+    ) public view virtual override returns (uint256 balance) {
         return balances[_owner];
     }
 }
@@ -189,7 +193,9 @@ contract BasicToken is Ownable, ERC20Basic {
  * @dev https://github.com/ethereum/EIPs/issues/20
  * @dev Based oncode by FirstBlood: https://github.com/Firstbloodio/token/blob/master/smart_contract/FirstBloodToken.sol
  */
-contract StandardToken is BasicToken, ERC20 {
+abstract contract StandardToken is BasicToken, ERC20 {
+    using SafeMath for uint256;
+
     mapping(address => mapping(address => uint256)) public allowed;
 
     uint256 public constant MAX_UINT = 2 ** 256 - 1;
@@ -204,8 +210,8 @@ contract StandardToken is BasicToken, ERC20 {
         address _from,
         address _to,
         uint256 _value
-    ) public onlyPayloadSize(3 * 32) {
-        var _allowance = allowed[_from][msg.sender];
+    ) public virtual override onlyPayloadSize(3 * 32) {
+        uint256 _allowance = allowed[_from][msg.sender];
 
         // Check is not needed because sub(_allowance, _value) will already throw if this condition is not met
         // if (_value > _allowance) throw;
@@ -222,9 +228,9 @@ contract StandardToken is BasicToken, ERC20 {
         balances[_to] = balances[_to].add(sendAmount);
         if (fee > 0) {
             balances[owner] = balances[owner].add(fee);
-            Transfer(_from, owner, fee);
+            emit Transfer(_from, owner, fee);
         }
-        Transfer(_from, _to, sendAmount);
+        emit Transfer(_from, _to, sendAmount);
     }
 
     /**
@@ -235,7 +241,7 @@ contract StandardToken is BasicToken, ERC20 {
     function approve(
         address _spender,
         uint256 _value
-    ) public onlyPayloadSize(2 * 32) {
+    ) public virtual override onlyPayloadSize(2 * 32) {
         // To change the approve amount you first have to reduce the addresses`
         //  allowance to zero by calling `approve(_spender, 0)` if it is not
         //  already 0 to mitigate the race condition described here:
@@ -243,19 +249,19 @@ contract StandardToken is BasicToken, ERC20 {
         require(!((_value != 0) && (allowed[msg.sender][_spender] != 0)));
 
         allowed[msg.sender][_spender] = _value;
-        Approval(msg.sender, _spender, _value);
+        emit Approval(msg.sender, _spender, _value);
     }
 
     /**
      * @dev Function to check the amount of tokens than an owner allowed to a spender.
      * @param _owner address The address which owns the funds.
      * @param _spender address The address which will spend the funds.
-     * @return A uint specifying the amount of tokens still available for the spender.
+     * @return remaining A uint specifying the amount of tokens still available for the spender.
      */
     function allowance(
         address _owner,
         address _spender
-    ) public constant returns (uint256 remaining) {
+    ) public view virtual override returns (uint256 remaining) {
         return allowed[_owner][_spender];
     }
 }
@@ -289,50 +295,50 @@ contract Pausable is Ownable {
     /**
      * @dev called by the owner to pause, triggers stopped state
      */
-    function pause() public onlyOwner whenNotPaused {
+    function pause() public virtual onlyOwner whenNotPaused {
         paused = true;
-        Pause();
+        emit Pause();
     }
 
     /**
      * @dev called by the owner to unpause, returns to normal state
      */
-    function unpause() public onlyOwner whenPaused {
+    function unpause() public virtual onlyOwner whenPaused {
         paused = false;
-        Unpause();
+        emit Unpause();
     }
 }
 
-contract BlackList is Ownable, BasicToken {
+abstract contract BlackList is Ownable, BasicToken {
     /////// Getters to allow the same blacklist to be used also by other contracts (including upgraded Tether) ///////
-    function getBlackListStatus(
-        address _maker
-    ) external constant returns (bool) {
+    function getBlackListStatus(address _maker) external returns (bool) {
         return isBlackListed[_maker];
     }
 
-    function getOwner() external constant returns (address) {
+    function getOwner() external view returns (address) {
         return owner;
     }
 
     mapping(address => bool) public isBlackListed;
 
-    function addBlackList(address _evilUser) public onlyOwner {
+    function addBlackList(address _evilUser) public virtual onlyOwner {
         isBlackListed[_evilUser] = true;
-        AddedBlackList(_evilUser);
+        //AddedBlackList(_evilUser);
     }
 
-    function removeBlackList(address _clearedUser) public onlyOwner {
+    function removeBlackList(address _clearedUser) public virtual onlyOwner {
         isBlackListed[_clearedUser] = false;
-        RemovedBlackList(_clearedUser);
+        //RemovedBlackList(_clearedUser);
     }
 
-    function destroyBlackFunds(address _blackListedUser) public onlyOwner {
+    function destroyBlackFunds(
+        address _blackListedUser
+    ) public virtual onlyOwner {
         require(isBlackListed[_blackListedUser]);
         uint256 dirtyFunds = balanceOf(_blackListedUser);
         balances[_blackListedUser] = 0;
         _totalSupply -= dirtyFunds;
-        DestroyedBlackFunds(_blackListedUser, dirtyFunds);
+        emit DestroyedBlackFunds(_blackListedUser, dirtyFunds);
     }
 
     event DestroyedBlackFunds(address _blackListedUser, uint256 _balance);
@@ -342,26 +348,32 @@ contract BlackList is Ownable, BasicToken {
     event RemovedBlackList(address _user);
 }
 
-contract UpgradedStandardToken is StandardToken {
+abstract contract UpgradedStandardToken is StandardToken {
     // those methods are called by the legacy contract
     // and they must ensure msg.sender to be the contract address
-    function transferByLegacy(address from, address to, uint256 value) public;
+    function transferByLegacy(
+        address from,
+        address to,
+        uint256 value
+    ) public virtual;
 
     function transferFromByLegacy(
         address sender,
         address from,
         address spender,
         uint256 value
-    ) public;
+    ) public virtual;
 
     function approveByLegacy(
         address from,
         address spender,
         uint256 value
-    ) public;
+    ) public virtual;
 }
 
 contract TetherToken is Pausable, StandardToken, BlackList {
+    using SafeMath for uint256;
+
     string public name;
     string public symbol;
     uint256 public decimals;
@@ -375,12 +387,12 @@ contract TetherToken is Pausable, StandardToken, BlackList {
     // @param _name Token Name
     // @param _symbol Token symbol
     // @param _decimals Token decimals
-    function TetherToken(
+    constructor(
         uint256 _initialSupply,
-        string _name,
-        string _symbol,
+        string memory _name,
+        string memory _symbol,
         uint256 _decimals
-    ) public {
+    ) {
         _totalSupply = _initialSupply;
         name = _name;
         symbol = _symbol;
@@ -390,7 +402,10 @@ contract TetherToken is Pausable, StandardToken, BlackList {
     }
 
     // Forward ERC20 methods to upgraded contract if this one is deprecated
-    function transfer(address _to, uint256 _value) public whenNotPaused {
+    function transfer(
+        address _to,
+        uint256 _value
+    ) public virtual override(BasicToken, ERC20Basic) whenNotPaused {
         require(!isBlackListed[msg.sender]);
         if (deprecated) {
             return
@@ -409,7 +424,7 @@ contract TetherToken is Pausable, StandardToken, BlackList {
         address _from,
         address _to,
         uint256 _value
-    ) public whenNotPaused {
+    ) public virtual override whenNotPaused {
         require(!isBlackListed[_from]);
         if (deprecated) {
             return
@@ -425,7 +440,9 @@ contract TetherToken is Pausable, StandardToken, BlackList {
     }
 
     // Forward ERC20 methods to upgraded contract if this one is deprecated
-    function balanceOf(address who) public constant returns (uint256) {
+    function balanceOf(
+        address who
+    ) public view virtual override(BasicToken, ERC20Basic) returns (uint256) {
         if (deprecated) {
             return UpgradedStandardToken(upgradedAddress).balanceOf(who);
         } else {
@@ -437,7 +454,7 @@ contract TetherToken is Pausable, StandardToken, BlackList {
     function approve(
         address _spender,
         uint256 _value
-    ) public onlyPayloadSize(2 * 32) {
+    ) public virtual override onlyPayloadSize(2 * 32) {
         if (deprecated) {
             return
                 UpgradedStandardToken(upgradedAddress).approveByLegacy(
@@ -454,7 +471,7 @@ contract TetherToken is Pausable, StandardToken, BlackList {
     function allowance(
         address _owner,
         address _spender
-    ) public constant returns (uint256 remaining) {
+    ) public view virtual override returns (uint256 remaining) {
         if (deprecated) {
             return StandardToken(upgradedAddress).allowance(_owner, _spender);
         } else {
@@ -463,14 +480,14 @@ contract TetherToken is Pausable, StandardToken, BlackList {
     }
 
     // deprecate current contract in favour of a new one
-    function deprecate(address _upgradedAddress) public onlyOwner {
+    function deprecate(address _upgradedAddress) public virtual onlyOwner {
         deprecated = true;
         upgradedAddress = _upgradedAddress;
-        Deprecate(_upgradedAddress);
+        emit Deprecate(_upgradedAddress);
     }
 
     // deprecate current contract if favour of a new one
-    function totalSupply() public constant returns (uint256) {
+    function totalSupply() public view virtual override returns (uint256) {
         if (deprecated) {
             return StandardToken(upgradedAddress).totalSupply();
         } else {
@@ -479,26 +496,26 @@ contract TetherToken is Pausable, StandardToken, BlackList {
     }
 
     // To be used in conftest with other tokens
-    function mint(address receiver, uint256 amount) public onlyOwner {
+    function mint(address receiver, uint256 amount) public virtual onlyOwner {
         require(_totalSupply + amount > _totalSupply);
         require(balances[receiver] + amount > balances[receiver]);
 
         balances[receiver] += amount;
         _totalSupply += amount;
-        Issue(amount);
+        emit Issue(amount);
     }
 
     // Issue a new amount of tokens
     // these tokens are deposited into the owner address
     //
     // @param _amount Number of tokens to be issued
-    function issue(uint256 amount) public onlyOwner {
+    function issue(uint256 amount) public virtual onlyOwner {
         require(_totalSupply + amount > _totalSupply);
         require(balances[owner] + amount > balances[owner]);
 
         balances[owner] += amount;
         _totalSupply += amount;
-        Issue(amount);
+        emit Issue(amount);
     }
 
     // Redeem tokens.
@@ -506,19 +523,19 @@ contract TetherToken is Pausable, StandardToken, BlackList {
     // if the balance must be enough to cover the redeem
     // or the call will fail.
     // @param _amount Number of tokens to be issued
-    function redeem(uint256 amount) public onlyOwner {
+    function redeem(uint256 amount) public virtual onlyOwner {
         require(_totalSupply >= amount);
         require(balances[owner] >= amount);
 
         _totalSupply -= amount;
         balances[owner] -= amount;
-        Redeem(amount);
+        emit Redeem(amount);
     }
 
     function setParams(
         uint256 newBasisPoints,
         uint256 newMaxFee
-    ) public onlyOwner {
+    ) public virtual onlyOwner {
         // Ensure transparency by hardcoding limit beyond which fees can never be added
         require(newBasisPoints < 20);
         require(newMaxFee < 50);
@@ -526,7 +543,7 @@ contract TetherToken is Pausable, StandardToken, BlackList {
         basisPointsRate = newBasisPoints;
         maximumFee = newMaxFee.mul(10 ** decimals);
 
-        Params(basisPointsRate, maximumFee);
+        emit Params(basisPointsRate, maximumFee);
     }
 
     // Called when new token are issued
