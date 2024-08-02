@@ -23,7 +23,7 @@ def __init__(
 
 @view
 @external
-def available_deposit_limit(receiver: address) -> uint256:
+def availableDepositLimit(receiver: address) -> uint256:
     if self.enforce_whitelist:
         if not self.whitelist[receiver]:
             return 0
@@ -35,7 +35,7 @@ def available_deposit_limit(receiver: address) -> uint256:
 
 @view
 @external
-def available_withdraw_limit(owner: address, max_loss: uint256, strategies: DynArray[address, 10]) -> uint256:
+def availableWithdrawLimit(owner: address, max_loss: uint256, strategies: DynArray[address, 10]) -> uint256:
     return self.default_withdraw_limit
 
 @external
