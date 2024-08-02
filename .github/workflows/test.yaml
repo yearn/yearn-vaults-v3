@@ -20,7 +20,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - uses: ApeWorX/github-action@v2.0
+    - uses: ApeWorX/github-action
       with:
         python-version: '3.10'
 
@@ -34,7 +34,7 @@ jobs:
     - name: Setup node.js
       uses: actions/setup-node@v1
       with:
-        node-version: '16.x'
+        node-version: '18.x'
 
     - name: Install hardhat
       run: npm install hardhat
