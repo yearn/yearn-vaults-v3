@@ -130,6 +130,9 @@ event UpdateDefaultQueue:
 event UpdateUseDefaultQueue:
     use_default_queue: bool
 
+event UpdateAutoAllocate:
+    auto_allocate: bool
+
 event UpdatedMaxDebtForStrategy:
     sender: indexed(address)
     strategy: indexed(address)
@@ -214,6 +217,8 @@ strategies: public(HashMap[address, StrategyParams])
 default_queue: public(DynArray[address, MAX_QUEUE])
 # Should the vault use the default_queue regardless whats passed in.
 use_default_queue: public(bool)
+# Should automatically allocate funds to the first strategy in queue.
+auto_allocate: public(bool)
 
 ### ACCOUNTING ###
 # ERC20 - amount of shares per account
@@ -682,7 +687,11 @@ def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
 
     assert shares > 0, "cannot mint zero"
 
-    log Deposit(sender, recipient, amount, shares)
+    log Deposit(sender, recipient, assets, shares)
+
+    if self.auto_allocate:
+        self._update_debt(self.default_queue[0], max_value(uint256), 0)
+
     return shares
 
 @internal
@@ -708,6 +717,10 @@ def _mint(sender: address, recipient: address, shares: uint256) -> uint256:
     self._issue_shares(shares, recipient)
 
     log Deposit(sender, recipient, assets, shares)
+
+    if self.auto_allocate:
+        self._update_debt(self.default_queue[0], max_value(uint256), 0)
+
     return assets
 
 @view
@@ -1425,6 +1438,15 @@ def set_use_default_queue(use_default_queue: bool):
 
     log UpdateUseDefaultQueue(use_default_queue)
 
+@external
+def set_auto_allocate(auto_allocate: bool):
+    """
+    """
+    self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
+    self.auto_allocate = auto_allocate
+
+    log UpdateAutoAllocate(auto_allocate)
+    
 @external
 def set_deposit_limit(deposit_limit: uint256, override: bool = False):
     """
