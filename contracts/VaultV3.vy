@@ -1106,12 +1106,18 @@ def _update_debt(strategy: address, target_debt: uint256, max_loss: uint256) -> 
     else: 
         # We are increasing the strategies debt
 
-        # Revert if target_debt cannot be achieved due to configured max_debt for given strategy
-        assert new_debt <= self.strategies[strategy].max_debt, "target debt higher than max debt"
+        # Respect the maximum amount allowed. TODO: Should this just check if max uint?
+        max_debt: uint256 = self.strategies[strategy].max_debt
+        if new_debt > max_debt:
+            new_debt = max_debt
+            # Possible for current to be greater than max from reports.
+            if new_debt < current_debt:
+                return current_debt
 
         # Vault is increasing debt with the strategy by sending more funds.
         max_deposit: uint256 = IStrategy(strategy).maxDeposit(self)
-        assert max_deposit != 0, "nothing to deposit"
+        if max_deposit == 0:
+            return current_debt
 
         # Deposit the difference between desired and current.
         assets_to_deposit: uint256 = new_debt - current_debt
@@ -1123,7 +1129,9 @@ def _update_debt(strategy: address, target_debt: uint256, max_loss: uint256) -> 
         minimum_total_idle: uint256 = self.minimum_total_idle
         total_idle: uint256 = self.total_idle
 
-        assert total_idle > minimum_total_idle, "no funds to deposit"
+        if total_idle <= minimum_total_idle:
+            return current_debt
+        
         available_idle: uint256 = unsafe_sub(total_idle, minimum_total_idle)
 
         # If insufficient funds to deposit, transfer only what is free.
@@ -1441,6 +1449,12 @@ def set_use_default_queue(use_default_queue: bool):
 @external
 def set_auto_allocate(auto_allocate: bool):
     """
+    @notice Set new value for `auto_allocate`
+    @dev If `True` every {deposit} and {mint} call will
+        try and allocate the deposited amount to the strategy
+        at position 0 of the `default_queue` atomically.
+    NOTE: An empty `default_queue` will cause deposits to fail.
+    @param auto_allocate new value.
     """
     self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
     self.auto_allocate = auto_allocate
