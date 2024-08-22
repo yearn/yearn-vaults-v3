@@ -663,19 +663,25 @@ def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
     vault accounting.
     """
     assert self.shutdown == False # dev: shutdown
-    assert assets <= self._max_deposit(recipient), "exceed deposit limit"
+    
+    amount: uint256 = assets
+    # Deposit all if sent with max uint
+    if amount == max_value(uint256):
+        amount = ERC20(self.asset).balanceOf(msg.sender)
+
+    assert amount <= self._max_deposit(recipient), "exceed deposit limit"
  
     # Transfer the tokens to the vault first.
-    self._erc20_safe_transfer_from(self.asset, msg.sender, self, assets)
+    self._erc20_safe_transfer_from(self.asset, msg.sender, self, amount)
     # Record the change in total assets.
-    self.total_idle += assets
+    self.total_idle += amount
     
-    # Issue the corresponding shares for assets.
-    shares: uint256 = self._issue_shares_for_amount(assets, recipient)
+    # Issue the corresponding shares for amount.
+    shares: uint256 = self._issue_shares_for_amount(amount, recipient)
 
     assert shares > 0, "cannot mint zero"
 
-    log Deposit(sender, recipient, assets, shares)
+    log Deposit(sender, recipient, amount, shares)
     return shares
 
 @internal
