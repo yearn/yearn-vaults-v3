@@ -1066,11 +1066,13 @@ def _update_debt(strategy: address, target_debt: uint256, max_loss: uint256) -> 
         withdrawable: uint256 = IStrategy(strategy).convertToAssets(
             IStrategy(strategy).maxRedeem(self)
         )
-        assert withdrawable != 0, "nothing to withdraw"
 
         # If insufficient withdrawable, withdraw what we can.
         if withdrawable < assets_to_withdraw:
             assets_to_withdraw = withdrawable
+
+        if assets_to_withdraw == 0:
+            return current_debt
 
         # If there are unrealised losses we don't let the vault reduce its debt until there is a new report
         unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, current_debt, assets_to_withdraw)
@@ -1106,7 +1108,7 @@ def _update_debt(strategy: address, target_debt: uint256, max_loss: uint256) -> 
     else: 
         # We are increasing the strategies debt
 
-        # Respect the maximum amount allowed. TODO: Should this just check if max uint?
+        # Respect the maximum amount allowed.
         max_debt: uint256 = self.strategies[strategy].max_debt
         if new_debt > max_debt:
             new_debt = max_debt

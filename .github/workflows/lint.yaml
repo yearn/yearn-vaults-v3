@@ -31,7 +31,7 @@ jobs:
       - name: Set up python 3.9
         uses: actions/setup-python@v2
         with:
-          python-version: 3.10
+          python-version: 3.9
 
       - name: Set pip cache directory path
         id: pip-cache-dir-path

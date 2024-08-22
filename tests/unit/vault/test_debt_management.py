@@ -96,7 +96,7 @@ def test_update_debt__with_current_debt_equal_to_new_debt__reverts(
         vault.update_debt(strategy.address, new_debt, sender=gov)
 
 
-def test_update_debt__with_current_debt_greater_than_new_debt_and_zero_withdrawable__reverts(
+def test_update_debt__with_current_debt_greater_than_new_debt_and_zero_withdrawable(
     gov, asset, vault, locked_strategy, add_debt_to_strategy
 ):
     vault_balance = asset.balanceOf(vault)
@@ -109,8 +109,9 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_zero_withdrawa
     # reduce debt in strategy
     vault.update_max_debt_for_strategy(locked_strategy.address, new_debt, sender=gov)
 
-    with ape.reverts("nothing to withdraw"):
-        vault.update_debt(locked_strategy.address, new_debt, sender=gov)
+    tx = vault.update_debt(locked_strategy.address, new_debt, sender=gov)
+
+    assert tx.return_value == current_debt
 
 
 def test_update_debt__with_current_debt_greater_than_new_debt_and_strategy_has_losses__reverts(
