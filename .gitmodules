@@ -8,3 +8,6 @@
 	path = lib/openzeppelin-contracts
 	url = https://github.com/OpenZeppelin/openzeppelin-contracts
 	release = v4.9.5
+[submodule "lib/tokenized-strategy"]
+	path = lib/tokenized-strategy
+	url = https://github.com/yearn/tokenized-strategy
