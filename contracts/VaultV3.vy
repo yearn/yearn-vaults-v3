@@ -1169,18 +1169,29 @@ def _process_report(strategy: address) -> (uint256, uint256):
     Any applicable fees are charged and distributed during the report as well
     to the specified recipients.
     """
-    # Make sure we have a valid strategy.
-    assert self.strategies[strategy].activation != 0, "inactive strategy"
+    # Cache `asset` for repeated use.
+    _asset: address = self.asset
 
-    # Vault assesses profits using 4626 compliant interface. 
-    # NOTE: It is important that a strategies `convertToAssets` implementation
-    # cannot be manipulated or else the vault could report incorrect gains/losses.
-    strategy_shares: uint256 = IStrategy(strategy).balanceOf(self)
-    # How much the vaults position is worth.
-    total_assets: uint256 = IStrategy(strategy).convertToAssets(strategy_shares)
-    # How much the vault had deposited to the strategy.
-    current_debt: uint256 = self.strategies[strategy].current_debt
+    total_assets: uint256 = 0
+    current_debt: uint256 = 0
+    
+    if strategy != self:
+        # Make sure we have a valid strategy.
+        assert self.strategies[strategy].activation != 0, "inactive strategy"
 
+        # Vault assesses profits using 4626 compliant interface. 
+        # NOTE: It is important that a strategies `convertToAssets` implementation
+        # cannot be manipulated or else the vault could report incorrect gains/losses.
+        strategy_shares: uint256 = IStrategy(strategy).balanceOf(self)
+        # How much the vaults position is worth.
+        total_assets = IStrategy(strategy).convertToAssets(strategy_shares)
+        # How much the vault had deposited to the strategy.
+        current_debt = self.strategies[strategy].current_debt
+    else:
+        # Accrue any airdropped `asset` into `total_idle`
+        total_assets = ERC20(_asset).balanceOf(self)
+        current_debt = self.total_idle
+    
     gain: uint256 = 0
     loss: uint256 = 0
 
@@ -1193,9 +1204,6 @@ def _process_report(strategy: address) -> (uint256, uint256):
     else:
         # We have a loss.
         loss = unsafe_sub(current_debt, total_assets)
-    
-    # Cache `asset` for repeated use.
-    _asset: address = self.asset
 
     ### Asses Fees and Refunds ###
 
@@ -1282,15 +1290,21 @@ def _process_report(strategy: address) -> (uint256, uint256):
     if gain > 0:
         # NOTE: this will increase total_assets
         current_debt = unsafe_add(current_debt, gain)
-        self.strategies[strategy].current_debt = current_debt
-        self.total_debt += gain
-
+        if strategy != self:
+            self.strategies[strategy].current_debt = current_debt
+            self.total_debt += gain
+        else:
+            self.total_idle += gain
+        
     # Or record any reported loss
     elif loss > 0:
         current_debt = unsafe_sub(current_debt, loss)
-        self.strategies[strategy].current_debt = current_debt
-        self.total_debt -= loss
-
+        if strategy != self:
+            self.strategies[strategy].current_debt = current_debt
+            self.total_debt -= loss
+        else:
+            self.total_idle -= loss
+        
     # Issue shares for fees that were calculated above if applicable.
     if total_fees_shares > 0:
         # Accountant fees are (total_fees - protocol_fees).
