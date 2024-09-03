@@ -1168,6 +1168,9 @@ def _process_report(strategy: address) -> (uint256, uint256):
 
     Any applicable fees are charged and distributed during the report as well
     to the specified recipients.
+
+    Can update the vaults `totalIdle` to account for any airdropped tokens by
+    passing the vaults address in as the parameter.
     """
     # Cache `asset` for repeated use.
     _asset: address = self.asset
