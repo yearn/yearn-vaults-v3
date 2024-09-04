@@ -8,8 +8,8 @@ libs = ['lib']
 remappings = [
     'forge-std/=lib/forge-std/src/',
     'erc4626-tests/=lib/erc4626-tests/',
-    "@tokenized-strategy=contracts/.cache/tokenized-strategy/v3.0.2",
-    '@openzeppelin/contracts=contracts/.cache/openzeppelin/v4.9.5/',
+    "@tokenized-strategy=lib/tokenized-strategy/src",
+    '@openzeppelin/=lib/openzeppelin-contracts/',
 ]
 fs_permissions = [{ access = "read", path = "./"}]
 
