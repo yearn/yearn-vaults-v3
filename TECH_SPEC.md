@@ -173,6 +173,13 @@ The vault checks that the `minimumTotalIdle` parameter is respected (i.e. there'
 
 If the strategy has more debt than the max_debt, the vault will request the funds back. These funds may be locked in the strategy, which will result in the strategy returning less funds than requested by the vault. 
 
+#### Auto Allocations
+The DEBT_MANAGER can set the vaults `auto_allocate` flag to `True`.
+
+This will cause every deposit or mint call to end by the vault pushing as much debt as possible to the first strategy in the queue.
+
+NOTE: Not having at least 1 strategy in the `default_queue` with the `auto_allocate` flag will cause all deposits to revert.
+
 #### Setting maximum debt for a specific strategy
 The MAX_DEBT_MANAGER can set the maximum amount of tokens the vault will allow a strategy to owe at any moment in time.
 
