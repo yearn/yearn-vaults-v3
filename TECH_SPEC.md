@@ -129,11 +129,7 @@ Every role can be filled by an EOA, multi-sig or other smart contracts. Each rol
 
 The account that manages roles is a single account, set in `role_manager`.
 
-This role_manager can be an EOA, a multi-sig or a Governance Module that relays calls. 
-
-The vault comes with the ability to "open" every role. Meaning that any function that requires the caller to hold that role would be come permsissionless.
-
-The vault imposes no restrictions on the role managers ability to open or close any role. **But this should be done with extreme care as most of the roles are not meant to be opened and can lead to loss of funds if done incorrectly**.
+This role_manager can be an EOA, a multi-sig or a Governance contract that relays calls. 
 
 ### Strategy Management
 This responsibility is taken by callers with ADD_STRATEGY_MANAGER, REVOKE_STRATEGY_MANAGER and FORCE_REVOKE_MANAGER roles

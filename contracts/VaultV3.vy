@@ -217,7 +217,7 @@ strategies: public(HashMap[address, StrategyParams])
 default_queue: public(DynArray[address, MAX_QUEUE])
 # Should the vault use the default_queue regardless whats passed in.
 use_default_queue: public(bool)
-# Should automatically allocate funds to the first strategy in queue.
+# Should the vault automatically allocate funds to the first strategy in queue.
 auto_allocate: public(bool)
 
 ### ACCOUNTING ###
