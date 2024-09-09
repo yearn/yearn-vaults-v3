@@ -45,6 +45,8 @@ When deploying a new vault, it requires the following parameters:
 - role_manager: account that can assign and revoke Roles
 - profit_max_unlock_time: max amount of time profit will be locked before being distributed
 
+All deployment variables besides the `asset` can be updated post deployment.
+
 ## Normal Operation
 
 ### Deposits / Mints
