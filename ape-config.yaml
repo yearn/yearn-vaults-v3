@@ -13,13 +13,11 @@ dependencies:
   - name: tokenized-strategy
     github: yearn/tokenized-strategy
     ref: v3.0.2
-    contracts_folder: src
+    config_override:
+      contracts_folder: src
 
 solidity:
   version: 0.8.18
-  import_remapping:
-    - "@openzeppelin/contracts=openzeppelin/v4.9.5"
-    - "@tokenized-strategy=tokenized-strategy/v3.0.2"
 
 ethereum:
   local:
