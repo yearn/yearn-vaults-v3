@@ -527,3 +527,61 @@ def test__mint_shares_with_zero_total_supply_positive_assets(
     # shares should be minted at 1:1
     assert vault.balanceOf(fish) == amount
     assert vault.pricePerShare() > (10 ** vault.decimals())
+
+
+def test__deposit_with_zero_total_assets_positive_supply(
+    asset, fish_amount, fish, initial_set_up, gov
+):
+    amount = fish_amount // 10
+
+    vault, strategy, _ = initial_set_up(asset, gov, amount, fish)
+
+    # Create a loss
+    asset.transfer(gov, amount, sender=strategy)
+    strategy.report(sender=gov)
+
+    assert strategy.convertToAssets(amount) == 0
+
+    vault.process_report(strategy, sender=gov)
+
+    assert vault.totalAssets() == 0
+    assert vault.totalSupply() != 0
+
+    with ape.reverts("cannot mint zero"):
+        vault.deposit(amount, fish, sender=fish)
+
+    # shares should not be
+    assert vault.balanceOf(fish) == amount
+    assert vault.pricePerShare() == 0
+    assert vault.convertToShares(amount) == 0
+    assert vault.convertToAssets(amount) == 0
+    # assert vault.maxDeposit(fish) == 0
+
+
+def test__mint_with_zero_total_assets_positive_supply(
+    asset, fish_amount, fish, initial_set_up, gov
+):
+    amount = fish_amount // 10
+
+    vault, strategy, _ = initial_set_up(asset, gov, amount, fish)
+
+    # Create a loss
+    asset.transfer(gov, amount, sender=strategy)
+    strategy.report(sender=gov)
+
+    assert strategy.convertToAssets(amount) == 0
+
+    vault.process_report(strategy, sender=gov)
+
+    assert vault.totalAssets() == 0
+    assert vault.totalSupply() != 0
+
+    with ape.reverts("cannot deposit zero"):
+        vault.mint(amount, fish, sender=fish)
+
+    # shares should not be
+    assert vault.balanceOf(fish) == amount
+    assert vault.pricePerShare() == 0
+    assert vault.convertToShares(amount) == 0
+    assert vault.convertToAssets(amount) == 0
+    # assert vault.maxMint(fish) == 0
