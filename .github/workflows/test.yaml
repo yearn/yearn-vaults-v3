@@ -20,7 +20,7 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - uses: ApeWorX/github-action@main
+    - uses: ApeWorX/github-action@v3.0
       with:
         python-version: '3.10'
 
