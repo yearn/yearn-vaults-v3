@@ -462,11 +462,12 @@ def _convert_to_shares(assets: uint256, rounding: Rounding) -> uint256:
         return assets
 
     total_supply: uint256 = self._total_supply()
-    total_assets: uint256 = self._total_assets()
 
     # if total_supply is 0, price_per_share is 1
     if total_supply == 0:
         return assets
+
+    total_assets: uint256 = self._total_assets()
 
     # if total_Supply > 0 but total_assets == 0, price_per_share = 0
     if total_assets == 0:
@@ -652,7 +653,7 @@ def _deposit(sender: address, recipient: address, assets: uint256, shares: uint2
     # Record the change in total assets.
     self.total_idle += assets
     
-    # Issue the corresponding shares for amount.
+    # Issue the corresponding shares for assets.
     self._issue_shares(shares, recipient)
 
     log Deposit(sender, recipient, assets, shares)
