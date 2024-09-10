@@ -18,7 +18,7 @@ def test_deposit__with_zero_funds__reverts(fish, asset, create_vault):
     vault = create_vault(asset)
     amount = 0
 
-    with ape.reverts("cannot mint zero"):
+    with ape.reverts("cannot deposit zero"):
         vault.deposit(amount, fish.address, sender=fish)
 
 
@@ -471,7 +471,7 @@ def create_profit(
     return event[0].total_fees
 
 
-def test__mint_shares_with_zero_total_supply_positive_assets(
+def test__deposit_shares_with_zero_total_supply_positive_assets(
     asset, fish_amount, fish, initial_set_up, gov
 ):
     amount = fish_amount // 10
@@ -494,6 +494,35 @@ def test__mint_shares_with_zero_total_supply_positive_assets(
     assert vault.totalSupply() == 0
 
     vault.deposit(amount, fish, sender=fish)
+
+    # shares should be minted at 1:1
+    assert vault.balanceOf(fish) == amount
+    assert vault.pricePerShare() > (10 ** vault.decimals())
+
+
+def test__mint_shares_with_zero_total_supply_positive_assets(
+    asset, fish_amount, fish, initial_set_up, gov
+):
+    amount = fish_amount // 10
+    first_profit = fish_amount // 10
+
+    vault, strategy, _ = initial_set_up(asset, gov, amount, fish)
+    create_profit(asset, strategy, gov, vault, first_profit)
+    vault.update_debt(strategy, int(0), sender=gov)
+    assert (
+        vault.totalSupply() > amount
+    )  # there are more shares than deposits (due to profit unlock)
+
+    # User redeems shares
+    vault.redeem(vault.balanceOf(fish), fish, fish, sender=fish)
+
+    assert vault.totalSupply() > 0
+
+    ape.chain.mine(timestamp=ape.chain.pending_timestamp + 14 * 24 * 3600)
+
+    assert vault.totalSupply() == 0
+
+    vault.mint(amount, fish, sender=fish)
 
     # shares should be minted at 1:1
     assert vault.balanceOf(fish) == amount
