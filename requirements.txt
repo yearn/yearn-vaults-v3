@@ -1,3 +1,4 @@
 black==22.3.0
 eth-ape>=0.8.0
 vyper==0.3.7
+eth-typing==3.5.2
