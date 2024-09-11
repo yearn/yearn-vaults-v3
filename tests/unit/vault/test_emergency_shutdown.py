@@ -26,7 +26,7 @@ def test_shutdown_gives_debt_manager_role(gov, panda, vault):
     vault.set_role(panda.address, ROLES.EMERGENCY_MANAGER, sender=gov)
     assert ROLES.DEBT_MANAGER not in ROLES(vault.roles(panda))
     vault.shutdown_vault(sender=panda)
-    assert ROLES.DEBT_MANAGER in ROLES(vault.roles(panda))
+    assert ROLES.DEBT_MANAGER | ROLES.EMERGENCY_MANAGER == vault.roles(panda)
 
 
 def test_shutdown__increase_deposit_limit__reverts(
