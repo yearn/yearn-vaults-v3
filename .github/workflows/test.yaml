@@ -29,9 +29,6 @@ jobs:
     - name: install plugins
       run: ape plugins install .
     
-    #- name: install vyper
-    #  run: pip install git+https://github.com/vyperlang/vyper
-    
     - name: Compile contracts
       # TODO: Force recompiles until ape compile caching is fixed
       run: ape compile --force --size
