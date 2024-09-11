@@ -684,3 +684,43 @@ def test__remove_role__wont_add(gov, vault, bunny, strategy):
 
     with ape.reverts("not allowed"):
         vault.add_strategy(strategy, sender=bunny)
+
+
+def test__set_name(gov, vault, bunny):
+    name = vault.name()
+    new_name = "New Vault Name"
+
+    with ape.reverts("not allowed"):
+        vault.setName(new_name, sender=bunny)
+
+    vault.set_role(bunny, ROLES.ALL, sender=gov)
+
+    with ape.reverts("not allowed"):
+        vault.setName(new_name, sender=bunny)
+
+    assert vault.name() != new_name
+
+    vault.setName(new_name, sender=gov)
+
+    assert vault.name() == new_name
+    assert vault.name() != name
+
+
+def test__set_symbol(gov, vault, bunny):
+    symbol = vault.name()
+    new_symbol = "New Vault symbol"
+
+    with ape.reverts("not allowed"):
+        vault.setSymbol(new_symbol, sender=bunny)
+
+    vault.set_role(bunny, ROLES.ALL, sender=gov)
+
+    with ape.reverts("not allowed"):
+        vault.setSymbol(new_symbol, sender=bunny)
+
+    assert vault.symbol() != new_symbol
+
+    vault.setSymbol(new_symbol, sender=gov)
+
+    assert vault.symbol() == new_symbol
+    assert vault.symbol() != symbol

@@ -1344,6 +1344,27 @@ def _process_report(strategy: address) -> (uint256, uint256):
     return (gain, loss)
 
 # SETTERS #
+
+@external
+def setName(name: String[64]):
+    """
+    @notice Change the vault name.
+    @dev Can only be called by the Role Manager.
+    @param name The new name for the vault.
+    """
+    assert msg.sender == self.role_manager, "not allowed"
+    self.name = name
+
+@external
+def setSymbol(symbol: String[32]):
+    """
+    @notice Change the vault name.
+    @dev Can only be called by the Role Manager.
+    @param symbol The new name for the vault.
+    """
+    assert msg.sender == self.role_manager, "not allowed"
+    self.symbol = symbol
+
 @external
 def set_accountant(new_accountant: address):
     """
