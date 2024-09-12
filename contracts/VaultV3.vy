@@ -602,16 +602,17 @@ def _max_withdraw(
             # Can't use an invalid strategy.
             assert self.strategies[strategy].activation != 0, "inactive strategy"
 
+            current_debt: uint256 = self.strategies[strategy].current_debt
             # Get the maximum amount the vault would withdraw from the strategy.
             to_withdraw: uint256 = min(
                 # What we still need for the full withdraw.
                 max_assets - have, 
                 # The current debt the strategy has.
-                self.strategies[strategy].current_debt
+                current_debt
             )
 
             # Get any unrealised loss for the strategy.
-            unrealised_loss: uint256 = self._assess_share_of_unrealised_losses(strategy, to_withdraw)
+            unrealised_loss: uint256 = self._assess_share_of_unrealised_losses(strategy, current_debt, to_withdraw)
 
             # See if any limit is enforced by the strategy.
             strategy_limit: uint256 = IStrategy(strategy).convertToAssets(
@@ -711,7 +712,7 @@ def _mint(sender: address, recipient: address, shares: uint256) -> uint256:
 
 @view
 @internal
-def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256) -> uint256:
+def _assess_share_of_unrealised_losses(strategy: address, strategy_current_debt: uint256, assets_needed: uint256) -> uint256:
     """
     Returns the share of losses that a user would take if withdrawing from this strategy
     This accounts for losses that have been realized at the strategy level but not yet
@@ -720,8 +721,6 @@ def _assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256
     e.g. if the strategy has unrealised losses for 10% of its current debt and the user 
     wants to withdraw 1_000 tokens, the losses that they will take is 100 token
     """
-    # Minimum of how much debt the debt should be worth.
-    strategy_current_debt: uint256 = self.strategies[strategy].current_debt
     # The actual amount that the debt is currently worth.
     vault_shares: uint256 = IStrategy(strategy).balanceOf(self)
     strategy_assets: uint256 = IStrategy(strategy).convertToAssets(vault_shares)
@@ -850,7 +849,7 @@ def _redeem(
             # NOTE: strategies need to manage the fact that realising part of the loss can 
             # mean the realisation of 100% of the loss!! (i.e. if for withdrawing 10% of the
             # strategy it needs to unwind the whole position, generated losses might be bigger)
-            unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_to_withdraw)
+            unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, current_debt, assets_to_withdraw)
             if unrealised_losses_share > 0:
                 # If max withdraw is limiting the amount to pull, we need to adjust the portion of 
                 # the unrealized loss the user should take.
@@ -1061,7 +1060,7 @@ def _update_debt(strategy: address, target_debt: uint256, max_loss: uint256) -> 
             assets_to_withdraw = withdrawable
 
         # If there are unrealised losses we don't let the vault reduce its debt until there is a new report
-        unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, assets_to_withdraw)
+        unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, current_debt, assets_to_withdraw)
         assert unrealised_losses_share == 0, "strategy has unrealised losses"
         
         # Cache for repeated use.
@@ -2114,9 +2113,10 @@ def assess_share_of_unrealised_losses(strategy: address, assets_needed: uint256)
     @param assets_needed The amount of assets needed to be withdrawn.
     @return The share of unrealised losses that the strategy has.
     """
-    assert self.strategies[strategy].current_debt >= assets_needed
+    current_debt: uint256 = self.strategies[strategy].current_debt
+    assert current_debt >= assets_needed
 
-    return self._assess_share_of_unrealised_losses(strategy, assets_needed)
+    return self._assess_share_of_unrealised_losses(strategy, current_debt, assets_needed)
 
 ## Profit locking getter functions ##
 
