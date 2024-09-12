@@ -56,11 +56,14 @@ def test__set_custom_protocol_fee(gov, vault_factory, create_vault, asset):
     assert event[0].new_custom_protocol_fee == new_fee
 
     assert vault_factory.use_custom_protocol_fee(vault.address) == True
-    assert vault_factory.custom_protocol_fee(vault.address) == new_fee
+    assert vault_factory.protocol_fee_config(vault.address)[0] == new_fee
 
     # Should now be different than default
     assert vault_factory.protocol_fee_config(vault.address) == (new_fee, gov.address)
-    assert vault_factory.protocol_fee_config(sender=vault.address) == (new_fee, gov.address)
+    assert vault_factory.protocol_fee_config(sender=vault.address) == (
+        new_fee,
+        gov.address,
+    )
 
     # Make sure the default is not changed.
     assert vault_factory.protocol_fee_config() == (0, gov.address)
@@ -87,7 +90,10 @@ def test__remove_custom_protocol_fee(gov, vault_factory, create_vault, asset):
 
     # Should now be different than default
     assert vault_factory.protocol_fee_config(vault.address) == (new_fee, gov.address)
-    assert vault_factory.protocol_fee_config(sender=vault.address) == (new_fee, gov.address)
+    assert vault_factory.protocol_fee_config(sender=vault.address) == (
+        new_fee,
+        gov.address,
+    )
 
     # Now remove the custom fee config
     tx = vault_factory.remove_custom_protocol_fee(vault.address, sender=gov)
@@ -98,11 +104,16 @@ def test__remove_custom_protocol_fee(gov, vault_factory, create_vault, asset):
     assert event[0].vault == vault.address
 
     # Should now be the default
-    assert vault_factory.protocol_fee_config(vault.address) == (generic_fee, gov.address)
-    assert vault_factory.protocol_fee_config(sender=vault.address) == (generic_fee, gov.address)
+    assert vault_factory.protocol_fee_config(vault.address) == (
+        generic_fee,
+        gov.address,
+    )
+    assert vault_factory.protocol_fee_config(sender=vault.address) == (
+        generic_fee,
+        gov.address,
+    )
 
     assert vault_factory.use_custom_protocol_fee(vault.address) == False
-    assert vault_factory.custom_protocol_fee(vault.address) == 0
 
 
 def test__set_protocol_fee_before_recipient__reverts(gov, vault_factory):
