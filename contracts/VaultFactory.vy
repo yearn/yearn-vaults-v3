@@ -183,16 +183,6 @@ def protocol_fee_config(vault: address = msg.sender) -> (uint16, address):
 
 @view
 @external
-def protocol_fee_recipient() -> address:
-    return self._unpack_fee_recipient(self.default_protocol_fee_data)
-
-@view
-@external
-def protocol_fee(vault: address = msg.sender) -> uint16:
-    return self._unpack_protocol_fee(self.default_protocol_fee_data)
-    
-@view
-@external
 def use_custom_protocol_fee(vault: address) -> bool:
     return self.custom_protocol_fee_data[vault] & 1 == 1
 
@@ -222,9 +212,6 @@ def _unpack_fee_recipient(config_data: uint256) -> address:
 def _pack_data(recipient: address, fee: uint16, custom: bool) -> uint256:
     return shift(convert(recipient, uint256), 24) | shift(convert(fee, uint256), 8) | convert(custom, uint256)
 
-event ConfigData:
-    data: uint256
-
 @external
 def set_protocol_fee_bps(new_protocol_fee_bps: uint16):
     """
@@ -244,8 +231,6 @@ def set_protocol_fee_bps(new_protocol_fee_bps: uint16):
 
     # Set the new fee
     self.default_protocol_fee_data = self._pack_data(recipient, new_protocol_fee_bps, False)
-
-    log ConfigData(self.default_protocol_fee_data)
 
     log UpdateProtocolFeeBps(
         self._unpack_protocol_fee(default_fee_data), 
@@ -268,8 +253,6 @@ def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
 
     self.default_protocol_fee_data = self._pack_data(new_protocol_fee_recipient, self._unpack_protocol_fee(default_fee_data), False)
     
-    log ConfigData(self.default_protocol_fee_data)
-
     log UpdateProtocolFeeRecipient(
         old_recipient,
         new_protocol_fee_recipient
