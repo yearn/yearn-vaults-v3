@@ -687,7 +687,7 @@ def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
 
     assert shares > 0, "cannot mint zero"
 
-    log Deposit(sender, recipient, assets, shares)
+    log Deposit(sender, recipient, amount, shares)
 
     if self.auto_allocate:
         self._update_debt(self.default_queue[0], max_value(uint256), 0)
