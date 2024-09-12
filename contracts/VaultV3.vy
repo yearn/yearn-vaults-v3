@@ -1804,6 +1804,7 @@ def update_debt(
 ) -> uint256:
     """
     @notice Update the debt for a strategy.
+    @dev Pass max uint256 to allocate as much idle as possible.
     @param strategy The strategy to update the debt for.
     @param target_debt The target debt for the strategy.
     @param max_loss Optional to check realized losses on debt decreases.
