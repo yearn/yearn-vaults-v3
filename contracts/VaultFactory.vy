@@ -66,17 +66,14 @@ event UpdateGovernance:
 event NewPendingGovernance:
     pending_governance: indexed(address)
 
-struct PFConfig:
-    # Percent of protocol's split of fees in Basis Points.
-    fee_bps: uint16
-    # Address the protocol fees get paid to.
-    fee_recipient: address
 
 # Identifier for this version of the vault.
 API_VERSION: constant(String[28]) = "3.0.3"
 
 # The max amount the protocol fee can be set to.
 MAX_FEE_BPS: constant(uint16) = 5_000 # 50%
+
+FEE_BPS_MASK: constant(uint256) = 2**16-1
 
 # The address that all newly deployed vaults are based from.
 VAULT_ORIGINAL: immutable(address)
@@ -92,12 +89,13 @@ pending_governance: public(address)
 # Name for identification.
 name: public(String[64])
 
+# Protocol Fee Data is packed into a uint256
+# 72 Bits Empty | 160 Bits fee recipient | 16 bits fee bps | 8 bits custom flag
+
 # The default config for assessing protocol fees.
-default_protocol_fee_config: public(PFConfig)
+default_protocol_fee_data: uint256
 # Custom fee to charge for a specific vault or strategy.
-custom_protocol_fee: public(HashMap[address, uint16])
-# Represents if a custom protocol fee should be used.
-use_custom_protocol_fee: public(HashMap[address, bool])
+custom_protocol_fee_data: HashMap[address, uint256]
 
 @external
 def __init__(name: String[64], vault_original: address, governance: address):
@@ -163,7 +161,7 @@ def apiVersion() -> String[28]:
 
 @view
 @external
-def protocol_fee_config(vault: address = msg.sender) -> PFConfig:
+def protocol_fee_config(vault: address = msg.sender) -> (uint16, address):
     """
     @notice Called during vault and strategy reports 
     to retrieve the protocol fee to charge and address
@@ -172,15 +170,60 @@ def protocol_fee_config(vault: address = msg.sender) -> PFConfig:
     @return The protocol fee config for the msg sender.
     """
     # If there is a custom protocol fee set we return it.
-    if self.use_custom_protocol_fee[vault]:
+    custom_data: uint256 = self.custom_protocol_fee_data[vault]
+    if custom_data & 1 == 1:
         # Always use the default fee recipient even with custom fees.
-        return PFConfig({
-            fee_bps: self.custom_protocol_fee[vault],
-            fee_recipient: self.default_protocol_fee_config.fee_recipient
-        })
+        return (
+            self._unpack_protocol_fee(custom_data),
+            self._unpack_fee_recipient(self.default_protocol_fee_data)
+        )
     else:
         # Otherwise return the default config.
-        return self.default_protocol_fee_config
+        return self._default_protocol_fee_config(self.default_protocol_fee_data)
+
+@view
+@external
+def protocol_fee_recipient() -> address:
+    return self._unpack_fee_recipient(self.default_protocol_fee_data)
+
+@view
+@external
+def protocol_fee(vault: address = msg.sender) -> uint16:
+    return self._unpack_protocol_fee(self.default_protocol_fee_data)
+    
+@view
+@external
+def use_custom_protocol_fee(vault: address) -> bool:
+    return self.custom_protocol_fee_data[vault] & 1 == 1
+
+@view
+@external
+def custom_protocol_fee(vault: address) -> uint16:
+    return self._unpack_protocol_fee(self.custom_protocol_fee_data[vault])
+
+@view
+@internal
+def _default_protocol_fee_config(config_data: uint256) -> (uint16, address):
+    fee: uint16 = self._unpack_protocol_fee(config_data)
+    recipient: address = self._unpack_fee_recipient(config_data)
+    return (fee, recipient)
+
+@view
+@internal
+def _unpack_protocol_fee(config_data: uint256) -> uint16:
+    return convert(shift(config_data, -8) & FEE_BPS_MASK, uint16)
+    
+@view
+@internal
+def _unpack_fee_recipient(config_data: uint256) -> address:
+    return convert(shift(config_data, -24), address)
+
+@internal
+def _pack_data(recipient: address, fee: uint16, custom: bool) -> uint256:
+    return shift(convert(recipient, uint256), 24) | shift(convert(fee, uint256), 8) | convert(custom, uint256)
+
+event ConfigData:
+    data: uint256
 
 @external
 def set_protocol_fee_bps(new_protocol_fee_bps: uint16):
@@ -194,14 +237,18 @@ def set_protocol_fee_bps(new_protocol_fee_bps: uint16):
     assert new_protocol_fee_bps <= MAX_FEE_BPS, "fee too high"
 
     # Cache the current default protocol fee.
-    default_config: PFConfig = self.default_protocol_fee_config
-    assert default_config.fee_recipient != empty(address), "no recipient"
+    default_fee_data: uint256 = self.default_protocol_fee_data
+    recipient: address = self._unpack_fee_recipient(default_fee_data)
+    
+    assert recipient != empty(address), "no recipient"
 
     # Set the new fee
-    self.default_protocol_fee_config.fee_bps = new_protocol_fee_bps
+    self.default_protocol_fee_data = self._pack_data(recipient, new_protocol_fee_bps, False)
+
+    log ConfigData(self.default_protocol_fee_data)
 
     log UpdateProtocolFeeBps(
-        default_config.fee_bps, 
+        self._unpack_protocol_fee(default_fee_data), 
         new_protocol_fee_bps
     )
 
@@ -216,9 +263,12 @@ def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
     assert msg.sender == self.governance, "not governance"
     assert new_protocol_fee_recipient != empty(address), "zero address"
 
-    old_recipient: address = self.default_protocol_fee_config.fee_recipient
+    default_fee_data: uint256 = self.default_protocol_fee_data
+    old_recipient: address = self._unpack_fee_recipient(default_fee_data)
 
-    self.default_protocol_fee_config.fee_recipient = new_protocol_fee_recipient
+    self.default_protocol_fee_data = self._pack_data(new_protocol_fee_recipient, self._unpack_protocol_fee(default_fee_data), False)
+    
+    log ConfigData(self.default_protocol_fee_data)
 
     log UpdateProtocolFeeRecipient(
         old_recipient,
@@ -238,14 +288,9 @@ def set_custom_protocol_fee_bps(vault: address, new_custom_protocol_fee: uint16)
     """
     assert msg.sender == self.governance, "not governance"
     assert new_custom_protocol_fee <= MAX_FEE_BPS, "fee too high"
-    assert self.default_protocol_fee_config.fee_recipient != empty(address), "no recipient"
+    assert self._unpack_fee_recipient(self.default_protocol_fee_data) != empty(address), "no recipient"
 
-    self.custom_protocol_fee[vault] = new_custom_protocol_fee
-
-    # If this is the first time a custom fee is set for this vault
-    # set the bool indicator so it returns the correct fee.
-    if not self.use_custom_protocol_fee[vault]:
-        self.use_custom_protocol_fee[vault] = True
+    self.custom_protocol_fee_data[vault] = self._pack_data(empty(address), new_custom_protocol_fee, True)
 
     log UpdateCustomProtocolFee(vault, new_custom_protocol_fee)
 
@@ -260,10 +305,7 @@ def remove_custom_protocol_fee(vault: address):
     assert msg.sender == self.governance, "not governance"
 
     # Reset the custom fee to 0.
-    self.custom_protocol_fee[vault] = 0
-
-    # Set custom fee bool back to false.
-    self.use_custom_protocol_fee[vault] = False
+    self.custom_protocol_fee_data[vault] = self._pack_data(empty(address), 0, False)
 
     log RemovedCustomProtocolFee(vault)
 
@@ -304,4 +346,3 @@ def accept_governance():
     self.pending_governance = empty(address)
 
     log UpdateGovernance(msg.sender)
-
