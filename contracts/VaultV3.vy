@@ -640,7 +640,7 @@ def _max_withdraw(
 @internal
 def _deposit(sender: address, recipient: address, assets: uint256, shares: uint256):
     """
-    Used for `deposit` calls to transfer the amount of `asset` to the vault, 
+    Used for `deposit` and `mint` calls to transfer the amount of `asset` to the vault, 
     issue the corresponding `shares` to the `recipient` and update all needed 
     vault accounting.
     """
