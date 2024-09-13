@@ -130,6 +130,9 @@ event UpdateDefaultQueue:
 event UpdateUseDefaultQueue:
     use_default_queue: bool
 
+event UpdateAutoAllocate:
+    auto_allocate: bool
+
 event UpdatedMaxDebtForStrategy:
     sender: indexed(address)
     strategy: indexed(address)
@@ -214,6 +217,8 @@ strategies: public(HashMap[address, StrategyParams])
 default_queue: public(DynArray[address, MAX_QUEUE])
 # Should the vault use the default_queue regardless whats passed in.
 use_default_queue: public(bool)
+# Should the vault automatically allocate funds to the first strategy in queue.
+auto_allocate: public(bool)
 
 ### ACCOUNTING ###
 # ERC20 - amount of shares per account
@@ -683,6 +688,10 @@ def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
     assert shares > 0, "cannot mint zero"
 
     log Deposit(sender, recipient, amount, shares)
+
+    if self.auto_allocate:
+        self._update_debt(self.default_queue[0], max_value(uint256), 0)
+
     return shares
 
 @internal
@@ -708,6 +717,10 @@ def _mint(sender: address, recipient: address, shares: uint256) -> uint256:
     self._issue_shares(shares, recipient)
 
     log Deposit(sender, recipient, assets, shares)
+
+    if self.auto_allocate:
+        self._update_debt(self.default_queue[0], max_value(uint256), 0)
+
     return assets
 
 @view
@@ -1053,11 +1066,13 @@ def _update_debt(strategy: address, target_debt: uint256, max_loss: uint256) -> 
         withdrawable: uint256 = IStrategy(strategy).convertToAssets(
             IStrategy(strategy).maxRedeem(self)
         )
-        assert withdrawable != 0, "nothing to withdraw"
 
         # If insufficient withdrawable, withdraw what we can.
         if withdrawable < assets_to_withdraw:
             assets_to_withdraw = withdrawable
+
+        if assets_to_withdraw == 0:
+            return current_debt
 
         # If there are unrealised losses we don't let the vault reduce its debt until there is a new report
         unrealised_losses_share: uint256 = self._assess_share_of_unrealised_losses(strategy, current_debt, assets_to_withdraw)
@@ -1093,12 +1108,18 @@ def _update_debt(strategy: address, target_debt: uint256, max_loss: uint256) -> 
     else: 
         # We are increasing the strategies debt
 
-        # Revert if target_debt cannot be achieved due to configured max_debt for given strategy
-        assert new_debt <= self.strategies[strategy].max_debt, "target debt higher than max debt"
+        # Respect the maximum amount allowed.
+        max_debt: uint256 = self.strategies[strategy].max_debt
+        if new_debt > max_debt:
+            new_debt = max_debt
+            # Possible for current to be greater than max from reports.
+            if new_debt < current_debt:
+                return current_debt
 
         # Vault is increasing debt with the strategy by sending more funds.
         max_deposit: uint256 = IStrategy(strategy).maxDeposit(self)
-        assert max_deposit != 0, "nothing to deposit"
+        if max_deposit == 0:
+            return current_debt
 
         # Deposit the difference between desired and current.
         assets_to_deposit: uint256 = new_debt - current_debt
@@ -1110,7 +1131,9 @@ def _update_debt(strategy: address, target_debt: uint256, max_loss: uint256) -> 
         minimum_total_idle: uint256 = self.minimum_total_idle
         total_idle: uint256 = self.total_idle
 
-        assert total_idle > minimum_total_idle, "no funds to deposit"
+        if total_idle <= minimum_total_idle:
+            return current_debt
+        
         available_idle: uint256 = unsafe_sub(total_idle, minimum_total_idle)
 
         # If insufficient funds to deposit, transfer only what is free.
@@ -1425,6 +1448,21 @@ def set_use_default_queue(use_default_queue: bool):
 
     log UpdateUseDefaultQueue(use_default_queue)
 
+@external
+def set_auto_allocate(auto_allocate: bool):
+    """
+    @notice Set new value for `auto_allocate`
+    @dev If `True` every {deposit} and {mint} call will
+        try and allocate the deposited amount to the strategy
+        at position 0 of the `default_queue` atomically.
+    NOTE: An empty `default_queue` will cause deposits to fail.
+    @param auto_allocate new value.
+    """
+    self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
+    self.auto_allocate = auto_allocate
+
+    log UpdateAutoAllocate(auto_allocate)
+    
 @external
 def set_deposit_limit(deposit_limit: uint256, override: bool = False):
     """
@@ -1766,6 +1804,7 @@ def update_debt(
 ) -> uint256:
     """
     @notice Update the debt for a strategy.
+    @dev Pass max uint256 to allocate as much idle as possible.
     @param strategy The strategy to update the debt for.
     @param target_debt The target debt for the strategy.
     @param max_loss Optional to check realized losses on debt decreases.

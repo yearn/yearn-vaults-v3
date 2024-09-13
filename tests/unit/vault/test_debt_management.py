@@ -33,7 +33,7 @@ def test_update_debt__without_permission__reverts(gov, vault, asset, strategy, b
         vault.update_debt(strategy.address, new_debt, sender=bunny)
 
 
-def test_update_debt__with_strategy_max_debt_less_than_new_debt__reverts(
+def test_update_debt__with_strategy_max_debt_less_than_new_debt(
     gov, asset, vault, strategy
 ):
     vault_balance = asset.balanceOf(vault)
@@ -41,8 +41,22 @@ def test_update_debt__with_strategy_max_debt_less_than_new_debt__reverts(
 
     vault.update_max_debt_for_strategy(strategy.address, new_debt, sender=gov)
 
-    with ape.reverts("target debt higher than max debt"):
-        vault.update_debt(strategy.address, new_debt + 1, sender=gov)
+    tx = vault.update_debt(strategy.address, new_debt + 10, sender=gov)
+
+    assert tx.return_value == new_debt
+
+    event = list(tx.decode_logs(vault.DebtUpdated))
+
+    assert len(event) == 1
+    assert event[0].strategy == strategy.address
+    assert event[0].current_debt == 0
+    assert event[0].new_debt == new_debt
+
+    assert vault.strategies(strategy.address).current_debt == new_debt
+    assert asset.balanceOf(strategy) == new_debt
+    assert asset.balanceOf(vault) == vault_balance - new_debt
+    assert vault.totalIdle() == vault_balance - new_debt
+    assert vault.totalDebt() == new_debt
 
 
 def test_update_debt__with_current_debt_less_than_new_debt(gov, asset, vault, strategy):
@@ -82,7 +96,7 @@ def test_update_debt__with_current_debt_equal_to_new_debt__reverts(
         vault.update_debt(strategy.address, new_debt, sender=gov)
 
 
-def test_update_debt__with_current_debt_greater_than_new_debt_and_zero_withdrawable__reverts(
+def test_update_debt__with_current_debt_greater_than_new_debt_and_zero_withdrawable(
     gov, asset, vault, locked_strategy, add_debt_to_strategy
 ):
     vault_balance = asset.balanceOf(vault)
@@ -95,8 +109,9 @@ def test_update_debt__with_current_debt_greater_than_new_debt_and_zero_withdrawa
     # reduce debt in strategy
     vault.update_max_debt_for_strategy(locked_strategy.address, new_debt, sender=gov)
 
-    with ape.reverts("nothing to withdraw"):
-        vault.update_debt(locked_strategy.address, new_debt, sender=gov)
+    tx = vault.update_debt(locked_strategy.address, new_debt, sender=gov)
+
+    assert tx.return_value == current_debt
 
 
 def test_update_debt__with_current_debt_greater_than_new_debt_and_strategy_has_losses__reverts(
@@ -269,7 +284,7 @@ def test_update_debt__with_current_debt_less_than_new_debt_and_minimum_total_idl
     assert vault.totalIdle() > vault.minimum_total_idle()
 
 
-def test_update_debt__with_current_debt_less_than_new_debt_and_total_idle_lower_than_minimum_total_idle__revert(
+def test_update_debt__with_current_debt_less_than_new_debt_and_total_idle_lower_than_minimum_total_idle(
     gov, asset, vault, strategy
 ):
     """
@@ -287,8 +302,9 @@ def test_update_debt__with_current_debt_less_than_new_debt_and_total_idle_lower_
     # increase debt in strategy
     vault.update_max_debt_for_strategy(strategy.address, new_debt, sender=gov)
 
-    with ape.reverts("no funds to deposit"):
-        vault.update_debt(strategy.address, new_debt, sender=gov)
+    tx = vault.update_debt(strategy.address, new_debt, sender=gov)
+
+    assert tx.return_value == 0
 
 
 def test_update_debt__with_current_debt_less_than_new_debt_and_minimum_total_idle_reducing_new_debt(
