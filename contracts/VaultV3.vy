@@ -1397,7 +1397,7 @@ def setName(name: String[64]):
 @external
 def setSymbol(symbol: String[32]):
     """
-    @notice Change the vault name.
+    @notice Change the vault symbol.
     @dev Can only be called by the Role Manager.
     @param symbol The new name for the vault.
     """
