@@ -13,8 +13,8 @@ remappings = [
 ]
 fs_permissions = [{ access = "read", path = "./"}]
 
-match_contract = "VaultERC4626StdTest"
-#match_path = "./foundry_tests/tests/*"
+#match_contract = "VaultERC4626StdTest"
+match_path = "./foundry_tests/tests/*"
 ffi = true
 
 [fuzz]
