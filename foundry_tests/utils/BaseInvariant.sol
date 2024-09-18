@@ -24,7 +24,7 @@ abstract contract BaseInvariant is Setup {
 
     function assert_maxWithdraw(bool unreportedLoss) public {
         if (unreportedLoss) {
-            // withdraw would revert with unreported loss so maxWithdraw is 0
+            // withdraw would revert with unreported loss so maxWithdraw is totalIdle
             assertLe(vault.maxWithdraw(msg.sender), vault.totalIdle());
         } else {
             assertLe(vault.maxWithdraw(msg.sender), vault.totalAssets());
@@ -124,11 +124,14 @@ abstract contract BaseInvariant is Setup {
         );
     }
 
-    function assert_balanceAndTotalAssets() public {
-        assertLe(
-            vault.totalAssets(),
-            asset.balanceOf(address(strategy)) + asset.balanceOf(address(vault))
-        );
+    function assert_balanceAndTotalAssets(bool unreported) public {
+        if (!unreported) {
+            assertLe(
+                vault.totalAssets(),
+                asset.balanceOf(address(strategy)) +
+                    asset.balanceOf(address(vault))
+            );
+        }
         assertEq(vault.totalIdle(), asset.balanceOf(address(vault)));
     }
 

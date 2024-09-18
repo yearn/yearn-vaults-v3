@@ -66,9 +66,7 @@ contract VaultInvariantTest is BaseInvariant {
     }
 
     function invariant_balanceAndTotalAssets() public {
-        if (!vaultHandler.unreported()) {
-            assert_balanceAndTotalAssets();
-        }
+        assert_balanceAndTotalAssets(vaultHandler.unreported());
     }
 
     function invariant_totalDebt() public {
