@@ -462,16 +462,17 @@ def _convert_to_shares(assets: uint256, rounding: Rounding) -> uint256:
         return assets
 
     total_supply: uint256 = self._total_supply()
+
+    # if total_supply is 0, price_per_share is 1
+    if total_supply == 0:
+        return assets
+
     total_assets: uint256 = self._total_assets()
 
+    # if total_Supply > 0 but total_assets == 0, price_per_share = 0
     if total_assets == 0:
-        # if total_assets and total_supply is 0, price_per_share is 1
-        if total_supply == 0:
-            return assets
-        else:
-            # Else if total_supply > 0 price_per_share is 0
-            return 0
-
+        return 0
+    
     numerator: uint256 = assets * total_supply
     shares: uint256 = numerator / total_assets
     if rounding == Rounding.ROUND_UP and numerator % total_assets != 0:
@@ -503,31 +504,6 @@ def _issue_shares(shares: uint256, recipient: address):
     self.total_supply += shares
 
     log Transfer(empty(address), recipient, shares)
-
-@internal
-def _issue_shares_for_amount(amount: uint256, recipient: address) -> uint256:
-    """
-    Issues shares that are worth 'amount' in the underlying token (asset).
-    WARNING: this takes into account that any new assets have been summed 
-    to total_assets (otherwise pps will go down).
-    """
-    total_supply: uint256 = self._total_supply()
-    total_assets: uint256 = self._total_assets()
-    new_shares: uint256 = 0
-    
-    # If no supply PPS = 1.
-    if total_supply == 0:
-        new_shares = amount
-    elif total_assets > amount:
-        new_shares = amount * total_supply / (total_assets - amount)
-
-    # We don't make the function revert
-    if new_shares == 0:
-       return 0
-
-    self._issue_shares(new_shares, recipient)
-
-    return new_shares
 
 ## ERC4626 ##
 @view
@@ -662,52 +638,16 @@ def _max_withdraw(
     return max_assets
 
 @internal
-def _deposit(sender: address, recipient: address, assets: uint256) -> uint256:
+def _deposit(recipient: address, assets: uint256, shares: uint256):
     """
-    Used for `deposit` calls to transfer the amount of `asset` to the vault, 
-    issue the corresponding shares to the `recipient` and update all needed 
+    Used for `deposit` and `mint` calls to transfer the amount of `asset` to the vault, 
+    issue the corresponding `shares` to the `recipient` and update all needed 
     vault accounting.
     """
-    assert self.shutdown == False # dev: shutdown
-    
-    amount: uint256 = assets
-    # Deposit all if sent with max uint
-    if amount == max_value(uint256):
-        amount = ERC20(self.asset).balanceOf(msg.sender)
-
-    assert amount <= self._max_deposit(recipient), "exceed deposit limit"
- 
-    # Transfer the tokens to the vault first.
-    self._erc20_safe_transfer_from(self.asset, msg.sender, self, amount)
-    # Record the change in total assets.
-    self.total_idle += amount
-    
-    # Issue the corresponding shares for amount.
-    shares: uint256 = self._issue_shares_for_amount(amount, recipient)
-
-    assert shares > 0, "cannot mint zero"
-
-    log Deposit(sender, recipient, amount, shares)
-
-    if self.auto_allocate:
-        self._update_debt(self.default_queue[0], max_value(uint256), 0)
-
-    return shares
-
-@internal
-def _mint(sender: address, recipient: address, shares: uint256) -> uint256:
-    """
-    Used for `mint` calls to issue the corresponding shares to the `recipient`,
-    transfer the amount of `asset` to the vault, and update all needed vault 
-    accounting.
-    """
-    assert self.shutdown == False # dev: shutdown
-    # Get corresponding amount of assets.
-    assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_UP)
-
-    assert assets > 0, "cannot deposit zero"
     assert assets <= self._max_deposit(recipient), "exceed deposit limit"
-
+    assert assets > 0, "cannot deposit zero"
+    assert shares > 0, "cannot mint zero"
+ 
     # Transfer the tokens to the vault first.
     self._erc20_safe_transfer_from(self.asset, msg.sender, self, assets)
     # Record the change in total assets.
@@ -716,12 +656,10 @@ def _mint(sender: address, recipient: address, shares: uint256) -> uint256:
     # Issue the corresponding shares for assets.
     self._issue_shares(shares, recipient)
 
-    log Deposit(sender, recipient, assets, shares)
+    log Deposit(msg.sender, recipient, assets, shares)
 
     if self.auto_allocate:
         self._update_debt(self.default_queue[0], max_value(uint256), 0)
-
-    return assets
 
 @view
 @internal
@@ -1849,7 +1787,14 @@ def deposit(assets: uint256, receiver: address) -> uint256:
     @param receiver The address to receive the shares.
     @return The amount of shares minted.
     """
-    return self._deposit(msg.sender, receiver, assets)
+    amount: uint256 = assets
+    # Deposit all if sent with max uint
+    if amount == max_value(uint256):
+        amount = ERC20(self.asset).balanceOf(msg.sender)
+
+    shares: uint256 = self._convert_to_shares(amount, Rounding.ROUND_DOWN)
+    self._deposit(receiver, amount, shares)
+    return shares
 
 @external
 @nonreentrant("lock")
@@ -1860,7 +1805,9 @@ def mint(shares: uint256, receiver: address) -> uint256:
     @param receiver The address to receive the shares.
     @return The amount of assets deposited.
     """
-    return self._mint(msg.sender, receiver, shares)
+    assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_UP)
+    self._deposit(receiver, assets, shares)
+    return assets
 
 @external
 @nonreentrant("lock")
