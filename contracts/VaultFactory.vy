@@ -221,6 +221,7 @@ def _unpack_custom_flag(config_data: uint256) -> bool:
     """
     return config_data & 1 == 1
 
+@view
 @internal
 def _pack_protocol_fee_data(recipient: address, fee: uint16, custom: bool) -> uint256:
     """
