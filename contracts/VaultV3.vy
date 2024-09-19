@@ -638,7 +638,7 @@ def _max_withdraw(
     return max_assets
 
 @internal
-def _deposit(sender: address, recipient: address, assets: uint256, shares: uint256):
+def _deposit(recipient: address, assets: uint256, shares: uint256):
     """
     Used for `deposit` and `mint` calls to transfer the amount of `asset` to the vault, 
     issue the corresponding `shares` to the `recipient` and update all needed 
@@ -656,7 +656,7 @@ def _deposit(sender: address, recipient: address, assets: uint256, shares: uint2
     # Issue the corresponding shares for assets.
     self._issue_shares(shares, recipient)
 
-    log Deposit(sender, recipient, assets, shares)
+    log Deposit(msg.sender, recipient, assets, shares)
 
     if self.auto_allocate:
         self._update_debt(self.default_queue[0], max_value(uint256), 0)
@@ -1793,7 +1793,7 @@ def deposit(assets: uint256, receiver: address) -> uint256:
         amount = ERC20(self.asset).balanceOf(msg.sender)
 
     shares: uint256 = self._convert_to_shares(amount, Rounding.ROUND_DOWN)
-    self._deposit(msg.sender, receiver, amount, shares)
+    self._deposit(receiver, amount, shares)
     return shares
 
 @external
@@ -1806,7 +1806,7 @@ def mint(shares: uint256, receiver: address) -> uint256:
     @return The amount of assets deposited.
     """
     assets: uint256 = self._convert_to_assets(shares, Rounding.ROUND_UP)
-    self._deposit(msg.sender, receiver, assets, shares)
+    self._deposit(receiver, assets, shares)
     return assets
 
 @external
