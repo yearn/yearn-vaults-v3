@@ -579,7 +579,7 @@ def test__mint_with_zero_total_assets_positive_supply(
     with ape.reverts("cannot deposit zero"):
         vault.mint(amount, fish, sender=fish)
 
-    # shares should not be
+    # shares should not be minted
     assert vault.balanceOf(fish) == amount
     assert vault.pricePerShare() == 0
     assert vault.convertToShares(amount) == 0
