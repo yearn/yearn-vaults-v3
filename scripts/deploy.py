@@ -52,7 +52,7 @@ def deploy_original_and_factory():
     print(f"Deploying factory...")
 
     factory_constructor = vault_factory.constructor.encode_input(
-        "Yearn v3.0.2 Vault Factory",
+        "Yearn v3.0.3 Vault Factory",
         original_address,
         "0x33333333D5eFb92f19a5F94a43456b3cec2797AE",
     )
