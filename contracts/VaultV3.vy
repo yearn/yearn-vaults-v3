@@ -1257,7 +1257,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
             self.strategies[strategy].current_debt = current_debt
             self.total_debt += gain
         else:
-            self.total_idle += gain
+            self.total_idle = total_assets
         
     # Or record any reported loss
     elif loss > 0:
@@ -1266,7 +1266,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
             self.strategies[strategy].current_debt = current_debt
             self.total_debt -= loss
         else:
-            self.total_idle -= loss
+            self.total_idle = total_assets
         
     # Issue shares for fees that were calculated above if applicable.
     if total_fees_shares > 0:
@@ -1783,6 +1783,7 @@ def shutdown_vault():
 def deposit(assets: uint256, receiver: address) -> uint256:
     """
     @notice Deposit assets into the vault.
+    @dev Pass max uint256 to deposit full asset balance.
     @param assets The amount of assets to deposit.
     @param receiver The address to receive the shares.
     @return The amount of shares minted.

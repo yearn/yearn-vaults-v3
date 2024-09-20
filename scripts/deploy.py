@@ -19,7 +19,7 @@ def deploy_original_and_factory():
         "0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed"
     )
 
-    salt_string = "v3.0.2"
+    salt_string = "v3.0.3"
 
     # Create a SHA-256 hash object
     hash_object = hashlib.sha256()

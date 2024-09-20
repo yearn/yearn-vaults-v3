@@ -27,9 +27,9 @@ This allows different players to deploy their own version and implement their ow
 
 ```
 Example periphery contracts: 
-- Emergency module: it receives deposits of Vault Shares and allows the contract to call the shutdown function after a certain % of total Vault Shares have been deposited
-- Debt Allocator: a smart contract that incentivize's APY / debt allocation optimization by rewarding the best debt allocation (see [yStarkDebtAllocator](https://github.com/jmonteer/ystarkdebtallocator))
-- Strategy Staking Module: a smart contract that allows players to sponsor specific strategies (so that they are added to the vault) by staking their YFI, making money if they do well and losing money if they don't.
+- Role Manager: Governance contract that holds the vaults `role_manager` position to codify vault setup and ownership guidelines. (see [RoleManager](https://github.com/yearn/vault-periphery/tree/master/contracts/Managers))
+- Debt Allocator: a smart contract that optimizes between multiple strategies based on the optimal return. (see [DebAllocators](https://github.com/yearn/vault-periphery/tree/master/contracts/debtAllocators))
+- Safety Staking Module: a smart contract that allows players to sponsor specific strategies (so that they are added to the vault) by staking their YFI, making money if they do well and losing money if they don't.
 - Deposit Limit Module: Will dynamically adjust the deposit limit based on the depositor and arbitrary conditions.
 - ...
 ```
@@ -81,7 +81,7 @@ If totalAssets > currentDebt: the vault will record a profit
 Both loss and profit will impact strategy's debt, increasing the debt (current debt + profit) if there are profits, decreasing its debt (current debt - loss) if there are losses.
 
 #### Fees
-Fee assessment and distribution are handled by the Accountant module. 
+Fee assessment and distribution are handled by the `accountant` module. 
 
 It will report the amount of fees that need to be charged and the vault will issue shares for that amount of fees.
 
@@ -130,6 +130,8 @@ Every role can be filled by an EOA, multi-sig or other smart contracts. Each rol
 The account that manages roles is a single account, set in `role_manager`.
 
 This role_manager can be an EOA, a multi-sig or a Governance contract that relays calls. 
+
+The `role_manager` can also update the vaults name and symbol as well as give out the vaults Roles.
 
 ### Strategy Management
 This responsibility is taken by callers with ADD_STRATEGY_MANAGER, REVOKE_STRATEGY_MANAGER and FORCE_REVOKE_MANAGER roles

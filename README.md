@@ -6,6 +6,8 @@ This repository contains the Smart Contracts for Yearns V3 vault implementation.
 
 [Vault.vy](contracts/VaultV3.vy) - The ERC4626 compliant Vault that will handle all logic associated with deposits, withdraws, strategy management, profit reporting etc.
 
+For the most updated deployment addresses see the [docs](https://docs.yearn.fi/developers/addresses/v3-contracts). And read more about V3 and how to manage your own multi strategy vault here https://docs.yearn.fi/developers/v3/overview
+
 For the V3 strategy implementation see the [Tokenized Strategy](https://github.com/yearn/tokenized-strategy) repo.
 
 ## Requirements
@@ -72,7 +74,7 @@ forge test
 
 Deployments of the Vault Factory are done using create2 to be at a deterministic address on any EVM chain.
 
-Check the [docs](https://docs.yearn.fi/developers/v3/overview) for the most updated deployment address.
+Check the [docs](https://docs.yearn.fi/developers/addresses/v3-contracts) for the most updated deployment address.
 
 Deployments on new chains can be done permissionlessly by anyone using the included script.
 ```

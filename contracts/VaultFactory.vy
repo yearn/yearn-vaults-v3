@@ -90,8 +90,8 @@ pending_governance: public(address)
 # Name for identification.
 name: public(String[64])
 
-# Protocol Fee Data is packed into a uint256 slot
-# 72 Bits Empty | 160 Bits fee recipient | 16 bits fee bps | 8 bits custom flag
+# Protocol Fee Data is packed into a single uint256 slot
+# 72 bits Empty | 160 bits fee recipient | 16 bits fee bps | 8 bits custom flag
 
 # The default config for assessing protocol fees.
 default_protocol_fee_data: uint256
@@ -227,7 +227,7 @@ def _pack_protocol_fee_data(recipient: address, fee: uint16, custom: bool) -> ui
     """
     Packs the full protocol fee data into a single uint256 slot.
     This is used for both the default fee storage as well as for custom fees.
-    72 Bits Empty | 160 Bits fee recipient | 16 bits fee bps | 8 bits custom flag
+    72 bits Empty | 160 bits fee recipient | 16 bits fee bps | 8 bits custom flag
     """
     return shift(convert(recipient, uint256), 24) | shift(convert(fee, uint256), 8) | convert(custom, uint256)
 
@@ -272,8 +272,7 @@ def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
     assert new_protocol_fee_recipient != empty(address), "zero address"
 
     default_fee_data: uint256 = self.default_protocol_fee_data
-    old_recipient: address = self._unpack_fee_recipient(default_fee_data)
-
+    
     self.default_protocol_fee_data = self._pack_protocol_fee_data(
         new_protocol_fee_recipient, 
         self._unpack_protocol_fee(default_fee_data), 
@@ -281,7 +280,7 @@ def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
     )
     
     log UpdateProtocolFeeRecipient(
-        old_recipient,
+        self._unpack_fee_recipient(default_fee_data),
         new_protocol_fee_recipient
     )
     
