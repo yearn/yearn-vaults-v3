@@ -60,11 +60,12 @@ event RemovedCustomProtocolFee:
 event FactoryShutdown:
     pass
 
-event UpdateGovernance:
-    governance: indexed(address)
+event GovernanceTransferred:
+    previousGovernance: indexed(address)
+    newGovernance: indexed(address)
 
-event NewPendingGovernance:
-    pending_governance: indexed(address)
+event UpdatePendingGovernance:
+    newPendingGovernance: indexed(address)
 
 
 # Identifier for this version of the vault.
@@ -85,7 +86,7 @@ shutdown: public(bool)
 # Address that can set or change the fee configs.
 governance: public(address)
 # Pending governance waiting to be accepted.
-pending_governance: public(address)
+pendingGovernance: public(address)
 
 # Name for identification.
 name: public(String[64])
@@ -272,7 +273,7 @@ def set_protocol_fee_recipient(new_protocol_fee_recipient: address):
     assert new_protocol_fee_recipient != empty(address), "zero address"
 
     default_fee_data: uint256 = self.default_protocol_fee_data
-    
+
     self.default_protocol_fee_data = self._pack_protocol_fee_data(
         new_protocol_fee_recipient, 
         self._unpack_protocol_fee(default_fee_data), 
@@ -339,23 +340,26 @@ def shutdown_factory():
     log FactoryShutdown()
 
 @external
-def set_governance(new_governance: address):
+def transferGovernance(new_governance: address):
     """
     @notice Set the governance address
     @param new_governance The new governance address
     """
     assert msg.sender == self.governance, "not governance"
-    self.pending_governance = new_governance
+    self.pendingGovernance = new_governance
 
-    log NewPendingGovernance(new_governance)
+    log UpdatePendingGovernance(new_governance)
 
 @external
-def accept_governance():
+def acceptGovernance():
     """
     @notice Accept the governance address
     """
-    assert msg.sender == self.pending_governance, "not pending governance"
-    self.governance = msg.sender
-    self.pending_governance = empty(address)
+    assert msg.sender == self.pendingGovernance, "not pending governance"
 
-    log UpdateGovernance(msg.sender)
+    old_governance: address = self.governance
+
+    self.governance = msg.sender
+    self.pendingGovernance = empty(address)
+
+    log GovernanceTransferred(old_governance, msg.sender)
