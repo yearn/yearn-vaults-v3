@@ -4,6 +4,7 @@ test = 'foundry_tests'
 out = 'out'
 solc = "0.8.18"
 libs = ['lib']
+evm_version = "paris"
 
 remappings = [
     'forge-std/=lib/forge-std/src/',
