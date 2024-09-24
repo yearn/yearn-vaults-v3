@@ -12,7 +12,7 @@ dependencies:
     ref: 4.9.5
   - name: tokenized-strategy
     github: yearn/tokenized-strategy
-    ref: v3.0.2
+    ref: v3.0.3
     config_override:
       contracts_folder: src
 
