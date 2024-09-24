@@ -51,10 +51,12 @@ def deploy_original_and_factory():
     # deploy factory
     print(f"Deploying factory...")
 
+    init_gov = "0x6f3cBE2ab3483EC4BA7B672fbdCa0E9B33F88db8"
+
     factory_constructor = vault_factory.constructor.encode_input(
         "Yearn v3.0.3 Vault Factory",
         original_address,
-        "0x33333333D5eFb92f19a5F94a43456b3cec2797AE",
+        init_gov,
     )
 
     factory_deploy_bytecode = HexBytes(
