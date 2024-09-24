@@ -16,14 +16,17 @@ interface IVaultFactory {
     event UpdateCustomProtocolFee(address vault, uint16 newCustomProtocolFee);
     event RemovedCustomProtocolFee(address vault);
     event FactoryShutdown();
-    event NewPendingGovernance(address newPendingGovernance);
-    event UpdateGovernance(address newGovernance);
+    event UpdatePendingGovernance(address newPendingGovernance);
+    event GovernanceTransferred(
+        address previousGovernance,
+        address newGovernance
+    );
 
     function shutdown() external view returns (bool);
 
     function governance() external view returns (address);
 
-    function pending_governance() external view returns (address);
+    function pendingGovernance() external view returns (address);
 
     function name() external view returns (string memory);
 
@@ -65,7 +68,7 @@ interface IVaultFactory {
 
     function shutdown_factory() external;
 
-    function set_governance(address new_governance) external;
+    function transferGovernance(address new_governance) external;
 
-    function accept_governance() external;
+    function acceptGovernance() external;
 }
