@@ -27,10 +27,6 @@ interface IVaultFactory {
 
     function name() external view returns (string memory);
 
-    function default_protocol_fee_config() external view returns (uint256);
-
-    function custom_protocol_fee(address) external view returns (uint16);
-
     function use_custom_protocol_fee(address) external view returns (bool);
 
     function deploy_new_vault(

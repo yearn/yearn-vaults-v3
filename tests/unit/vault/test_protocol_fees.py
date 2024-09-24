@@ -1,6 +1,6 @@
 from ape import chain
 import pytest
-from utils.constants import ROLES, YEAR, MAX_BPS_ACCOUNTANT
+from utils.constants import ROLES, YEAR, MAX_BPS_ACCOUNTANT, ZERO_ADDRESS
 from utils.utils import days_to_secs
 
 
@@ -18,7 +18,7 @@ def test__report_with_no_protocol_fees__no_accountant_fees(
 ):
     amount = fish_amount // 10
 
-    assert vault_factory.protocol_fee_config().fee_bps == 0
+    assert vault_factory.protocol_fee_config() == (0, ZERO_ADDRESS)
 
     vault = create_vault(asset)
     strategy = create_strategy(vault)

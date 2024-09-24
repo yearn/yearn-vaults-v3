@@ -1,4 +1,4 @@
-name: Test
+name: Ape tests
 
 on:
   push:
@@ -20,12 +20,15 @@ jobs:
 
     steps:
     - uses: actions/checkout@v1
-    - uses: ApeWorX/github-action@v2.0
       with:
         python-version: '3.10'
 
-    - name: install vyper
-      run: pip install git+https://github.com/vyperlang/vyper
+    - name: install requirements
+      run: python3 -m pip install -r requirements.txt 
+    
+    - name: install plugins
+      run: ape plugins install .
+    
     - name: Compile contracts
       # TODO: Force recompiles until ape compile caching is fixed
       run: ape compile --force --size
@@ -34,7 +37,7 @@ jobs:
     - name: Setup node.js
       uses: actions/setup-node@v1
       with:
-        node-version: '16.x'
+        node-version: '18.x'
 
     - name: Install hardhat
       run: npm install hardhat

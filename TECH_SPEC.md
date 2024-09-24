@@ -27,9 +27,9 @@ This allows different players to deploy their own version and implement their ow
 
 ```
 Example periphery contracts: 
-- Emergency module: it receives deposits of Vault Shares and allows the contract to call the shutdown function after a certain % of total Vault Shares have been deposited
-- Debt Allocator: a smart contract that incentivize's APY / debt allocation optimization by rewarding the best debt allocation (see [yStarkDebtAllocator](https://github.com/jmonteer/ystarkdebtallocator))
-- Strategy Staking Module: a smart contract that allows players to sponsor specific strategies (so that they are added to the vault) by staking their YFI, making money if they do well and losing money if they don't.
+- Role Manager: Governance contract that holds the vaults `role_manager` position to codify vault setup and ownership guidelines. (see [RoleManager](https://github.com/yearn/vault-periphery/tree/master/contracts/Managers))
+- Debt Allocator: a smart contract that optimizes between multiple strategies based on the optimal return. (see [DebAllocators](https://github.com/yearn/vault-periphery/tree/master/contracts/debtAllocators))
+- Safety Staking Module: a smart contract that allows players to sponsor specific strategies (so that they are added to the vault) by staking their YFI, making money if they do well and losing money if they don't.
 - Deposit Limit Module: Will dynamically adjust the deposit limit based on the depositor and arbitrary conditions.
 - ...
 ```
@@ -44,6 +44,8 @@ When deploying a new vault, it requires the following parameters:
 - symbol: symbol of Shares ERC20
 - role_manager: account that can assign and revoke Roles
 - profit_max_unlock_time: max amount of time profit will be locked before being distributed
+
+All deployment variables besides the `asset` can be updated post deployment.
 
 ## Normal Operation
 
@@ -79,7 +81,7 @@ If totalAssets > currentDebt: the vault will record a profit
 Both loss and profit will impact strategy's debt, increasing the debt (current debt + profit) if there are profits, decreasing its debt (current debt - loss) if there are losses.
 
 #### Fees
-Fee assessment and distribution are handled by the Accountant module. 
+Fee assessment and distribution are handled by the `accountant` module. 
 
 It will report the amount of fees that need to be charged and the vault will issue shares for that amount of fees.
 
@@ -127,11 +129,9 @@ Every role can be filled by an EOA, multi-sig or other smart contracts. Each rol
 
 The account that manages roles is a single account, set in `role_manager`.
 
-This role_manager can be an EOA, a multi-sig or a Governance Module that relays calls. 
+This role_manager can be an EOA, a multi-sig or a Governance contract that relays calls. 
 
-The vault comes with the ability to "open" every role. Meaning that any function that requires the caller to hold that role would be come permsissionless.
-
-The vault imposes no restrictions on the role managers ability to open or close any role. **But this should be done with extreme care as most of the roles are not meant to be opened and can lead to loss of funds if done incorrectly**.
+The `role_manager` can also update the vaults name and symbol as well as give out the vaults Roles.
 
 ### Strategy Management
 This responsibility is taken by callers with ADD_STRATEGY_MANAGER, REVOKE_STRATEGY_MANAGER and FORCE_REVOKE_MANAGER roles
@@ -170,6 +170,13 @@ If the strategy currently has less debt than the target_debt, the vault will sen
 The vault checks that the `minimumTotalIdle` parameter is respected (i.e. there's at least a certain amount of funds in the vault).
 
 If the strategy has more debt than the max_debt, the vault will request the funds back. These funds may be locked in the strategy, which will result in the strategy returning less funds than requested by the vault. 
+
+#### Auto Allocations
+The DEBT_MANAGER can set the vaults `auto_allocate` flag to `True`.
+
+This will cause every deposit or mint call to end by the vault pushing as much debt as possible to the first strategy in the queue.
+
+NOTE: Not having at least 1 strategy in the `default_queue` with the `auto_allocate` flag will cause all deposits to revert.
 
 #### Setting maximum debt for a specific strategy
 The MAX_DEBT_MANAGER can set the maximum amount of tokens the vault will allow a strategy to owe at any moment in time.

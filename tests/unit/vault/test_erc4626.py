@@ -785,6 +785,29 @@ def test_max_redeem__with_withdraw_limit_module(
     assert vault.maxRedeem(bunny.address) == 0
 
 
+def test_deposit__with_max_uint(
+    asset, fish, fish_amount, gov, create_vault, deploy_limit_module, user_deposit
+):
+    vault = create_vault(asset)
+    assets = fish_amount
+
+    assert asset.balanceOf(fish) == fish_amount
+
+    asset.approve(vault.address, assets, sender=fish)
+
+    # Should go through now
+    tx = vault.deposit(MAX_INT, fish.address, sender=fish)
+
+    event = list(tx.decode_logs(vault.Deposit))[0]
+
+    assert event.assets == assets
+    assert event.shares == assets
+    assert event.owner == fish
+    assert event.sender == fish
+    assert vault.balanceOf(fish.address) == assets
+    assert asset.balanceOf(vault.address) == assets
+
+
 def test_deposit__with_deposit_limit_module(
     asset, fish, fish_amount, gov, create_vault, deploy_limit_module, user_deposit
 ):

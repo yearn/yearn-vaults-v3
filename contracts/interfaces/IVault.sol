@@ -33,6 +33,7 @@ interface IVault is IERC4626 {
         address indexed strategy,
         uint256 new_debt
     );
+    event UpdateAutoAllocate(bool auto_allocate);
     event UpdateDepositLimit(uint256 deposit_limit);
     event UpdateMinimumTotalIdle(uint256 minimum_total_idle);
     event UpdateProfitMaxUnlockTime(uint256 profit_max_unlock_time);
@@ -53,6 +54,8 @@ interface IVault is IERC4626 {
     function default_queue(uint256) external view returns (address);
 
     function use_default_queue() external view returns (bool);
+
+    function auto_allocate() external view returns (bool);
 
     function minimum_total_idle() external view returns (uint256);
 
@@ -82,11 +85,17 @@ interface IVault is IERC4626 {
         uint256
     ) external;
 
+    function setName(string memory) external;
+
+    function setSymbol(string memory) external;
+
     function set_accountant(address new_accountant) external;
 
     function set_default_queue(address[] memory new_default_queue) external;
 
     function set_use_default_queue(bool) external;
+
+    function set_auto_allocate(bool) external;
 
     function set_deposit_limit(uint256 deposit_limit) external;
 
