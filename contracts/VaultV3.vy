@@ -1257,7 +1257,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
             self.strategies[strategy].current_debt = current_debt
             self.total_debt += gain
         else:
-            # Add in any refunds since it is idle.
+            # Add in any refunds since it is now idle.
             current_debt = unsafe_add(current_debt, total_refunds)
             self.total_idle = current_debt
             
@@ -1268,7 +1268,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
             self.strategies[strategy].current_debt = current_debt
             self.total_debt -= loss
         else:
-            # Add in any refunds since it is idle.
+            # Add in any refunds since it is now idle.
             current_debt = unsafe_add(current_debt, total_refunds)
             self.total_idle = current_debt
         

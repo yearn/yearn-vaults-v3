@@ -242,7 +242,9 @@ contract VaultHandler is ExtendedTest {
         uint256 _amount
     ) public countCall("unreportedLoss") {
         _amount = bound(_amount, 0, strategy.totalAssets() / 10);
-
+        
+        if(_amount == 0) return;
+        
         // Simulate losing money
         vm.prank(address(strategy));
         asset.transfer(address(69), _amount);
