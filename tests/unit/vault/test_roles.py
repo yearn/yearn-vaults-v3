@@ -18,7 +18,10 @@ def test_transfers_role_manager(vault, gov, strategist):
     assert vault.role_manager() == gov
     assert vault.future_role_manager() == ZERO_ADDRESS
 
-    vault.transfer_role_manager(strategist, sender=gov)
+    tx = vault.transfer_role_manager(strategist, sender=gov)
+    event = list(tx.decode_logs(vault.UpdateFutureRoleManager))
+    assert len(event) == 1
+    assert event[0].future_role_manager == strategist
 
     assert vault.role_manager() == gov
     assert vault.future_role_manager() == strategist
@@ -36,7 +39,10 @@ def test_gov_transfers_role_manager__gov_cant_accept(vault, gov, strategist):
     assert vault.role_manager() == gov
     assert vault.future_role_manager() == ZERO_ADDRESS
 
-    vault.transfer_role_manager(strategist, sender=gov)
+    tx = vault.transfer_role_manager(strategist, sender=gov)
+    event = list(tx.decode_logs(vault.UpdateFutureRoleManager))
+    assert len(event) == 1
+    assert event[0].future_role_manager == strategist
 
     assert vault.role_manager() == gov
     assert vault.future_role_manager() == strategist
@@ -65,12 +71,18 @@ def test_gov_transfers_role_manager__can_change_future_manager(
     assert vault.role_manager() == gov
     assert vault.future_role_manager() == ZERO_ADDRESS
 
-    vault.transfer_role_manager(strategist, sender=gov)
+    tx = vault.transfer_role_manager(strategist, sender=gov)
+    event = list(tx.decode_logs(vault.UpdateFutureRoleManager))
+    assert len(event) == 1
+    assert event[0].future_role_manager == strategist
 
     assert vault.role_manager() == gov
     assert vault.future_role_manager() == strategist
 
-    vault.transfer_role_manager(bunny, sender=gov)
+    tx = vault.transfer_role_manager(bunny, sender=gov)
+    event = list(tx.decode_logs(vault.UpdateFutureRoleManager))
+    assert len(event) == 1
+    assert event[0].future_role_manager == bunny
 
     assert vault.role_manager() == gov
     assert vault.future_role_manager() == bunny

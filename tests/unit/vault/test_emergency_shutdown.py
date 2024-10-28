@@ -25,7 +25,11 @@ def test_shutdown(gov, panda, vault):
 def test_shutdown_gives_debt_manager_role(gov, panda, vault):
     vault.set_role(panda.address, ROLES.EMERGENCY_MANAGER, sender=gov)
     assert ROLES.DEBT_MANAGER not in ROLES(vault.roles(panda))
-    vault.shutdown_vault(sender=panda)
+    tx = vault.shutdown_vault(sender=panda)
+    event = list(tx.decode_logs(vault.RoleSet))
+    assert len(event) == 1
+    assert event[0].account == panda.address
+    assert event[0].role == ROLES.DEBT_MANAGER | ROLES.EMERGENCY_MANAGER
     assert ROLES.DEBT_MANAGER | ROLES.EMERGENCY_MANAGER == vault.roles(panda)
 
 

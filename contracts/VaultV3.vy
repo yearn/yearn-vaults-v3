@@ -112,6 +112,9 @@ event RoleSet:
     role: indexed(Roles)
 
 # STORAGE MANAGEMENT EVENTS
+event UpdateFutureRoleManager:
+    future_role_manager: indexed(address)
+
 event UpdateRoleManager:
     role_manager: indexed(address)
 
@@ -1577,6 +1580,8 @@ def transfer_role_manager(role_manager: address):
     assert msg.sender == self.role_manager
     self.future_role_manager = role_manager
 
+    log UpdateFutureRoleManager(role_manager)
+
 @external
 def accept_role_manager():
     """
@@ -1779,7 +1784,7 @@ def shutdown_vault():
     new_roles: Roles = self.roles[msg.sender] | Roles.DEBT_MANAGER
     self.roles[msg.sender] = new_roles
     log RoleSet(msg.sender, new_roles)
-    
+
     log Shutdown()
 
 
