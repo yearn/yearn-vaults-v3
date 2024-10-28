@@ -1776,7 +1776,10 @@ def shutdown_vault():
     self.deposit_limit = 0
     log UpdateDepositLimit(0)
 
-    self.roles[msg.sender] = self.roles[msg.sender] | Roles.DEBT_MANAGER
+    new_roles: Roles = self.roles[msg.sender] | Roles.DEBT_MANAGER
+    self.roles[msg.sender] = new_roles
+    log RoleSet(msg.sender, new_roles)
+    
     log Shutdown()
 
 
