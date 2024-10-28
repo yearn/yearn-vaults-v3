@@ -2103,7 +2103,7 @@ def FACTORY() -> address:
     """
     return self.factory
 
-@view
+@pure
 @external
 def apiVersion() -> String[28]:
     """
