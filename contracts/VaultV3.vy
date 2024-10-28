@@ -1541,11 +1541,11 @@ def set_role(account: address, role: Roles):
 @external
 def add_role(account: address, role: Roles):
     """
-    @notice Add a new role to an address.
-    @dev This will add a new role to the account
+    @notice Add a new role/s to an address.
+    @dev This will add a new role/s to the account
      without effecting any of the previously held roles.
     @param account The account to add a role to.
-    @param role The new role to add to account.
+    @param role The new role/s to add to account.
     """
     assert msg.sender == self.role_manager
     new_roles: Roles = self.roles[account] | role
@@ -1556,11 +1556,11 @@ def add_role(account: address, role: Roles):
 @external
 def remove_role(account: address, role: Roles):
     """
-    @notice Remove a single role from an account.
+    @notice Remove a role/s from an account.
     @dev This will leave all other roles for the 
      account unchanged.
-    @param account The account to remove a Role from.
-    @param role The Role to remove.
+    @param account The account to remove a Role/s from.
+    @param role The Role/s to remove.
     """
     assert msg.sender == self.role_manager
     new_roles: Roles = self.roles[account] & ~role
@@ -1755,7 +1755,7 @@ def update_debt(
     @param strategy The strategy to update the debt for.
     @param target_debt The target debt for the strategy.
     @param max_loss Optional to check realized losses on debt decreases.
-    @return The amount of debt added or removed.
+    @return The new current debt of the strategy.
     """
     self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
     return self._update_debt(strategy, target_debt, max_loss)
