@@ -861,7 +861,7 @@ def _redeem(
 
             # NOTE: strategy's debt decreases by the full amount but the total idle increases 
             # by the actual amount only (as the difference is considered lost).
-            current_total_idle += (assets_to_withdraw - loss)
+            current_total_idle += (unsafe_sub(assets_to_withdraw, loss))
             requested_assets -= loss
             current_total_debt -= assets_to_withdraw
 
@@ -928,14 +928,11 @@ def _add_strategy(new_strategy: address, add_to_queue: bool):
 @internal
 def _revoke_strategy(strategy: address, force: bool=False):
     assert self.strategies[strategy].activation != 0, "strategy not active"
-
-    # If force revoking a strategy, it will cause a loss.
-    loss: uint256 = 0
     
     if self.strategies[strategy].current_debt != 0:
         assert force, "strategy has debt"
         # Vault realizes the full loss of outstanding debt.
-        loss = self.strategies[strategy].current_debt
+        loss: uint256 = self.strategies[strategy].current_debt
         # Adjust total vault debt.
         self.total_debt -= loss
 
@@ -1031,7 +1028,7 @@ def _update_debt(strategy: address, target_debt: uint256, max_loss: uint256) -> 
         # If we didn't get the amount we asked for and there is a max loss.
         if withdrawn < assets_to_withdraw and max_loss < MAX_BPS:
             # Make sure the loss is within the allowed range.
-            assert assets_to_withdraw - withdrawn <= assets_to_withdraw * max_loss / MAX_BPS, "too much loss"
+            assert unsafe_sub(assets_to_withdraw, withdrawn) <= assets_to_withdraw * max_loss / MAX_BPS, "too much loss"
 
         # If we got too much make sure not to increase PPS.
         elif withdrawn > assets_to_withdraw:
@@ -1548,9 +1545,10 @@ def add_role(account: address, role: Roles):
     @param role The new role to add to account.
     """
     assert msg.sender == self.role_manager
-    self.roles[account] = self.roles[account] | role
+    new_roles: Roles = self.roles[account] | role
+    self.roles[account] = new_roles
 
-    log RoleSet(account, self.roles[account])
+    log RoleSet(account, new_roles)
 
 @external
 def remove_role(account: address, role: Roles):
@@ -1562,9 +1560,10 @@ def remove_role(account: address, role: Roles):
     @param role The Role to remove.
     """
     assert msg.sender == self.role_manager
-    self.roles[account] = self.roles[account] & ~role
+    new_roles: Roles = self.roles[account] & ~role
+    self.roles[account] = new_roles
 
-    log RoleSet(account, self.roles[account])
+    log RoleSet(account, new_roles)
     
 @external
 def transfer_role_manager(role_manager: address):
@@ -1675,15 +1674,16 @@ def buy_debt(strategy: address, amount: uint256):
 
     self._erc20_safe_transfer_from(self.asset, msg.sender, self, _amount)
 
-    # Lower strategy debt
-    self.strategies[strategy].current_debt -= _amount
+    # Lower strategy debt 
+    new_debt: uint256 = unsafe_sub(current_debt, _amount)
+    self.strategies[strategy].current_debt = new_debt
     # lower total debt
     self.total_debt -= _amount
     # Increase total idle
     self.total_idle += _amount
 
     # log debt change
-    log DebtUpdated(strategy, current_debt, current_debt - _amount)
+    log DebtUpdated(strategy, current_debt, new_debt)
 
     # Transfer the strategies shares out.
     self._erc20_safe_transfer(strategy, msg.sender, shares)
