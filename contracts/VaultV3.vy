@@ -112,6 +112,9 @@ event RoleSet:
     role: indexed(Roles)
 
 # STORAGE MANAGEMENT EVENTS
+event UpdateFutureRoleManager:
+    future_role_manager: indexed(address)
+
 event UpdateRoleManager:
     role_manager: indexed(address)
 
@@ -861,7 +864,7 @@ def _redeem(
 
             # NOTE: strategy's debt decreases by the full amount but the total idle increases 
             # by the actual amount only (as the difference is considered lost).
-            current_total_idle += (assets_to_withdraw - loss)
+            current_total_idle += (unsafe_sub(assets_to_withdraw, loss))
             requested_assets -= loss
             current_total_debt -= assets_to_withdraw
 
@@ -928,14 +931,11 @@ def _add_strategy(new_strategy: address, add_to_queue: bool):
 @internal
 def _revoke_strategy(strategy: address, force: bool=False):
     assert self.strategies[strategy].activation != 0, "strategy not active"
-
-    # If force revoking a strategy, it will cause a loss.
-    loss: uint256 = 0
     
     if self.strategies[strategy].current_debt != 0:
         assert force, "strategy has debt"
         # Vault realizes the full loss of outstanding debt.
-        loss = self.strategies[strategy].current_debt
+        loss: uint256 = self.strategies[strategy].current_debt
         # Adjust total vault debt.
         self.total_debt -= loss
 
@@ -1031,7 +1031,7 @@ def _update_debt(strategy: address, target_debt: uint256, max_loss: uint256) -> 
         # If we didn't get the amount we asked for and there is a max loss.
         if withdrawn < assets_to_withdraw and max_loss < MAX_BPS:
             # Make sure the loss is within the allowed range.
-            assert assets_to_withdraw - withdrawn <= assets_to_withdraw * max_loss / MAX_BPS, "too much loss"
+            assert unsafe_sub(assets_to_withdraw, withdrawn) <= assets_to_withdraw * max_loss / MAX_BPS, "too much loss"
 
         # If we got too much make sure not to increase PPS.
         elif withdrawn > assets_to_withdraw:
@@ -1257,8 +1257,10 @@ def _process_report(strategy: address) -> (uint256, uint256):
             self.strategies[strategy].current_debt = current_debt
             self.total_debt += gain
         else:
-            self.total_idle = total_assets
-        
+            # Add in any refunds since it is now idle.
+            current_debt = unsafe_add(current_debt, total_refunds)
+            self.total_idle = current_debt
+            
     # Or record any reported loss
     elif loss > 0:
         current_debt = unsafe_sub(current_debt, loss)
@@ -1266,7 +1268,9 @@ def _process_report(strategy: address) -> (uint256, uint256):
             self.strategies[strategy].current_debt = current_debt
             self.total_debt -= loss
         else:
-            self.total_idle = total_assets
+            # Add in any refunds since it is now idle.
+            current_debt = unsafe_add(current_debt, total_refunds)
+            self.total_idle = current_debt
         
     # Issue shares for fees that were calculated above if applicable.
     if total_fees_shares > 0:
@@ -1537,30 +1541,32 @@ def set_role(account: address, role: Roles):
 @external
 def add_role(account: address, role: Roles):
     """
-    @notice Add a new role to an address.
-    @dev This will add a new role to the account
+    @notice Add a new role/s to an address.
+    @dev This will add a new role/s to the account
      without effecting any of the previously held roles.
     @param account The account to add a role to.
-    @param role The new role to add to account.
+    @param role The new role/s to add to account.
     """
     assert msg.sender == self.role_manager
-    self.roles[account] = self.roles[account] | role
+    new_roles: Roles = self.roles[account] | role
+    self.roles[account] = new_roles
 
-    log RoleSet(account, self.roles[account])
+    log RoleSet(account, new_roles)
 
 @external
 def remove_role(account: address, role: Roles):
     """
-    @notice Remove a single role from an account.
+    @notice Remove a role/s from an account.
     @dev This will leave all other roles for the 
      account unchanged.
-    @param account The account to remove a Role from.
-    @param role The Role to remove.
+    @param account The account to remove a Role/s from.
+    @param role The Role/s to remove.
     """
     assert msg.sender == self.role_manager
-    self.roles[account] = self.roles[account] & ~role
+    new_roles: Roles = self.roles[account] & ~role
+    self.roles[account] = new_roles
 
-    log RoleSet(account, self.roles[account])
+    log RoleSet(account, new_roles)
     
 @external
 def transfer_role_manager(role_manager: address):
@@ -1573,6 +1579,8 @@ def transfer_role_manager(role_manager: address):
     """
     assert msg.sender == self.role_manager
     self.future_role_manager = role_manager
+
+    log UpdateFutureRoleManager(role_manager)
 
 @external
 def accept_role_manager():
@@ -1671,15 +1679,16 @@ def buy_debt(strategy: address, amount: uint256):
 
     self._erc20_safe_transfer_from(self.asset, msg.sender, self, _amount)
 
-    # Lower strategy debt
-    self.strategies[strategy].current_debt -= _amount
+    # Lower strategy debt 
+    new_debt: uint256 = unsafe_sub(current_debt, _amount)
+    self.strategies[strategy].current_debt = new_debt
     # lower total debt
     self.total_debt -= _amount
     # Increase total idle
     self.total_idle += _amount
 
     # log debt change
-    log DebtUpdated(strategy, current_debt, current_debt - _amount)
+    log DebtUpdated(strategy, current_debt, new_debt)
 
     # Transfer the strategies shares out.
     self._erc20_safe_transfer(strategy, msg.sender, shares)
@@ -1746,7 +1755,7 @@ def update_debt(
     @param strategy The strategy to update the debt for.
     @param target_debt The target debt for the strategy.
     @param max_loss Optional to check realized losses on debt decreases.
-    @return The amount of debt added or removed.
+    @return The new current debt of the strategy.
     """
     self._enforce_role(msg.sender, Roles.DEBT_MANAGER)
     return self._update_debt(strategy, target_debt, max_loss)
@@ -1772,7 +1781,10 @@ def shutdown_vault():
     self.deposit_limit = 0
     log UpdateDepositLimit(0)
 
-    self.roles[msg.sender] = self.roles[msg.sender] | Roles.DEBT_MANAGER
+    new_roles: Roles = self.roles[msg.sender] | Roles.DEBT_MANAGER
+    self.roles[msg.sender] = new_roles
+    log RoleSet(msg.sender, new_roles)
+
     log Shutdown()
 
 
@@ -2099,7 +2111,7 @@ def FACTORY() -> address:
     """
     return self.factory
 
-@view
+@pure
 @external
 def apiVersion() -> String[28]:
     """

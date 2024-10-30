@@ -101,7 +101,7 @@ contract VaultHandler is ExtendedTest {
                 deposit(_amount * 2);
             }
         }
-        _amount = bound(_amount, 0, vault.maxWithdraw(address(actor)));
+        _amount = bound(_amount, 0, vault.maxWithdraw(address(actor)) + 1);
         if (_amount == 0) ghost_zeroWithdrawals++;
 
         uint256 idle = vault.totalIdle();
@@ -122,7 +122,7 @@ contract VaultHandler is ExtendedTest {
                 mint(_amount * 2);
             }
         }
-        _amount = bound(_amount, 0, vault.balanceOf(address(actor)));
+        _amount = bound(_amount, 0, vault.balanceOf(address(actor)) + 1);
         if (_amount == 0) ghost_zeroWithdrawals++;
 
         uint256 idle = vault.totalIdle();
@@ -242,6 +242,8 @@ contract VaultHandler is ExtendedTest {
         uint256 _amount
     ) public countCall("unreportedLoss") {
         _amount = bound(_amount, 0, strategy.totalAssets() / 10);
+
+        if (_amount == 0) return;
 
         // Simulate losing money
         vm.prank(address(strategy));

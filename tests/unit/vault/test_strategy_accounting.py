@@ -651,3 +651,118 @@ def test_set_accountant__with_accountant(gov, vault, deploy_accountant):
     assert event[0].accountant == accountant.address
 
     assert vault.accountant() == accountant.address
+
+
+def test_process_report_on_self__gain_and_refunds(
+    chain,
+    gov,
+    asset,
+    vault,
+    set_fees_for_strategy,
+    airdrop_asset,
+    deploy_flexible_accountant,
+):
+    vault_balance = asset.balanceOf(vault)
+    gain = vault_balance // 10
+    loss = 0
+    management_fee = 0
+    performance_fee = 0
+    refund_ratio = 5_000
+    refund = gain * refund_ratio // MAX_BPS_ACCOUNTANT
+
+    accountant = deploy_flexible_accountant(vault)
+    # set up accountant
+    asset.mint(accountant, gain, sender=gov)
+
+    set_fees_for_strategy(
+        gov, vault, accountant, management_fee, performance_fee, refund_ratio
+    )
+
+    initial_idle = vault.totalIdle()
+
+    airdrop_asset(gov, asset, vault, gain)
+
+    # Not yet recorded
+    assert vault.totalIdle() == initial_idle
+    assert asset.balanceOf(vault) == initial_idle + gain
+    pps_before = vault.pricePerShare()
+    assets_before = vault.totalAssets()
+    supply_before = vault.totalSupply()
+    tx = vault.process_report(vault.address, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyReported))
+
+    assert len(event) == 1
+    assert event[0].strategy == vault.address
+    assert event[0].gain == gain
+    assert event[0].loss == 0
+    assert event[0].current_debt == vault_balance + gain + refund
+    assert event[0].total_fees == 0
+    assert event[0].total_refunds == refund
+
+    # Due to refunds, pps should have increased
+    assert vault.pricePerShare() == pps_before
+    assert vault.totalAssets() == vault_balance + gain + refund
+    assert vault.totalSupply() > supply_before
+    assert vault.totalDebt() == 0
+    assert vault.totalIdle() == vault_balance + gain + refund
+    assert asset.balanceOf(vault) == vault_balance + gain + refund
+
+    chain.pending_timestamp += DAY
+    chain.mine(timestamp=chain.pending_timestamp)
+
+    assert vault.pricePerShare() > pps_before
+
+
+def test_process_report_on_self__loss_and_refunds(
+    chain,
+    gov,
+    asset,
+    vault,
+    set_fees_for_strategy,
+    airdrop_asset,
+    deploy_flexible_accountant,
+):
+    vault_balance = asset.balanceOf(vault)
+    gain = 0
+    loss = vault_balance // 10
+    management_fee = 0
+    performance_fee = 0
+    refund_ratio = 5_000
+    refund = loss * refund_ratio // MAX_BPS_ACCOUNTANT
+
+    accountant = deploy_flexible_accountant(vault)
+    # set up accountant
+    asset.mint(accountant, loss, sender=gov)
+
+    set_fees_for_strategy(
+        gov, vault, accountant, management_fee, performance_fee, refund_ratio
+    )
+
+    initial_idle = vault.totalIdle()
+
+    asset.transfer(gov, loss, sender=vault.address)
+
+    # Not yet recorded
+    assert vault.totalIdle() == initial_idle
+    assert asset.balanceOf(vault) == initial_idle - loss
+    pps_before = vault.pricePerShare()
+    assets_before = vault.totalAssets()
+    supply_before = vault.totalSupply()
+    tx = vault.process_report(vault.address, sender=gov)
+    event = list(tx.decode_logs(vault.StrategyReported))
+
+    assert len(event) == 1
+    assert event[0].strategy == vault.address
+    assert event[0].gain == gain
+    assert event[0].loss == loss
+    assert event[0].current_debt == vault_balance + refund - loss
+    assert event[0].total_fees == 0
+    assert event[0].total_refunds == refund
+
+    # Due to refunds, pps should have increased
+    assert vault.pricePerShare() < pps_before
+    assert vault.totalAssets() == vault_balance + refund - loss
+    assert vault.totalSupply() == supply_before
+    assert vault.totalDebt() == 0
+    assert vault.totalIdle() == vault_balance + refund - loss
+    assert asset.balanceOf(vault) == vault_balance + refund - loss
