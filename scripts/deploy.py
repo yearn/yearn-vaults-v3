@@ -28,7 +28,7 @@ def deploy_original_and_factory():
     # Get the hexadecimal representation of the hash
     hex_hash = hash_object.hexdigest()
     # Convert the hexadecimal hash to an integer
-    salt = 0 #int(hex_hash, 16)
+    salt = 0  # int(hex_hash, 16)
 
     print(f"Salt we are using {salt}")
     print("Init balance:", deployer.balance / 1e18)
