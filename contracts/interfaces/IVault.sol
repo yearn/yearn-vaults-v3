@@ -23,6 +23,7 @@ interface IVault is IERC4626 {
     );
     // ROLE UPDATES
     event RoleSet(address indexed account, uint256 role);
+    event UpdateFutureRoleManager(address indexed future_role_manager);
     event UpdateRoleManager(address indexed role_manager);
 
     event UpdateAccountant(address indexed accountant);

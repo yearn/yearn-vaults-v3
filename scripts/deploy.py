@@ -19,7 +19,7 @@ def deploy_original_and_factory():
         "0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed"
     )
 
-    salt_string = "v3.0.3"
+    salt_string = ""
 
     # Create a SHA-256 hash object
     hash_object = hashlib.sha256()
@@ -28,7 +28,7 @@ def deploy_original_and_factory():
     # Get the hexadecimal representation of the hash
     hex_hash = hash_object.hexdigest()
     # Convert the hexadecimal hash to an integer
-    salt = int(hex_hash, 16)
+    salt = 0  # int(hex_hash, 16)
 
     print(f"Salt we are using {salt}")
     print("Init balance:", deployer.balance / 1e18)
@@ -54,7 +54,7 @@ def deploy_original_and_factory():
     init_gov = "0x6f3cBE2ab3483EC4BA7B672fbdCa0E9B33F88db8"
 
     factory_constructor = vault_factory.constructor.encode_input(
-        "Yearn v3.0.3 Vault Factory",
+        "Yearn v3.0.4 Vault Factory",
         original_address,
         init_gov,
     )
