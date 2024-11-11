@@ -85,6 +85,6 @@ If the deployments do not end at the same address you can also manually send the
 
 ### To make a contribution please follow the [guidelines](https://github.com/yearn/yearn-vaults-v3/bloc/master/CONTRIBUTING.md)
 
-See the ApeWorx [documentation](https://docs.apeworx.io/ape/stable/) and [github](https://github.com/ApeWorX/ape) for more information.
+See the ApeWorx [documentation](https://docs.apeworx.io/ape/stable/) and [GitHub](https://github.com/ApeWorX/ape) for more information.
 
 You will need hardhat to run the test `yarn`
