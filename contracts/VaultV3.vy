@@ -1608,7 +1608,7 @@ def isShutdown() -> bool:
 def unlockedShares() -> uint256:
     """
     @notice Get the amount of shares that have been unlocked.
-    @return The amount of shares that are have been unlocked.
+    @return The amount of shares that have been unlocked.
     """
     return self._unlocked_shares()
 
