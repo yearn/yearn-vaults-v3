@@ -1,6 +1,6 @@
 # Yearn V3 Vaults
 
-This repository contains the Smart Contracts for Yearns V3 vault implementation.
+This repository contains the Smart Contracts for Yearn's V3 vault implementation.
 
 [VaultFactory.vy](contracts/VaultFactory.vy) - The base factory that all vaults will be deployed from and used to configure protocol fees
 
