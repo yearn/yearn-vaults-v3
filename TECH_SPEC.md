@@ -28,7 +28,7 @@ This allows different players to deploy their own version and implement their ow
 ```
 Example periphery contracts: 
 - Role Manager: Governance contract that holds the vaults `role_manager` position to codify vault setup and ownership guidelines. (see [RoleManager](https://github.com/yearn/vault-periphery/tree/master/contracts/Managers))
-- Debt Allocator: a smart contract that optimizes between multiple strategies based on the optimal return. (see [DebAllocators](https://github.com/yearn/vault-periphery/tree/master/contracts/debtAllocators))
+- Debt Allocator: a smart contract that optimizes between multiple strategies based on the optimal return. (see [DebtAllocators](https://github.com/yearn/vault-periphery/tree/master/contracts/debtAllocators))
 - Safety Staking Module: a smart contract that allows players to sponsor specific strategies (so that they are added to the vault) by staking their YFI, making money if they do well and losing money if they don't.
 - Deposit Limit Module: Will dynamically adjust the deposit limit based on the depositor and arbitrary conditions.
 - ...
