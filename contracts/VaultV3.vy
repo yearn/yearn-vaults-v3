@@ -186,7 +186,7 @@ enum Roles:
     ADD_STRATEGY_MANAGER # Can add strategies to the vault.
     REVOKE_STRATEGY_MANAGER # Can remove strategies from the vault.
     FORCE_REVOKE_MANAGER # Can force remove a strategy causing a loss.
-    ACCOUNTANT_MANAGER # Can set the accountant that assess fees.
+    ACCOUNTANT_MANAGER # Can set the accountant that assesses fees.
     QUEUE_MANAGER # Can set the default withdrawal queue.
     REPORTING_MANAGER # Calls report for strategies.
     DEBT_MANAGER # Adds and removes debt from strategies.
