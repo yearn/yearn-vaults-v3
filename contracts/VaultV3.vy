@@ -1543,7 +1543,7 @@ def add_role(account: address, role: Roles):
     """
     @notice Add a new role/s to an address.
     @dev This will add a new role/s to the account
-     without effecting any of the previously held roles.
+     without affecting any of the previously held roles.
     @param account The account to add a role to.
     @param role The new role/s to add to account.
     """
