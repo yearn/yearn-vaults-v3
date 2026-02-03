@@ -83,7 +83,7 @@ ape run scripts/deploy.py --network YOUR_RPC_URL
 
 If the deployments do not end at the same address you can also manually send the calldata used in the previous deployments on other chains.
 
-### To make a contribution please follow the [guidelines](https://github.com/yearn/yearn-vaults-v3/bloc/master/CONTRIBUTING.md)
+### To make a contribution please follow the [guidelines](https://github.com/yearn/yearn-vaults-v3/blob/master/CONTRIBUTING.md)
 
 See the ApeWorx [documentation](https://docs.apeworx.io/ape/stable/) and [github](https://github.com/ApeWorX/ape) for more information.
 
