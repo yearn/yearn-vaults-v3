@@ -37,7 +37,7 @@ git pull origin master
 
 ```
 
-To stage the changed files that are be committed, issue the command:
+To stage the changed files that are to be committed, issue the command:
 
 ```bash
 git add -a
