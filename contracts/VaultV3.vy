@@ -995,7 +995,7 @@ def _update_debt(strategy: address, target_debt: uint256, max_loss: uint256) -> 
         # Respect minimum total idle in vault
         if total_idle + assets_to_withdraw < minimum_total_idle:
             assets_to_withdraw = unsafe_sub(minimum_total_idle, total_idle)
-            # Cant withdraw more than the strategy has.
+            # Can't withdraw more than the strategy has.
             if assets_to_withdraw > current_debt:
                 assets_to_withdraw = current_debt
 
