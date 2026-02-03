@@ -176,7 +176,7 @@ abstract contract BasicToken is Ownable, ERC20Basic {
 
     /**
      * @dev Gets the balance of the specified address.
-     * @param _owner The address to query the the balance of.
+     * @param _owner The address to query the balance of.
      * @return balance An uint representing the amount owned by the passed address.
      */
     function balanceOf(
