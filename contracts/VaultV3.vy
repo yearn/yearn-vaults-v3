@@ -218,7 +218,7 @@ factory: address
 strategies: public(HashMap[address, StrategyParams])
 # The current default withdrawal queue.
 default_queue: public(DynArray[address, MAX_QUEUE])
-# Should the vault use the default_queue regardless whats passed in.
+# Should the vault use the default_queue regardless of what's passed in.
 use_default_queue: public(bool)
 # Should the vault automatically allocate funds to the first strategy in queue.
 auto_allocate: public(bool)
@@ -1382,7 +1382,7 @@ def set_use_default_queue(use_default_queue: bool):
     """
     @notice Set a new value for `use_default_queue`.
     @dev If set `True` the default queue will always be
-        used no matter whats passed in.
+        used no matter what's passed in.
     @param use_default_queue new value.
     """
     self._enforce_role(msg.sender, Roles.QUEUE_MANAGER)
