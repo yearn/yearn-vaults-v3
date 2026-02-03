@@ -1972,7 +1972,7 @@ def totalIdle() -> uint256:
 @external
 def totalDebt() -> uint256:
     """
-    @notice Get the the total amount of funds invested
+    @notice Get the total amount of funds invested
     across all strategies.
     @return The current total debt.
     """
