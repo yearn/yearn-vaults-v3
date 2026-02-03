@@ -1158,7 +1158,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
     gain: uint256 = 0
     loss: uint256 = 0
 
-    ### Asses Gain or Loss ###
+    ### Assess Gain or Loss ###
 
     # Compare reported assets vs. the current debt.
     if total_assets > current_debt:
@@ -1168,7 +1168,7 @@ def _process_report(strategy: address) -> (uint256, uint256):
         # We have a loss.
         loss = unsafe_sub(current_debt, total_assets)
 
-    ### Asses Fees and Refunds ###
+    ### Assess Fees and Refunds ###
 
     # For Accountant fee assessment.
     total_fees: uint256 = 0
