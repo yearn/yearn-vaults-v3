@@ -2049,7 +2049,7 @@ def maxWithdraw(
     """
     @notice Get the maximum amount of assets that can be withdrawn.
     @dev Complies to normal 4626 interface and takes custom params.
-    NOTE: Passing in a incorrectly ordered queue may result in
+    NOTE: Passing in an incorrectly ordered queue may result in
      incorrect returns values.
     @param owner The address that owns the shares.
     @param max_loss Custom max_loss if any.
@@ -2068,7 +2068,7 @@ def maxRedeem(
     """
     @notice Get the maximum amount of shares that can be redeemed.
     @dev Complies to normal 4626 interface and takes custom params.
-    NOTE: Passing in a incorrectly ordered queue may result in
+    NOTE: Passing in an incorrectly ordered queue may result in
      incorrect returns values.
     @param owner The address that owns the shares.
     @param max_loss Custom max_loss if any.
