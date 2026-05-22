@@ -11,6 +11,8 @@ default_deposit_limit: public(uint256)
 
 default_withdraw_limit: public(uint256)
 
+required_withdraw_strategy: public(address)
+
 @external
 def __init__(
     default_deposit_limit: uint256,
@@ -36,6 +38,12 @@ def available_deposit_limit(receiver: address) -> uint256:
 @view
 @external
 def available_withdraw_limit(owner: address, max_loss: uint256, strategies: DynArray[address, 10]) -> uint256:
+    if self.required_withdraw_strategy != empty(address):
+        if len(strategies) == 0:
+            return 0
+        if strategies[0] != self.required_withdraw_strategy:
+            return 0
+
     return self.default_withdraw_limit
 
 @external
@@ -49,6 +57,10 @@ def set_default_deposit_limit(limit: uint256):
 @external
 def set_default_withdraw_limit(limit: uint256):
     self.default_withdraw_limit = limit
+
+@external
+def set_required_withdraw_strategy(strategy: address):
+    self.required_withdraw_strategy = strategy
 
 @external
 def set_enforce_whitelist(enforce: bool):

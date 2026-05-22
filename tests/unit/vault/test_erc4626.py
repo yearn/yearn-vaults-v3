@@ -960,3 +960,89 @@ def test_redeem__with_withdraw_limit_module(
     assert vault.balanceOf(fish.address) == 0
     assert asset.balanceOf(vault.address) == 0
     assert asset.balanceOf(fish.address) == assets
+
+
+def test_redeem__with_withdraw_limit_module_uses_default_queue(
+    asset,
+    fish,
+    fish_amount,
+    gov,
+    create_vault,
+    create_strategy,
+    add_debt_to_strategy,
+    add_strategy_to_vault,
+    deploy_limit_module,
+    user_deposit,
+):
+    vault = create_vault(asset)
+    limit_module = deploy_limit_module()
+    strategy = create_strategy(vault)
+    assets = fish_amount
+
+    user_deposit(fish, vault, asset, assets)
+    add_strategy_to_vault(gov, strategy, vault)
+    add_debt_to_strategy(gov, strategy, vault, assets)
+
+    vault.set_withdraw_limit_module(limit_module, sender=gov)
+    limit_module.set_required_withdraw_strategy(strategy.address, sender=gov)
+
+    assert vault.maxRedeem(fish.address) == assets
+
+    tx = vault.redeem(assets, fish.address, fish.address, sender=fish)
+
+    event = list(tx.decode_logs(vault.Withdraw))[-1]
+
+    assert event.assets == assets
+    assert event.shares == assets
+    assert event.owner == fish
+    assert event.receiver == fish
+    assert vault.balanceOf(fish.address) == 0
+    assert asset.balanceOf(fish.address) == assets
+
+
+def test_withdraw__with_withdraw_limit_module_uses_forced_default_queue(
+    asset,
+    fish,
+    fish_amount,
+    gov,
+    create_vault,
+    create_strategy,
+    add_debt_to_strategy,
+    add_strategy_to_vault,
+    deploy_limit_module,
+    user_deposit,
+):
+    vault = create_vault(asset)
+    limit_module = deploy_limit_module()
+    default_strategy = create_strategy(vault)
+    custom_strategy = create_strategy(vault)
+    assets = fish_amount
+
+    user_deposit(fish, vault, asset, assets)
+    add_strategy_to_vault(gov, default_strategy, vault)
+    add_strategy_to_vault(gov, custom_strategy, vault)
+    add_debt_to_strategy(gov, default_strategy, vault, assets)
+
+    vault.set_withdraw_limit_module(limit_module, sender=gov)
+    limit_module.set_required_withdraw_strategy(default_strategy.address, sender=gov)
+    vault.set_use_default_queue(True, sender=gov)
+
+    assert vault.maxWithdraw(fish.address, 0, [custom_strategy]) == assets
+
+    tx = vault.withdraw(
+        assets,
+        fish.address,
+        fish.address,
+        0,
+        [custom_strategy],
+        sender=fish,
+    )
+
+    event = list(tx.decode_logs(vault.Withdraw))[-1]
+
+    assert event.assets == assets
+    assert event.shares == assets
+    assert event.owner == fish
+    assert event.receiver == fish
+    assert vault.balanceOf(fish.address) == 0
+    assert asset.balanceOf(fish.address) == assets

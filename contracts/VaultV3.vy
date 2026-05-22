@@ -533,6 +533,18 @@ def _max_deposit(receiver: address) -> uint256:
 
 @view
 @internal
+def _withdraw_queue(strategies: DynArray[address, MAX_QUEUE]) -> DynArray[address, MAX_QUEUE]:
+    """
+    @dev Returns the strategies queue that will be used for a withdrawal.
+    """
+    # If a custom queue was passed, and we don't force the default queue.
+    if len(strategies) != 0 and not self.use_default_queue:
+        return strategies
+
+    return self.default_queue
+
+@view
+@internal
 def _max_withdraw(
     owner: address,
     max_loss: uint256,
@@ -559,11 +571,13 @@ def _max_withdraw(
 
     # If there is a withdraw limit module use that.
     withdraw_limit_module: address = self.withdraw_limit_module
+    # Use the same queue that a redemption would use.
+    _strategies: DynArray[address, MAX_QUEUE] = self._withdraw_queue(strategies)
     if withdraw_limit_module != empty(address):
         return min(
             # Use the min between the returned value and the max.
             # Means the limit module doesn't need to account for balances or conversions.
-            IWithdrawLimitModule(withdraw_limit_module).available_withdraw_limit(owner, max_loss, strategies),
+            IWithdrawLimitModule(withdraw_limit_module).available_withdraw_limit(owner, max_loss, _strategies),
             max_assets
         )
     
@@ -573,14 +587,6 @@ def _max_withdraw(
         # Track how much we can pull.
         have: uint256 = current_idle
         loss: uint256 = 0
-
-        # Cache the default queue.
-        _strategies: DynArray[address, MAX_QUEUE] = self.default_queue
-
-        # If a custom queue was passed, and we don't force the default queue.
-        if len(strategies) != 0 and not self.use_default_queue:
-            # Use the custom queue.
-            _strategies = strategies
 
         for strategy in _strategies:
             # Can't use an invalid strategy.
@@ -742,8 +748,10 @@ def _redeem(
     
     # If there is a withdraw limit module, check the max.
     withdraw_limit_module: address = self.withdraw_limit_module
+    _strategies: DynArray[address, MAX_QUEUE] = self._withdraw_queue(strategies)
+    
     if withdraw_limit_module != empty(address):
-        assert assets <= IWithdrawLimitModule(withdraw_limit_module).available_withdraw_limit(owner, max_loss, strategies), "exceed withdraw limit"
+        assert assets <= IWithdrawLimitModule(withdraw_limit_module).available_withdraw_limit(owner, max_loss, _strategies), "exceed withdraw limit"
 
     assert self.balance_of[owner] >= shares, "insufficient shares to redeem"
     
@@ -760,15 +768,6 @@ def _redeem(
     # If there are not enough assets in the Vault contract, we try to free
     # funds from strategies.
     if requested_assets > current_total_idle:
-
-        # Cache the default queue.
-        _strategies: DynArray[address, MAX_QUEUE] = self.default_queue
-
-        # If a custom queue was passed, and we don't force the default queue.
-        if len(strategies) != 0 and not self.use_default_queue:
-            # Use the custom queue.
-            _strategies = strategies
-
         # load to memory to save gas
         current_total_debt: uint256 = self.total_debt
 
