@@ -694,7 +694,7 @@ def _assess_share_of_unrealised_losses(strategy: address, strategy_current_debt:
     numerator: uint256 = assets_needed * strategy_assets
     users_share_of_loss: uint256 = assets_needed - numerator / strategy_current_debt
     # Always round up.
-    if numerator % strategy_current_debt != 0:
+    if numerator % strategy_current_debt != 0 and users_share_of_loss < assets_needed:
         users_share_of_loss += 1
 
     return users_share_of_loss
@@ -822,9 +822,10 @@ def _redeem(
                 assets_needed -= unrealised_losses_share
                 current_total_debt -= unrealised_losses_share
 
-                # If max withdraw is 0 and unrealised loss is still > 0 then the strategy likely
-                # realized a 100% loss and we will need to realize that loss before moving on.
-                if max_withdraw == 0 and unrealised_losses_share > 0:
+                # If assets_to_withdraw is 0 and unrealised loss is still > 0 then the strategy likely
+                # realized a 100% loss or the loss consumed the full withdrawal slice.
+                # Either way, we need to realize that loss before moving on.
+                if assets_to_withdraw == 0 and unrealised_losses_share > 0:
                     # Adjust the strategy debt accordingly.
                     new_debt: uint256 = current_debt - unrealised_losses_share
         

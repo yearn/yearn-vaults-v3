@@ -223,6 +223,40 @@ def test_max_withdraw__with_lossy_strategy(
     assert vault.maxWithdraw(fish.address) == total_idle
 
 
+def test_max_withdraw__tiny_unrealised_loss_does_not_underflow(
+    asset,
+    fish,
+    bunny,
+    gov,
+    create_vault,
+    create_lossy_strategy,
+    add_debt_to_strategy,
+    add_strategy_to_vault,
+    user_deposit,
+    airdrop_asset,
+):
+    vault = create_vault(asset)
+    lossy_strategy = create_lossy_strategy(vault)
+
+    airdrop_asset(gov, asset, bunny, 1)
+    user_deposit(fish, vault, asset, 1)
+    user_deposit(bunny, vault, asset, 1)
+
+    vault.set_role(
+        gov.address,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
+        sender=gov,
+    )
+    add_strategy_to_vault(gov, lossy_strategy, vault)
+    add_debt_to_strategy(gov, lossy_strategy, vault, 2)
+
+    lossy_strategy.setLoss(gov.address, 1, sender=gov)
+
+    assert vault.maxWithdraw(fish.address, 10_000, [lossy_strategy.address]) == 1
+    assert vault.maxRedeem(fish.address, 10_000, [lossy_strategy.address]) == 1
+    assert vault.maxWithdraw(fish.address, 0, [lossy_strategy.address]) == 0
+
+
 # Tests if the first strategy has no losses but the second does
 # maxWithdraw will account for the first and not the second.
 def test_max_withdraw__with_liquid_and_lossy_strategy(

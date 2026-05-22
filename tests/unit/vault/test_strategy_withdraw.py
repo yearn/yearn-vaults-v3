@@ -617,6 +617,206 @@ def test_redeem__with_full_loss_strategy__withdraws_none(
     assert asset.balanceOf(fish) == amount_to_withdraw - amount_to_lose
 
 
+def test_withdraw__tiny_unrealised_loss_clamps_to_assets_needed(
+    gov,
+    fish,
+    bunny,
+    asset,
+    create_vault,
+    create_lossy_strategy,
+    user_deposit,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    airdrop_asset,
+):
+    vault = create_vault(asset)
+    lossy_strategy = create_lossy_strategy(vault)
+    max_loss = 10_000
+
+    airdrop_asset(gov, asset, bunny, 1)
+    user_deposit(fish, vault, asset, 1)
+    user_deposit(bunny, vault, asset, 1)
+
+    vault.set_role(
+        gov.address,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
+        sender=gov,
+    )
+    add_strategy_to_vault(gov, lossy_strategy, vault)
+    add_debt_to_strategy(gov, lossy_strategy, vault, 2)
+
+    lossy_strategy.setLoss(gov, 1, sender=gov)
+
+    fish_balance = asset.balanceOf(fish)
+    tx = vault.withdraw(
+        1,
+        fish.address,
+        fish.address,
+        max_loss,
+        [lossy_strategy.address],
+        sender=fish,
+    )
+
+    event = list(tx.decode_logs(vault.Withdraw))
+    assert event[-1].shares == 1
+    assert event[-1].assets == 0
+
+    event = list(tx.decode_logs(vault.DebtUpdated))
+    assert len(event) == 1
+    assert event[0].strategy == lossy_strategy.address
+    assert event[0].current_debt == 2
+    assert event[0].new_debt == 1
+
+    assert asset.balanceOf(fish) == fish_balance
+    assert vault.balanceOf(fish) == 0
+    assert vault.balanceOf(bunny) == 1
+    assert vault.totalDebt() == 1
+    assert vault.strategies(lossy_strategy.address).current_debt == 1
+
+
+def test_withdraw__unrealised_loss_keeps_existing_conservative_rounding(
+    gov,
+    fish,
+    bunny,
+    asset,
+    create_vault,
+    create_lossy_strategy,
+    user_deposit,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    airdrop_asset,
+):
+    vault = create_vault(asset)
+    lossy_strategy = create_lossy_strategy(vault)
+    max_loss = 10_000
+
+    airdrop_asset(gov, asset, bunny, 93)
+    user_deposit(fish, vault, asset, 7)
+    user_deposit(bunny, vault, asset, 93)
+
+    vault.set_role(
+        gov.address,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
+        sender=gov,
+    )
+    add_strategy_to_vault(gov, lossy_strategy, vault)
+    add_debt_to_strategy(gov, lossy_strategy, vault, 100)
+
+    lossy_strategy.setLoss(gov, 49, sender=gov)
+
+    fish_balance = asset.balanceOf(fish)
+    tx = vault.withdraw(
+        7,
+        fish.address,
+        fish.address,
+        max_loss,
+        [lossy_strategy.address],
+        sender=fish,
+    )
+
+    event = list(tx.decode_logs(vault.Withdraw))
+    assert event[-1].shares == 7
+    assert event[-1].assets == 2
+
+    event = list(tx.decode_logs(vault.DebtUpdated))
+    assert len(event) == 1
+    assert event[0].strategy == lossy_strategy.address
+    assert event[0].current_debt == 100
+    assert event[0].new_debt == 93
+
+    assert asset.balanceOf(fish) == fish_balance + 2
+    assert vault.balanceOf(fish) == 0
+    assert vault.totalDebt() == 93
+    assert vault.strategies(lossy_strategy.address).current_debt == 93
+
+
+def test_withdraw__max_redeem_adjustment_can_round_unrealised_loss_to_zero(
+    gov,
+    fish,
+    bunny,
+    asset,
+    create_vault,
+    create_strategy,
+    create_lossy_strategy,
+    user_deposit,
+    add_strategy_to_vault,
+    add_debt_to_strategy,
+    airdrop_asset,
+):
+    vault = create_vault(asset)
+    liquid_strategy = create_strategy(vault)
+    lossy_strategy = create_lossy_strategy(vault)
+    fish_deposit = 700
+    bunny_deposit = 19_300
+    strategy_debt = 10_000
+    loss = 100
+    locked_funds = 9_850
+    max_loss = 10_000
+
+    airdrop_asset(gov, asset, bunny, bunny_deposit)
+    user_deposit(fish, vault, asset, fish_deposit)
+    user_deposit(bunny, vault, asset, bunny_deposit)
+
+    vault.set_role(
+        gov.address,
+        ROLES.ADD_STRATEGY_MANAGER | ROLES.DEBT_MANAGER | ROLES.MAX_DEBT_MANAGER,
+        sender=gov,
+    )
+    add_strategy_to_vault(gov, lossy_strategy, vault)
+    add_strategy_to_vault(gov, liquid_strategy, vault)
+    add_debt_to_strategy(gov, lossy_strategy, vault, strategy_debt)
+    add_debt_to_strategy(gov, liquid_strategy, vault, strategy_debt)
+
+    lossy_strategy.setLoss(gov, loss, sender=gov)
+    lossy_strategy.setLockedFunds(locked_funds, sender=gov)
+
+    lossy_max_withdraw = lossy_strategy.convertToAssets(
+        lossy_strategy.maxRedeem(vault.address)
+    )
+    expected_initial_loss = fish_deposit - (
+        fish_deposit * (strategy_debt - loss) // strategy_debt
+    )
+    wanted_after_loss = fish_deposit - expected_initial_loss
+
+    assert expected_initial_loss == 7
+    assert 0 < lossy_max_withdraw < wanted_after_loss
+    assert expected_initial_loss * lossy_max_withdraw // wanted_after_loss == 0
+
+    fish_balance = asset.balanceOf(fish)
+    tx = vault.withdraw(
+        fish_deposit,
+        fish.address,
+        fish.address,
+        max_loss,
+        [lossy_strategy.address, liquid_strategy.address],
+        sender=fish,
+    )
+
+    event = list(tx.decode_logs(vault.Withdraw))
+    assert event[-1].shares == fish_deposit
+    assert event[-1].assets == fish_deposit
+
+    event = list(tx.decode_logs(vault.DebtUpdated))
+    assert len(event) == 2
+    assert event[0].strategy == lossy_strategy.address
+    assert event[0].current_debt == strategy_debt
+    assert event[0].new_debt == strategy_debt - lossy_max_withdraw
+    assert event[1].strategy == liquid_strategy.address
+    assert event[1].current_debt == strategy_debt
+    assert event[1].new_debt == strategy_debt - (fish_deposit - lossy_max_withdraw)
+
+    assert asset.balanceOf(fish) == fish_balance + fish_deposit
+    assert vault.balanceOf(fish) == 0
+    assert vault.balanceOf(bunny) == bunny_deposit
+    assert vault.totalDebt() == strategy_debt * 2 - fish_deposit
+    assert vault.strategies(lossy_strategy.address).current_debt == (
+        strategy_debt - lossy_max_withdraw
+    )
+    assert vault.strategies(liquid_strategy.address).current_debt == (
+        strategy_debt - (fish_deposit - lossy_max_withdraw)
+    )
+
+
 def test_withdraw__with_lossy_and_liquid_strategy__withdraws_less_than_deposited(
     gov,
     fish,
