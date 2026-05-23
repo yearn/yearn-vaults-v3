@@ -136,6 +136,9 @@ event UpdateUseDefaultQueue:
 event UpdateAutoAllocate:
     auto_allocate: bool
 
+event UpdatePaused:
+    paused: bool
+
 event UpdatedMaxDebtForStrategy:
     sender: indexed(address)
     strategy: indexed(address)
@@ -196,7 +199,7 @@ enum Roles:
     MINIMUM_IDLE_MANAGER # Sets the minimum total idle the vault should keep.
     PROFIT_UNLOCK_MANAGER # Sets the profit_max_unlock_time.
     DEBT_PURCHASER # Can purchase bad debt from the vault.
-    EMERGENCY_MANAGER # Can shutdown vault in an emergency.
+    EMERGENCY_MANAGER # Can shutdown or pause vault in an emergency.
 
 enum StrategyChangeType:
     ADDED
@@ -262,6 +265,8 @@ symbol: public(String[32])
 
 # State of the vault - if set to true, only withdrawals will be available. It can't be reverted.
 shutdown: bool
+# Reversible state that pauses ERC4626 user flows.
+paused: public(bool)
 # The amount of time profits will unlock over.
 profit_max_unlock_time: uint256
 # The timestamp of when the current unlocking period ends.
@@ -512,6 +517,9 @@ def _issue_shares(shares: uint256, recipient: address):
 @view
 @internal
 def _max_deposit(receiver: address) -> uint256: 
+    if self.paused:
+        return 0
+
     if receiver in [empty(address), self]:
         return 0
 
@@ -565,6 +573,8 @@ def _max_withdraw(
     out is 90, but a user of the vault will need to call withdraw with 100
     in order to get the full 90 out.
     """
+    if self.paused:
+        return 0
 
     # Get the max amount for the owner if fully liquid.
     max_assets: uint256 = self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN)
@@ -741,6 +751,7 @@ def _redeem(
     to the user that is redeeming their vault shares unless it exceeds the given
     `max_loss`.
     """
+    assert not self.paused, "paused"
     assert receiver != empty(address), "ZERO ADDRESS"
     assert shares > 0, "no shares to redeem"
     assert assets > 0, "no assets to withdraw"
@@ -1603,6 +1614,16 @@ def isShutdown() -> bool:
     @return Bool representing the shutdown status
     """
     return self.shutdown
+
+@view
+@external
+def isPaused() -> bool:
+    """
+    @notice Get if the vault is paused.
+    @return Bool representing the paused status.
+    """
+    return self.paused
+
 @view
 @external
 def unlockedShares() -> uint256:
@@ -1761,6 +1782,16 @@ def update_debt(
     return self._update_debt(strategy, target_debt, max_loss)
 
 ## EMERGENCY MANAGEMENT ##
+@external
+def setPaused(paused: bool):
+    """
+    @notice Set the vault's paused status.
+    """
+    self._enforce_role(msg.sender, Roles.EMERGENCY_MANAGER)
+    self.paused = paused
+
+    log UpdatePaused(paused)
+
 @external
 def shutdown_vault():
     """
