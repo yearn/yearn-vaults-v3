@@ -77,8 +77,6 @@ interface IVault is IERC4626 {
 
     function isShutdown() external view returns (bool);
 
-    function paused() external view returns (bool);
-
     function isPaused() external view returns (bool);
 
     function nonces(address) external view returns (uint256);

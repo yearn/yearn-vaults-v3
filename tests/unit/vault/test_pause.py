@@ -13,7 +13,6 @@ def test_setPaused__emergency_manager(asset, create_vault, gov, bunny):
     vault = create_vault(asset)
     vault.set_role(bunny.address, ROLES.EMERGENCY_MANAGER, sender=gov)
 
-    assert vault.paused() == False
     assert vault.isPaused() == False
 
     tx = vault.setPaused(True, sender=bunny)
@@ -21,7 +20,6 @@ def test_setPaused__emergency_manager(asset, create_vault, gov, bunny):
 
     assert len(event) == 1
     assert event[0].paused == True
-    assert vault.paused() == True
     assert vault.isPaused() == True
 
     tx = vault.setPaused(False, sender=bunny)
@@ -29,7 +27,6 @@ def test_setPaused__emergency_manager(asset, create_vault, gov, bunny):
 
     assert len(event) == 1
     assert event[0].paused == False
-    assert vault.paused() == False
     assert vault.isPaused() == False
 
 

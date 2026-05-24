@@ -266,7 +266,7 @@ symbol: public(String[32])
 # State of the vault - if set to true, only withdrawals will be available. It can't be reverted.
 shutdown: bool
 # Reversible state that pauses ERC4626 user flows.
-paused: public(bool)
+paused: bool
 # The amount of time profits will unlock over.
 profit_max_unlock_time: uint256
 # The timestamp of when the current unlocking period ends.
