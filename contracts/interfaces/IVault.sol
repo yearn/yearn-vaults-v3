@@ -39,6 +39,7 @@ interface IVault is IERC4626 {
     event UpdateMinimumTotalIdle(uint256 minimum_total_idle);
     event UpdateProfitMaxUnlockTime(uint256 profit_max_unlock_time);
     event DebtPurchased(address indexed strategy, uint256 amount);
+    event UpdatePaused(bool paused);
     event Shutdown();
 
     struct StrategyParams {
@@ -75,6 +76,8 @@ interface IVault is IERC4626 {
     function future_role_manager() external view returns (address);
 
     function isShutdown() external view returns (bool);
+
+    function isPaused() external view returns (bool);
 
     function nonces(address) external view returns (uint256);
 
@@ -167,6 +170,8 @@ interface IVault is IERC4626 {
         uint256 target_debt,
         uint256 max_loss
     ) external returns (uint256);
+
+    function setPaused(bool paused) external;
 
     function shutdown_vault() external;
 
