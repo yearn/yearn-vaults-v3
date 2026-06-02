@@ -44,8 +44,10 @@ jobs:
       with:
         node-version: '18.x'
 
-    - name: Install hardhat
-      run: npm ci
+    - name: Install node dependencies
+      run: |
+        corepack enable
+        yarn install --frozen-lockfile
 
     - name: output current installation
       run: pip freeze
