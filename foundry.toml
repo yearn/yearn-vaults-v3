@@ -16,6 +16,7 @@ fs_permissions = [{ access = "read", path = "./"}]
 
 #match_contract = "VaultERC4626StdTest"
 match_path = "./foundry_tests/tests/*"
+no_match_test = "testFail"
 ffi = true
 
 [fuzz]
