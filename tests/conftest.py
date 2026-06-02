@@ -358,16 +358,16 @@ def deploy_faulty_accountant(project, gov):
 
 
 @pytest.fixture(scope="session")
-def deploy_limit_module(project, gov):
-    def deploy_limit_module(
+def deploy_hook(project, gov):
+    def deploy_hook(
         deposit_limit=MAX_INT, withdraw_limit=MAX_INT, whitelist=False
     ):
-        limit_module = gov.deploy(
-            project.LimitModule, deposit_limit, withdraw_limit, whitelist
+        hook = gov.deploy(
+            project.HookModule, deposit_limit, withdraw_limit, whitelist
         )
-        return limit_module
+        return hook
 
-    yield deploy_limit_module
+    yield deploy_hook
 
 
 @pytest.fixture(scope="session")

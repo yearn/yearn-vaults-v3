@@ -51,11 +51,13 @@ interface IStrategy:
 interface IAccountant:
     def report(strategy: address, gain: uint256, loss: uint256) -> (uint256, uint256): nonpayable
 
-interface IDepositLimitModule:
+interface IDepositHook:
     def available_deposit_limit(receiver: address) -> uint256: view
+    def post_deposit(sender: address, receiver: address, assets: uint256, shares: uint256): nonpayable
     
-interface IWithdrawLimitModule:
+interface IWithdrawHook:
     def available_withdraw_limit(owner: address, max_loss: uint256, strategies: DynArray[address, MAX_QUEUE]) -> uint256: view
+    def post_withdraw(sender: address, receiver: address, owner: address, assets: uint256, shares: uint256): nonpayable
 
 interface IFactory:
     def protocol_fee_config() -> (uint16, address): view
@@ -121,11 +123,11 @@ event UpdateRoleManager:
 event UpdateAccountant:
     accountant: indexed(address)
 
-event UpdateDepositLimitModule:
-    deposit_limit_module: indexed(address)
+event UpdateDepositHook:
+    deposit_hook: indexed(address)
 
-event UpdateWithdrawLimitModule:
-    withdraw_limit_module: indexed(address)
+event UpdateWithdrawHook:
+    withdraw_hook: indexed(address)
 
 event UpdateDefaultQueue:
     new_default_queue: DynArray[address, MAX_QUEUE]
@@ -194,8 +196,8 @@ enum Roles:
     REPORTING_MANAGER # Calls report for strategies.
     DEBT_MANAGER # Adds and removes debt from strategies.
     MAX_DEBT_MANAGER # Can set the max debt for a strategy.
-    DEPOSIT_LIMIT_MANAGER # Sets deposit limit and module for the vault.
-    WITHDRAW_LIMIT_MANAGER # Sets the withdraw limit module.
+    DEPOSIT_LIMIT_MANAGER # Sets deposit limit and deposit hook for the vault.
+    WITHDRAW_LIMIT_MANAGER # Sets the withdraw hook.
     MINIMUM_IDLE_MANAGER # Sets the minimum total idle the vault should keep.
     PROFIT_UNLOCK_MANAGER # Sets the profit_max_unlock_time.
     DEBT_PURCHASER # Can purchase bad debt from the vault.
@@ -245,10 +247,10 @@ deposit_limit: public(uint256)
 ### PERIPHERY ###
 # Contract that charges fees and can give refunds.
 accountant: public(address)
-# Contract to control the deposit limit.
-deposit_limit_module: public(address)
-# Contract to control the withdraw limit.
-withdraw_limit_module: public(address)
+# Contract to control the deposit limit and receive post-deposit callbacks.
+deposit_hook: public(address)
+# Contract to control the withdraw limit and receive post-withdraw callbacks.
+withdraw_hook: public(address)
 
 ### ROLES ###
 # HashMap mapping addresses to their roles
@@ -523,10 +525,10 @@ def _max_deposit(receiver: address) -> uint256:
     if receiver in [empty(address), self]:
         return 0
 
-    # If there is a deposit limit module set use that.
-    deposit_limit_module: address = self.deposit_limit_module
-    if deposit_limit_module != empty(address):
-        return IDepositLimitModule(deposit_limit_module).available_deposit_limit(receiver)
+    # If there is a deposit hook set use that.
+    deposit_hook: address = self.deposit_hook
+    if deposit_hook != empty(address):
+        return IDepositHook(deposit_hook).available_deposit_limit(receiver)
     
     # Else use the standard flow.
     _deposit_limit: uint256 = self.deposit_limit
@@ -579,15 +581,15 @@ def _max_withdraw(
     # Get the max amount for the owner if fully liquid.
     max_assets: uint256 = self._convert_to_assets(self.balance_of[owner], Rounding.ROUND_DOWN)
 
-    # If there is a withdraw limit module use that.
-    withdraw_limit_module: address = self.withdraw_limit_module
+    # If there is a withdraw hook use that.
+    withdraw_hook: address = self.withdraw_hook
     # Use the same queue that a redemption would use.
     _strategies: DynArray[address, MAX_QUEUE] = self._withdraw_queue(strategies)
-    if withdraw_limit_module != empty(address):
+    if withdraw_hook != empty(address):
         return min(
             # Use the min between the returned value and the max.
-            # Means the limit module doesn't need to account for balances or conversions.
-            IWithdrawLimitModule(withdraw_limit_module).available_withdraw_limit(owner, max_loss, _strategies),
+            # Means the hook doesn't need to account for balances or conversions.
+            IWithdrawHook(withdraw_hook).available_withdraw_limit(owner, max_loss, _strategies),
             max_assets
         )
     
@@ -680,6 +682,10 @@ def _deposit(recipient: address, assets: uint256, shares: uint256):
     if self.auto_allocate:
         self._update_debt(self.default_queue[0], max_value(uint256), 0)
 
+    deposit_hook: address = self.deposit_hook
+    if deposit_hook != empty(address):
+        IDepositHook(deposit_hook).post_deposit(msg.sender, recipient, assets, shares)
+
 @view
 @internal
 def _assess_share_of_unrealised_losses(strategy: address, strategy_current_debt: uint256, assets_needed: uint256) -> uint256:
@@ -757,12 +763,12 @@ def _redeem(
     assert assets > 0, "no assets to withdraw"
     assert max_loss <= MAX_BPS, "max loss"
     
-    # If there is a withdraw limit module, check the max.
-    withdraw_limit_module: address = self.withdraw_limit_module
+    # If there is a withdraw hook, check the max.
+    withdraw_hook: address = self.withdraw_hook
     _strategies: DynArray[address, MAX_QUEUE] = self._withdraw_queue(strategies)
     
-    if withdraw_limit_module != empty(address):
-        assert assets <= IWithdrawLimitModule(withdraw_limit_module).available_withdraw_limit(owner, max_loss, _strategies), "exceed withdraw limit"
+    if withdraw_hook != empty(address):
+        assert assets <= IWithdrawHook(withdraw_hook).available_withdraw_limit(owner, max_loss, _strategies), "exceed withdraw limit"
 
     assert self.balance_of[owner] >= shares, "insufficient shares to redeem"
     
@@ -916,6 +922,10 @@ def _redeem(
     self._erc20_safe_transfer(_asset, receiver, requested_assets)
 
     log Withdraw(sender, receiver, owner, requested_assets, shares)
+
+    if withdraw_hook != empty(address):
+        IWithdrawHook(withdraw_hook).post_withdraw(sender, receiver, owner, requested_assets, shares)
+
     return requested_assets
 
 ## STRATEGY MANAGEMENT ##
@@ -1420,37 +1430,37 @@ def set_auto_allocate(auto_allocate: bool):
 def set_deposit_limit(deposit_limit: uint256, override: bool = False):
     """
     @notice Set the new deposit limit.
-    @dev Can not be changed if a deposit_limit_module
+    @dev Can not be changed if a deposit_hook
     is set unless the override flag is true or if shutdown.
     @param deposit_limit The new deposit limit.
-    @param override If a `deposit_limit_module` already set should be overridden.
+    @param override If a `deposit_hook` already set should be overridden.
     """
     assert self.shutdown == False # Dev: shutdown
     self._enforce_role(msg.sender, Roles.DEPOSIT_LIMIT_MANAGER)
 
-    # If we are overriding the deposit limit module.
+    # If we are overriding the deposit hook.
     if override:
         # Make sure it is set to address 0 if not already.
-        if self.deposit_limit_module != empty(address):
+        if self.deposit_hook != empty(address):
 
-            self.deposit_limit_module = empty(address)
-            log UpdateDepositLimitModule(empty(address))
+            self.deposit_hook = empty(address)
+            log UpdateDepositHook(empty(address))
     else:  
-        # Make sure the deposit_limit_module has been set to address(0).
-        assert self.deposit_limit_module == empty(address), "using module"
+        # Make sure the deposit_hook has been set to address(0).
+        assert self.deposit_hook == empty(address), "using hook"
 
     self.deposit_limit = deposit_limit
 
     log UpdateDepositLimit(deposit_limit)
 
 @external
-def set_deposit_limit_module(deposit_limit_module: address, override: bool = False):
+def set_deposit_hook(deposit_hook: address, override: bool = False):
     """
-    @notice Set a contract to handle the deposit limit.
+    @notice Set a contract to handle the deposit limit and post-deposit hook.
     @dev The default `deposit_limit` will need to be set to
-    max uint256 since the module will override it or the override flag
+    max uint256 since the hook will override it or the override flag
     must be set to true to set it to max in 1 tx..
-    @param deposit_limit_module Address of the module.
+    @param deposit_hook Address of the hook.
     @param override If a `deposit_limit` already set should be overridden.
     """
     assert self.shutdown == False # Dev: shutdown
@@ -1467,22 +1477,22 @@ def set_deposit_limit_module(deposit_limit_module: address, override: bool = Fal
         # Make sure the deposit_limit has been set to uint max.
         assert self.deposit_limit == max_value(uint256), "using deposit limit"
 
-    self.deposit_limit_module = deposit_limit_module
+    self.deposit_hook = deposit_hook
 
-    log UpdateDepositLimitModule(deposit_limit_module)
+    log UpdateDepositHook(deposit_hook)
 
 @external
-def set_withdraw_limit_module(withdraw_limit_module: address):
+def set_withdraw_hook(withdraw_hook: address):
     """
-    @notice Set a contract to handle the withdraw limit.
+    @notice Set a contract to handle the withdraw limit and post-withdraw hook.
     @dev This will override the default `max_withdraw`.
-    @param withdraw_limit_module Address of the module.
+    @param withdraw_hook Address of the hook.
     """
     self._enforce_role(msg.sender, Roles.WITHDRAW_LIMIT_MANAGER)
 
-    self.withdraw_limit_module = withdraw_limit_module
+    self.withdraw_hook = withdraw_hook
 
-    log UpdateWithdrawLimitModule(withdraw_limit_module)
+    log UpdateWithdrawHook(withdraw_hook)
 
 @external
 def set_minimum_total_idle(minimum_total_idle: uint256):
@@ -1804,10 +1814,10 @@ def shutdown_vault():
     self.shutdown = True
 
     # Set deposit limit to 0.
-    if self.deposit_limit_module != empty(address):
-        self.deposit_limit_module = empty(address)
+    if self.deposit_hook != empty(address):
+        self.deposit_hook = empty(address)
 
-        log UpdateDepositLimitModule(empty(address))
+        log UpdateDepositHook(empty(address))
 
     self.deposit_limit = 0
     log UpdateDepositLimit(0)

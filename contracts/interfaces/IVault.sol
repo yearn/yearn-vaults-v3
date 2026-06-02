@@ -27,6 +27,8 @@ interface IVault is IERC4626 {
     event UpdateRoleManager(address indexed role_manager);
 
     event UpdateAccountant(address indexed accountant);
+    event UpdateDepositHook(address indexed deposit_hook);
+    event UpdateWithdrawHook(address indexed withdraw_hook);
     event UpdateDefaultQueue(address[] new_default_queue);
     event UpdateUseDefaultQueue(bool use_default_queue);
     event UpdatedMaxDebtForStrategy(
@@ -63,9 +65,9 @@ interface IVault is IERC4626 {
 
     function deposit_limit() external view returns (uint256);
 
-    function deposit_limit_module() external view returns (address);
+    function deposit_hook() external view returns (address);
 
-    function withdraw_limit_module() external view returns (address);
+    function withdraw_hook() external view returns (address);
 
     function accountant() external view returns (address);
 
@@ -108,18 +110,14 @@ interface IVault is IERC4626 {
         bool should_override
     ) external;
 
-    function set_deposit_limit_module(
-        address new_deposit_limit_module
-    ) external;
+    function set_deposit_hook(address new_deposit_hook) external;
 
-    function set_deposit_limit_module(
-        address new_deposit_limit_module,
+    function set_deposit_hook(
+        address new_deposit_hook,
         bool should_override
     ) external;
 
-    function set_withdraw_limit_module(
-        address new_withdraw_limit_module
-    ) external;
+    function set_withdraw_hook(address new_withdraw_hook) external;
 
     function set_minimum_total_idle(uint256 minimum_total_idle) external;
 
