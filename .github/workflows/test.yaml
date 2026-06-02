@@ -45,7 +45,7 @@ jobs:
         node-version: '18.x'
 
     - name: Install hardhat
-      run: npm ci hardhat
+      run: npm ci
 
     - name: output current installation
       run: pip freeze

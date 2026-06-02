@@ -15,9 +15,14 @@ dependencies:
     ref: v3.0.4
     config_override:
       contracts_folder: src
+      solidity:
+        import_remapping:
+          - "@openzeppelin=contracts/.cache/openzeppelin/v4.9.5"
 
 solidity:
   version: 0.8.18
+  import_remapping:
+    - "@openzeppelin=contracts/.cache/openzeppelin/v4.9.5"
 
 ethereum:
   evm_version: paris
