@@ -30,6 +30,9 @@ jobs:
     
     - name: install plugins
       run: ape plugins install .
+
+    - name: install vyper compiler
+      run: ape vyper vvm install 0.3.7
     
     - name: Compile contracts
       # TODO: Force recompiles until ape compile caching is fixed
