@@ -27,9 +27,14 @@ jobs:
 
     - name: install requirements
       run: python3 -m pip install -r requirements.txt 
-    
-    - name: install plugins
-      run: ape plugins install .
+
+    - name: pin ape plugins
+      run: |
+        python3 -m pip install \
+          "eth-ape==0.8.25" \
+          "ape-solidity==0.8.5" \
+          "ape-vyper==0.8.12" \
+          "ape-hardhat==0.8.5"
 
     - name: install vyper compiler
       run: ape vyper vvm install 0.3.7
