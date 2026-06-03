@@ -20,14 +20,24 @@ jobs:
 
     steps:
     - uses: actions/checkout@50fbc622fc4ef5163becd7fab6573eac35f8462e # v1
+
+    - uses: actions/setup-python@e9aba2c848f5ebd159c070c61ea2c4e2b122355e # v2
       with:
         python-version: '3.10'
 
     - name: install requirements
       run: python3 -m pip install -r requirements.txt 
-    
-    - name: install plugins
-      run: ape plugins install .
+
+    - name: pin ape plugins
+      run: |
+        python3 -m pip install \
+          "eth-ape==0.8.25" \
+          "ape-solidity==0.8.5" \
+          "ape-vyper==0.8.12" \
+          "ape-hardhat==0.8.5"
+
+    - name: install vyper compiler
+      run: ape vyper vvm install 0.3.7
     
     - name: Compile contracts
       # TODO: Force recompiles until ape compile caching is fixed
@@ -39,8 +49,10 @@ jobs:
       with:
         node-version: '18.x'
 
-    - name: Install hardhat
-      run: npm ci hardhat
+    - name: Install node dependencies
+      run: |
+        corepack enable
+        yarn install --frozen-lockfile
 
     - name: output current installation
       run: pip freeze

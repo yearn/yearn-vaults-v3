@@ -13,6 +13,32 @@ default_withdraw_limit: public(uint256)
 
 required_withdraw_strategy: public(address)
 
+last_deposit_sender: public(address)
+
+last_deposit_receiver: public(address)
+
+last_deposit_assets: public(uint256)
+
+last_deposit_shares: public(uint256)
+
+post_deposit_count: public(uint256)
+
+last_withdraw_sender: public(address)
+
+last_withdraw_receiver: public(address)
+
+last_withdraw_owner: public(address)
+
+last_withdraw_assets: public(uint256)
+
+last_withdraw_shares: public(uint256)
+
+post_withdraw_count: public(uint256)
+
+revert_post_deposit: public(bool)
+
+revert_post_withdraw: public(bool)
+
 @external
 def __init__(
     default_deposit_limit: uint256,
@@ -30,8 +56,8 @@ def available_deposit_limit(receiver: address) -> uint256:
         if not self.whitelist[receiver]:
             return 0
 
-    if self.default_deposit_limit == MAX_UINT256:
-        return MAX_UINT256
+    if self.default_deposit_limit == max_value(uint256):
+        return max_value(uint256)
         
     return self.default_deposit_limit - IVault(msg.sender).totalAssets()
 
@@ -45,6 +71,27 @@ def available_withdraw_limit(owner: address, max_loss: uint256, strategies: DynA
             return 0
 
     return self.default_withdraw_limit
+
+@external
+def post_deposit(sender: address, receiver: address, assets: uint256, shares: uint256):
+    assert not self.revert_post_deposit, "post deposit revert"
+
+    self.last_deposit_sender = sender
+    self.last_deposit_receiver = receiver
+    self.last_deposit_assets = assets
+    self.last_deposit_shares = shares
+    self.post_deposit_count += 1
+
+@external
+def post_withdraw(sender: address, receiver: address, owner: address, assets: uint256, shares: uint256):
+    assert not self.revert_post_withdraw, "post withdraw revert"
+
+    self.last_withdraw_sender = sender
+    self.last_withdraw_receiver = receiver
+    self.last_withdraw_owner = owner
+    self.last_withdraw_assets = assets
+    self.last_withdraw_shares = shares
+    self.post_withdraw_count += 1
 
 @external
 def set_whitelist(list: address):
@@ -65,3 +112,11 @@ def set_required_withdraw_strategy(strategy: address):
 @external
 def set_enforce_whitelist(enforce: bool):
     self.enforce_whitelist = enforce
+
+@external
+def set_revert_post_deposit(should_revert: bool):
+    self.revert_post_deposit = should_revert
+
+@external
+def set_revert_post_withdraw(should_revert: bool):
+    self.revert_post_withdraw = should_revert
