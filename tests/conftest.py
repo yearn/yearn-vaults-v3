@@ -106,11 +106,12 @@ TOKENS_TO_TEST = os.getenv("TOKENS_TO_TEST", default="18").split(",")
 def asset(create_token, mock_real_token, request):
     try:
         token_decimals = int(request.param)
-        # We assume is the number of decimals of the token
-        return create_token("asset", decimals=token_decimals)
-    except:
+    except ValueError:
         # We assume is the name of the real token to test with
         return mock_real_token(name=request.param)
+
+    # We assume is the number of decimals of the token
+    return create_token("asset", decimals=token_decimals)
 
 
 # use this for token mock
@@ -190,7 +191,8 @@ def create_vault(project, gov, vault_factory):
             sender=gov,
         )
         event = list(tx.decode_logs(vault_factory.NewVault))
-        vault = project.VaultV3.at(event[0].vault_address)
+        vault = project.VaultV3.at(event[0].vault_address, txn_hash=tx.txn_hash)
+        chain.contracts.cache_deployment(vault)
 
         vault.set_role(
             gov.address,

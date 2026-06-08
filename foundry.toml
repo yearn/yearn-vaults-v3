@@ -19,6 +19,9 @@ match_path = "./foundry_tests/tests/*"
 no_match_test = "testFail"
 ffi = true
 
+[profile.default.vyper]
+optimize = "codesize"
+
 [fuzz]
 runs = 250
 max_test_rejects = 1_000_000

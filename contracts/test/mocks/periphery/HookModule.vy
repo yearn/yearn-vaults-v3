@@ -1,4 +1,5 @@
-# @version 0.3.7
+# @version 0.3.10
+#pragma evm-version paris
 
 interface IVault:
     def totalAssets() -> uint256: view

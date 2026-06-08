@@ -24,6 +24,9 @@ solidity:
   import_remapping:
     - "@openzeppelin=contracts/.cache/openzeppelin/v4.9.5"
 
+vyper:
+  evm_version: paris
+
 ethereum:
   evm_version: paris
   local:
