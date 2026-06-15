@@ -10,16 +10,19 @@ interface IVaultFactory {
         uint16 newProtocolFeeBps
     );
     event UpdateProtocolFeeRecipient(
-        address oldProtocolFeeRecipient,
-        address newProtocolFeeRecipient
+        address indexed oldProtocolFeeRecipient,
+        address indexed newProtocolFeeRecipient
     );
-    event UpdateCustomProtocolFee(address vault, uint16 newCustomProtocolFee);
-    event RemovedCustomProtocolFee(address vault);
+    event UpdateCustomProtocolFee(
+        address indexed vault,
+        uint16 newCustomProtocolFee
+    );
+    event RemovedCustomProtocolFee(address indexed vault);
     event FactoryShutdown();
-    event UpdatePendingGovernance(address newPendingGovernance);
+    event UpdatePendingGovernance(address indexed newPendingGovernance);
     event GovernanceTransferred(
-        address previousGovernance,
-        address newGovernance
+        address indexed previousGovernance,
+        address indexed newGovernance
     );
 
     function shutdown() external view returns (bool);

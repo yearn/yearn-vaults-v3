@@ -5,7 +5,10 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 interface IVault is IERC4626 {
     // STRATEGY EVENTS
-    event StrategyChanged(address indexed strategy, uint256 change_type);
+    event StrategyChanged(
+        address indexed strategy,
+        uint256 indexed change_type
+    );
     event StrategyReported(
         address indexed strategy,
         uint256 gain,
@@ -22,7 +25,7 @@ interface IVault is IERC4626 {
         uint256 new_debt
     );
     // ROLE UPDATES
-    event RoleSet(address indexed account, uint256 role);
+    event RoleSet(address indexed account, uint256 indexed role);
     event UpdateFutureRoleManager(address indexed future_role_manager);
     event UpdateRoleManager(address indexed role_manager);
 
@@ -51,7 +54,7 @@ interface IVault is IERC4626 {
         uint256 max_debt;
     }
 
-    function FACTORY() external view returns (uint256);
+    function FACTORY() external view returns (address);
 
     function strategies(address) external view returns (StrategyParams memory);
 
@@ -148,6 +151,8 @@ interface IVault is IERC4626 {
     function buy_debt(address strategy, uint256 amount) external;
 
     function add_strategy(address new_strategy) external;
+
+    function add_strategy(address new_strategy, bool add_to_queue) external;
 
     function revoke_strategy(address strategy) external;
 
