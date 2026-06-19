@@ -53,8 +53,8 @@ def test_shutdown__increase_deposit_limit__reverts(
     assert vault.maxDeposit(gov) == 0
 
 
-def test_shutdown__set_deposit_limit_module__reverts(
-    vault, gov, asset, mint_and_deposit_into_vault, deploy_limit_module
+def test_shutdown__set_deposit_hook__reverts(
+    vault, gov, asset, mint_and_deposit_into_vault, deploy_hook
 ):
     mint_and_deposit_into_vault(vault, gov)
     vault.shutdown_vault(sender=gov)
@@ -65,34 +65,34 @@ def test_shutdown__set_deposit_limit_module__reverts(
 
     assert ROLES.DEPOSIT_LIMIT_MANAGER in ROLES(vault.roles(gov))
 
-    limit_module = deploy_limit_module()
+    hook = deploy_hook()
 
     with ape.reverts():
-        vault.set_deposit_limit_module(limit_module, sender=gov)
+        vault.set_deposit_hook(hook, sender=gov)
 
     assert vault.maxDeposit(gov) == 0
 
 
-def test_shutdown__deposit_limit_module_is_removed(
-    create_vault, gov, asset, mint_and_deposit_into_vault, deploy_limit_module
+def test_shutdown__deposit_hook_is_removed(
+    create_vault, gov, asset, mint_and_deposit_into_vault, deploy_hook
 ):
     vault = create_vault(asset)
 
     mint_and_deposit_into_vault(vault, gov)
 
-    limit_module = deploy_limit_module()
-    vault.set_deposit_limit_module(limit_module, sender=gov)
+    hook = deploy_hook()
+    vault.set_deposit_hook(hook, sender=gov)
 
     assert vault.maxDeposit(gov) > 0
 
     tx = vault.shutdown_vault(sender=gov)
 
-    event = list(tx.decode_logs(vault.UpdateDepositLimitModule))
+    event = list(tx.decode_logs(vault.UpdateDepositHook))
 
     assert len(event) == 1
-    assert event[0].deposit_limit_module == ZERO_ADDRESS
+    assert event[0].deposit_hook == ZERO_ADDRESS
 
-    assert vault.deposit_limit_module() == ZERO_ADDRESS
+    assert vault.deposit_hook() == ZERO_ADDRESS
     assert vault.maxDeposit(gov) == 0
 
 

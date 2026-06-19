@@ -1,4 +1,5 @@
-# @version 0.3.7
+# @version 0.3.10
+#pragma evm-version paris
 
 """
 @title Yearn Vault Factory
@@ -69,7 +70,7 @@ event UpdatePendingGovernance:
 
 
 # Identifier for this version of the vault.
-API_VERSION: constant(String[28]) = "3.0.4"
+API_VERSION: constant(String[28]) = "3.1.0"
 
 # The max amount the protocol fee can be set to.
 MAX_FEE_BPS: constant(uint16) = 5_000 # 50%

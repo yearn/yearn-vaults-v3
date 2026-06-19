@@ -8,7 +8,7 @@
 - Vault: ERC4626 compliant Smart contract that receives Assets from Depositors to then distribute them among the different Strategies added to the vault, managing accounting and Assets distribution. 
 - Role: the different flags an Account can have in the Vault so that the Account can do certain specific actions. Can be fulfilled by a smart contract or an EOA.
 - Accountant: smart contract that receives P&L reporting and returns shares and refunds to the strategy
-- Limit Modules: Add on smart contracts that can control the vaults deposit and withdraw limits dynamically.
+- Hooks: Add on smart contracts that can control vault deposit and withdraw limits dynamically and receive post-deposit or post-withdraw callbacks.
 
 # VaultV3 Specification
 The Vault code has been designed as an non-opinionated system to distribute funds of depositors into different opportunities (aka Strategies) and manage accounting in a robust way. That's all.
@@ -30,7 +30,7 @@ Example periphery contracts:
 - Role Manager: Governance contract that holds the vaults `role_manager` position to codify vault setup and ownership guidelines. (see [RoleManager](https://github.com/yearn/vault-periphery/tree/master/contracts/Managers))
 - Debt Allocator: a smart contract that optimizes between multiple strategies based on the optimal return. (see [DebAllocators](https://github.com/yearn/vault-periphery/tree/master/contracts/debtAllocators))
 - Safety Staking Module: a smart contract that allows players to sponsor specific strategies (so that they are added to the vault) by staking their YFI, making money if they do well and losing money if they don't.
-- Deposit Limit Module: Will dynamically adjust the deposit limit based on the depositor and arbitrary conditions.
+- Deposit Hook: Will dynamically adjust the deposit limit based on the depositor and arbitrary conditions, and can react after deposits.
 - ...
 ```
 ## Deployment
@@ -52,7 +52,7 @@ All deployment variables besides the `asset` can be updated post deployment.
 ### Deposits / Mints
 Users can deposit ASSET tokens to receive yvTokens (SHARES).
 
-Deposits are limited under depositLimit/depositLimitModule and shutdown parameters. Read below for details.
+Deposits are limited under depositLimit/depositHook and shutdown parameters. Read below for details.
 
 ### Withdrawals / Redeems
 Users can redeem their shares at any point in time if there is liquidity available. 
@@ -118,8 +118,8 @@ These are:
 - REPORTING_MANAGER: role that calls report for strategies
 - DEBT_MANAGER: role that adds and removes debt from strategies
 - MAX_DEBT_MANAGER: role that can set the max debt for a strategy
-- DEPOSIT_LIMIT_MANAGER: role that sets deposit limit or deposit limit module for the vault
-- WITHDRAW_LIMIT_MANAGER: role that sets the withdraw limit module for the vault.
+- DEPOSIT_LIMIT_MANAGER: role that sets deposit limit or deposit hook for the vault
+- WITHDRAW_LIMIT_MANAGER: role that sets the withdraw hook for the vault.
 - MINIMUM_IDLE_MANAGER: role that sets the minimum total idle the vault should keep
 - PROFIT_UNLOCK_MANAGER: role that sets the profit_max_unlock_time
 - DEBT_PURCHASER # can purchase bad debt from the vault
@@ -144,12 +144,12 @@ Revoked strategies will return all debt and stop being eligible to receive more.
 
 Force revoking a strategy is only used in cases of a faulty strategy that cannot otherwise have its current_debt reduced to 0. Force revoking a strategy will result in a loss being reported by the vault.
 
-#### Setting the modules/periphery contracts
+#### Setting the hooks/periphery contracts
 The accountant can be set by the ACCOUNTANT_MANAGER.
 
-A deposit_limit_module can be set by the DEPOSIT_LIMIT_MANAGER
+A deposit_hook can be set by the DEPOSIT_LIMIT_MANAGER
 
-A withdraw_limit_module can be set by the WITHDRAW_LIMIT_MANAGER
+A withdraw_hook can be set by the WITHDRAW_LIMIT_MANAGER
 
 These contracts are not needed for the vault to function but are optional add ons for optimal use.
 
@@ -186,16 +186,16 @@ Stored in strategies[strategy].max_debt
 When a debt re-balance is triggered, the Vault will cap the new target debt to this number (max_debt)
 
 #### Setting the deposit limit
-The DEPOSIT_LIMIT_MANAGER is in charge of setting the deposit_limit or a deposit_limit_module for the vault
+The DEPOSIT_LIMIT_MANAGER is in charge of setting the deposit_limit or a deposit_hook for the vault
 
 On deployment deposit_limit defaults to 0 and will need to be increased to make the vault functional
 
-The deposit_limit will have to be set to MAX_UINT256 in order to set a deposit_limit_module, and the module will have to be address 0 to adjust the deposit_limit. Or the DEPOSIT_LIMIT_MANAGER can use the option `override` flags to do this in one step.
+The deposit_limit will have to be set to MAX_UINT256 in order to set a deposit_hook, and the hook will have to be address 0 to adjust the deposit_limit. Or the DEPOSIT_LIMIT_MANAGER can use the option `override` flags to do this in one step.
 
-#### Setting the withdraw limit module
-The WITHDRAW_LIMIT_MANAGER is in charge of setting the withdraw_limit_module for the vault
+#### Setting the withdraw hook
+The WITHDRAW_LIMIT_MANAGER is in charge of setting the withdraw_hook for the vault
 
-The vaults default withdraw limit is calculated based on the liquidity of its strategies. Setting a withdraw limit module will override this functionality.
+The vaults default withdraw limit is calculated based on the liquidity of its strategies. Setting a withdraw hook will override this functionality.
 
 #### Setting minimum idle funds
 The MINIMUM_IDLE_MANAGER can specify how many funds the vault should try to have reserved to serve withdrawal requests

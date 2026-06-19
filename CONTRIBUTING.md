@@ -37,7 +37,7 @@ git pull origin master
 
 ```
 
-To stage the changed files that are be committed, issue the command:
+To stage the changed files that are being committed, issue the command:
 
 ```bash
 git add -a
@@ -46,10 +46,10 @@ git add -a
 Once you are ready to make a commit, you can do so with:
 
 ```bash
-git commit  -m “fix: message to explain what the commit covers”
+git commit -m "fix: message to explain what the commit covers"
 ```
 
-**NOTE**: commit message must follow Conventional Commits [standard](https://www.conventionalcommits.org/en/v1.0.0/), otherwise your pull requests (discussed further below below) will not pass validation tests. You can use the [`--amend` flag](https://git-scm.com/docs/git-commit) to effectively change your commit message.
+**NOTE**: commit message must follow Conventional Commits [standard](https://www.conventionalcommits.org/en/v1.0.0/), otherwise your pull requests will not pass validation tests. You can use the [`--amend` flag](https://git-scm.com/docs/git-commit) to effectively change your commit message.
 
 ### Handling conflicts
 
@@ -71,7 +71,7 @@ Your version of the conflicting code
 
 The code from the yearn-vaults-v3 repository is inserted between `<<<` and `===` while the change you have made is inserted between `===` and `>>>>`. Remove everything between `<<<<` and `>>>` and replace it with code that resolves the conflict. Repeat the process for all files listed by Git status to have conflicts.
 
-When you are ready, use git push to move your local copy of the changes to your fork of the repository on Github.
+When you are ready, use git push to move your local copy of the changes to your fork of the repository on GitHub.
 
 ```bash
 git push git@github.com:<your_github_username>/yearn-vaults-v3.git feature-in-progress-branch
@@ -79,7 +79,7 @@ git push git@github.com:<your_github_username>/yearn-vaults-v3.git feature-in-pr
 
 ### Opening a pull request
 
-Navigate to your fork of the repository on Github. In the upper left where the current branch is listed, change the branch to your newly created one (feature-in-progress-branch). Open the files that you have worked on and ensure they include your changes.
+Navigate to your fork of the repository on GitHub. In the upper left where the current branch is listed, change the branch to your newly created one (feature-in-progress-branch). Open the files that you have worked on and ensure they include your changes.
 
 Navigate to yearn-vaults-v3 [repository](https://github.com/yearn/yearn-vaults-v3/tree/master) and click on the new pull request button. In the “base” box on the left, leave the default selection “base master”, the branch that you want your changes to be applied to. In the “compare” box on the right, select the branch containing the changes you want to apply. You will then be asked to answer a few questions about your pull request. Pull requests should have enough context about what you are working on, how you are solving a problem, and reference all necessary information for your reviewers to help.
 

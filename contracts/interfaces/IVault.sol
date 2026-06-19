@@ -5,7 +5,10 @@ import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 
 interface IVault is IERC4626 {
     // STRATEGY EVENTS
-    event StrategyChanged(address indexed strategy, uint256 change_type);
+    event StrategyChanged(
+        address indexed strategy,
+        uint256 indexed change_type
+    );
     event StrategyReported(
         address indexed strategy,
         uint256 gain,
@@ -22,11 +25,13 @@ interface IVault is IERC4626 {
         uint256 new_debt
     );
     // ROLE UPDATES
-    event RoleSet(address indexed account, uint256 role);
+    event RoleSet(address indexed account, uint256 indexed role);
     event UpdateFutureRoleManager(address indexed future_role_manager);
     event UpdateRoleManager(address indexed role_manager);
 
     event UpdateAccountant(address indexed accountant);
+    event UpdateDepositHook(address indexed deposit_hook);
+    event UpdateWithdrawHook(address indexed withdraw_hook);
     event UpdateDefaultQueue(address[] new_default_queue);
     event UpdateUseDefaultQueue(bool use_default_queue);
     event UpdatedMaxDebtForStrategy(
@@ -39,6 +44,7 @@ interface IVault is IERC4626 {
     event UpdateMinimumTotalIdle(uint256 minimum_total_idle);
     event UpdateProfitMaxUnlockTime(uint256 profit_max_unlock_time);
     event DebtPurchased(address indexed strategy, uint256 amount);
+    event UpdatePaused(bool paused);
     event Shutdown();
 
     struct StrategyParams {
@@ -48,7 +54,7 @@ interface IVault is IERC4626 {
         uint256 max_debt;
     }
 
-    function FACTORY() external view returns (uint256);
+    function FACTORY() external view returns (address);
 
     function strategies(address) external view returns (StrategyParams memory);
 
@@ -62,9 +68,9 @@ interface IVault is IERC4626 {
 
     function deposit_limit() external view returns (uint256);
 
-    function deposit_limit_module() external view returns (address);
+    function deposit_hook() external view returns (address);
 
-    function withdraw_limit_module() external view returns (address);
+    function withdraw_hook() external view returns (address);
 
     function accountant() external view returns (address);
 
@@ -75,6 +81,8 @@ interface IVault is IERC4626 {
     function future_role_manager() external view returns (address);
 
     function isShutdown() external view returns (bool);
+
+    function isPaused() external view returns (bool);
 
     function nonces(address) external view returns (uint256);
 
@@ -105,18 +113,14 @@ interface IVault is IERC4626 {
         bool should_override
     ) external;
 
-    function set_deposit_limit_module(
-        address new_deposit_limit_module
-    ) external;
+    function set_deposit_hook(address new_deposit_hook) external;
 
-    function set_deposit_limit_module(
-        address new_deposit_limit_module,
+    function set_deposit_hook(
+        address new_deposit_hook,
         bool should_override
     ) external;
 
-    function set_withdraw_limit_module(
-        address new_withdraw_limit_module
-    ) external;
+    function set_withdraw_hook(address new_withdraw_hook) external;
 
     function set_minimum_total_idle(uint256 minimum_total_idle) external;
 
@@ -148,6 +152,8 @@ interface IVault is IERC4626 {
 
     function add_strategy(address new_strategy) external;
 
+    function add_strategy(address new_strategy, bool add_to_queue) external;
+
     function revoke_strategy(address strategy) external;
 
     function force_revoke_strategy(address strategy) external;
@@ -167,6 +173,8 @@ interface IVault is IERC4626 {
         uint256 target_debt,
         uint256 max_loss
     ) external returns (uint256);
+
+    function setPaused(bool paused) external;
 
     function shutdown_vault() external;
 

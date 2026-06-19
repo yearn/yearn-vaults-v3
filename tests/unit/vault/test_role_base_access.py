@@ -149,7 +149,7 @@ def test_set_deposit_limit__deposit_limit_manager(gov, vault, bunny):
     assert vault.deposit_limit() == deposit_limit
 
 
-def test_set_deposit_limit_with_limit_module__reverts(gov, vault, bunny):
+def test_set_deposit_limit_with_hook__reverts(gov, vault, bunny):
     # We temporarily give bunny the role
     tx = vault.set_role(bunny.address, ROLES.DEPOSIT_LIMIT_MANAGER, sender=gov)
 
@@ -160,13 +160,13 @@ def test_set_deposit_limit_with_limit_module__reverts(gov, vault, bunny):
 
     deposit_limit = 1
 
-    vault.set_deposit_limit_module(bunny, sender=gov)
+    vault.set_deposit_hook(bunny, sender=gov)
 
-    with ape.reverts("using module"):
+    with ape.reverts("using hook"):
         vault.set_deposit_limit(deposit_limit, sender=bunny)
 
 
-def test_set_deposit_limit_with_limit_module__override(gov, vault, bunny):
+def test_set_deposit_limit_with_hook__override(gov, vault, bunny):
     # We temporarily give bunny the role
     tx = vault.set_role(bunny.address, ROLES.DEPOSIT_LIMIT_MANAGER, sender=gov)
 
@@ -176,24 +176,24 @@ def test_set_deposit_limit_with_limit_module__override(gov, vault, bunny):
     assert event[0].role == ROLES.DEPOSIT_LIMIT_MANAGER
 
     deposit_limit = 1
-    deposit_limit_module = bunny
+    deposit_hook = bunny
 
-    vault.set_deposit_limit_module(deposit_limit_module, sender=gov)
+    vault.set_deposit_hook(deposit_hook, sender=gov)
 
-    assert vault.deposit_limit_module() == deposit_limit_module
+    assert vault.deposit_hook() == deposit_hook
 
-    with ape.reverts("using module"):
+    with ape.reverts("using hook"):
         vault.set_deposit_limit(deposit_limit, sender=bunny)
 
     tx = vault.set_deposit_limit(deposit_limit, True, sender=bunny)
 
     assert vault.deposit_limit() == deposit_limit
-    assert vault.deposit_limit_module() == ZERO_ADDRESS
+    assert vault.deposit_hook() == ZERO_ADDRESS
 
-    event = list(tx.decode_logs(vault.UpdateDepositLimitModule))
+    event = list(tx.decode_logs(vault.UpdateDepositHook))
 
     assert len(event) == 1
-    assert event[0].deposit_limit_module == ZERO_ADDRESS
+    assert event[0].deposit_hook == ZERO_ADDRESS
 
     event = list(tx.decode_logs(vault.UpdateDepositLimit))
 
@@ -201,13 +201,13 @@ def test_set_deposit_limit_with_limit_module__override(gov, vault, bunny):
     assert event[0].deposit_limit == deposit_limit
 
 
-def test_set_deposit_limit_module__no_deposit_limit_manager__reverts(bunny, vault):
-    deposit_limit_module = bunny
+def test_set_deposit_hook__no_deposit_limit_manager__reverts(bunny, vault):
+    deposit_hook = bunny
     with ape.reverts("not allowed"):
-        vault.set_deposit_limit_module(deposit_limit_module, sender=bunny)
+        vault.set_deposit_hook(deposit_hook, sender=bunny)
 
 
-def test_set_deposit_limit_module__deposit_limit_manager(gov, vault, bunny):
+def test_set_deposit_hook__deposit_limit_manager(gov, vault, bunny):
     # We temporarily give bunny the role
     tx = vault.set_role(bunny.address, ROLES.DEPOSIT_LIMIT_MANAGER, sender=gov)
 
@@ -216,19 +216,19 @@ def test_set_deposit_limit_module__deposit_limit_manager(gov, vault, bunny):
     assert event[0].account == bunny.address
     assert event[0].role == ROLES.DEPOSIT_LIMIT_MANAGER
 
-    deposit_limit_module = bunny
-    assert vault.deposit_limit_module() == ZERO_ADDRESS
-    tx = vault.set_deposit_limit_module(deposit_limit_module, sender=bunny)
+    deposit_hook = bunny
+    assert vault.deposit_hook() == ZERO_ADDRESS
+    tx = vault.set_deposit_hook(deposit_hook, sender=bunny)
 
-    assert vault.deposit_limit_module() == deposit_limit_module
+    assert vault.deposit_hook() == deposit_hook
 
-    event = list(tx.decode_logs(vault.UpdateDepositLimitModule))
+    event = list(tx.decode_logs(vault.UpdateDepositHook))
 
     assert len(event) == 1
-    assert event[0].deposit_limit_module == deposit_limit_module
+    assert event[0].deposit_hook == deposit_hook
 
 
-def test_set_deposit_limit_module_with_limit__reverts(gov, vault, bunny):
+def test_set_deposit_hook_with_limit__reverts(gov, vault, bunny):
     # We temporarily give bunny the role
     tx = vault.set_role(bunny.address, ROLES.DEPOSIT_LIMIT_MANAGER, sender=gov)
 
@@ -240,10 +240,10 @@ def test_set_deposit_limit_module_with_limit__reverts(gov, vault, bunny):
     vault.set_deposit_limit(1, sender=gov)
 
     with ape.reverts("using deposit limit"):
-        vault.set_deposit_limit_module(bunny, sender=gov)
+        vault.set_deposit_hook(bunny, sender=gov)
 
 
-def test_set_deposit_limit_module_with_limit__override(gov, vault, bunny):
+def test_set_deposit_hook_with_limit__override(gov, vault, bunny):
     # We temporarily give bunny the role
     tx = vault.set_role(bunny.address, ROLES.DEPOSIT_LIMIT_MANAGER, sender=gov)
 
@@ -254,19 +254,19 @@ def test_set_deposit_limit_module_with_limit__override(gov, vault, bunny):
 
     vault.set_deposit_limit(1, sender=gov)
 
-    deposit_limit_module = bunny
+    deposit_hook = bunny
     with ape.reverts("using deposit limit"):
-        vault.set_deposit_limit_module(deposit_limit_module, sender=gov)
+        vault.set_deposit_hook(deposit_hook, sender=gov)
 
-    tx = vault.set_deposit_limit_module(deposit_limit_module, True, sender=gov)
+    tx = vault.set_deposit_hook(deposit_hook, True, sender=gov)
 
     assert vault.deposit_limit() == MAX_INT
-    assert vault.deposit_limit_module() == deposit_limit_module
+    assert vault.deposit_hook() == deposit_hook
 
-    event = list(tx.decode_logs(vault.UpdateDepositLimitModule))
+    event = list(tx.decode_logs(vault.UpdateDepositHook))
 
     assert len(event) == 1
-    assert event[0].deposit_limit_module == deposit_limit_module
+    assert event[0].deposit_hook == deposit_hook
 
     event = list(tx.decode_logs(vault.UpdateDepositLimit))
 
@@ -274,13 +274,13 @@ def test_set_deposit_limit_module_with_limit__override(gov, vault, bunny):
     assert event[0].deposit_limit == MAX_INT
 
 
-def test_set_withdraw_limit_module__no_withdraw_limit_manager__reverts(bunny, vault):
-    withdraw_limit_module = bunny
+def test_set_withdraw_hook__no_withdraw_limit_manager__reverts(bunny, vault):
+    withdraw_hook = bunny
     with ape.reverts("not allowed"):
-        vault.set_withdraw_limit_module(withdraw_limit_module, sender=bunny)
+        vault.set_withdraw_hook(withdraw_hook, sender=bunny)
 
 
-def test_set_withdraw_limit_module__withdraw_limit_manager(gov, vault, bunny):
+def test_set_withdraw_hook__withdraw_limit_manager(gov, vault, bunny):
     # We temporarily give bunny the role
     tx = vault.set_role(bunny.address, ROLES.WITHDRAW_LIMIT_MANAGER, sender=gov)
 
@@ -289,16 +289,16 @@ def test_set_withdraw_limit_module__withdraw_limit_manager(gov, vault, bunny):
     assert event[0].account == bunny.address
     assert event[0].role == ROLES.WITHDRAW_LIMIT_MANAGER
 
-    withdraw_limit_module = bunny
-    assert vault.withdraw_limit_module() == ZERO_ADDRESS
-    tx = vault.set_withdraw_limit_module(withdraw_limit_module, sender=bunny)
+    withdraw_hook = bunny
+    assert vault.withdraw_hook() == ZERO_ADDRESS
+    tx = vault.set_withdraw_hook(withdraw_hook, sender=bunny)
 
-    assert vault.withdraw_limit_module() == withdraw_limit_module
+    assert vault.withdraw_hook() == withdraw_hook
 
-    event = list(tx.decode_logs(vault.UpdateWithdrawLimitModule))
+    event = list(tx.decode_logs(vault.UpdateWithdrawHook))
 
     assert len(event) == 1
-    assert event[0].withdraw_limit_module == withdraw_limit_module
+    assert event[0].withdraw_hook == withdraw_hook
 
 
 # DEBT_PURCHASER

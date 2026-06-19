@@ -106,11 +106,12 @@ TOKENS_TO_TEST = os.getenv("TOKENS_TO_TEST", default="18").split(",")
 def asset(create_token, mock_real_token, request):
     try:
         token_decimals = int(request.param)
-        # We assume is the number of decimals of the token
-        return create_token("asset", decimals=token_decimals)
-    except:
+    except ValueError:
         # We assume is the name of the real token to test with
         return mock_real_token(name=request.param)
+
+    # We assume is the number of decimals of the token
+    return create_token("asset", decimals=token_decimals)
 
 
 # use this for token mock
@@ -190,7 +191,8 @@ def create_vault(project, gov, vault_factory):
             sender=gov,
         )
         event = list(tx.decode_logs(vault_factory.NewVault))
-        vault = project.VaultV3.at(event[0].vault_address)
+        vault = project.VaultV3.at(event[0].vault_address, txn_hash=tx.txn_hash)
+        chain.contracts.cache_deployment(vault)
 
         vault.set_role(
             gov.address,
@@ -358,16 +360,12 @@ def deploy_faulty_accountant(project, gov):
 
 
 @pytest.fixture(scope="session")
-def deploy_limit_module(project, gov):
-    def deploy_limit_module(
-        deposit_limit=MAX_INT, withdraw_limit=MAX_INT, whitelist=False
-    ):
-        limit_module = gov.deploy(
-            project.LimitModule, deposit_limit, withdraw_limit, whitelist
-        )
-        return limit_module
+def deploy_hook(project, gov):
+    def deploy_hook(deposit_limit=MAX_INT, withdraw_limit=MAX_INT, whitelist=False):
+        hook = gov.deploy(project.HookModule, deposit_limit, withdraw_limit, whitelist)
+        return hook
 
-    yield deploy_limit_module
+    yield deploy_hook
 
 
 @pytest.fixture(scope="session")
