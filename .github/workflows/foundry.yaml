@@ -31,7 +31,7 @@ jobs:
           python-version: '3.10'
         
       - name: Install Vyper
-        run: pip install vyper==0.3.7
+        run: pip install vyper==0.3.10
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@c7450ba673e133f5ee30098b3b54f444d3a2ca2d # v1

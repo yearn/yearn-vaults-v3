@@ -1,6 +1,5 @@
 from ape import project, accounts, Contract, chain, networks
 from hexbytes import HexBytes
-import hashlib
 
 
 def deploy_original_and_factory():
@@ -19,26 +18,22 @@ def deploy_original_and_factory():
         "0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed"
     )
 
-    salt_string = ""
+    salt = HexBytes(
+        "0x0000000000000000000000000000000000000000000000000000000000004b62"
+    )
 
-    # Create a SHA-256 hash object
-    hash_object = hashlib.sha256()
-    # Update the hash object with the string data
-    hash_object.update(salt_string.encode("utf-8"))
-    # Get the hexadecimal representation of the hash
-    hex_hash = hash_object.hexdigest()
-    # Convert the hexadecimal hash to an integer
-    salt = 0  # int(hex_hash, 16)
-
-    print(f"Salt we are using {salt}")
     print("Init balance:", deployer.balance / 1e18)
     print("------------------")
-    print(f"Deploying Original...")
+    print(f"Deploying Original with salt {salt}...")
 
     original_deploy_bytecode = vault.contract_type.deployment_bytecode.bytecode
 
     original_tx = deployer_contract.deployCreate2(
-        salt, original_deploy_bytecode, sender=deployer
+        salt,
+        original_deploy_bytecode,
+        sender=deployer,
+        max_fee=chain.provider.gas_price * 2,
+        max_priority_fee=chain.provider.priority_fee,
     )
 
     original_event = list(original_tx.decode_logs(deployer_contract.ContractCreation))
@@ -49,7 +44,7 @@ def deploy_original_and_factory():
     print("------------------")
 
     # deploy factory
-    print(f"Deploying factory...")
+    print(f"Deploying factory with salt {salt}...")
 
     init_gov = "0x6f3cBE2ab3483EC4BA7B672fbdCa0E9B33F88db8"
 
@@ -65,7 +60,11 @@ def deploy_original_and_factory():
     )
 
     factory_tx = deployer_contract.deployCreate2(
-        salt, factory_deploy_bytecode, sender=deployer
+        salt,
+        factory_deploy_bytecode,
+        sender=deployer,
+        max_fee=chain.provider.gas_price * 2,
+        max_priority_fee=chain.provider.priority_fee,
     )
 
     factory_event = list(factory_tx.decode_logs(deployer_contract.ContractCreation))

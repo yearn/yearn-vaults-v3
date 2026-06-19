@@ -37,7 +37,7 @@ jobs:
           "ape-hardhat==0.8.5"
 
     - name: install vyper compiler
-      run: ape vyper vvm install 0.3.7
+      run: ape vyper vvm install 0.3.10
     
     - name: Compile contracts
       # TODO: Force recompiles until ape compile caching is fixed
