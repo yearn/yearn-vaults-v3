@@ -74,7 +74,9 @@ def deploy_original_and_factory():
 
     print(f"Deployed Vault Factory to {factory_address}")
     print("------------------")
-    print(f"Encoded Constructor to use for verification {factory_constructor.hex()[2:]}")
+    print(
+        f"Encoded Constructor to use for verification {factory_constructor.hex()[2:]}"
+    )
 
 
 def main():
