@@ -31,7 +31,7 @@ jobs:
     - name: pin ape plugins
       run: |
         python3 -m pip install \
-          "eth-ape==0.8.25" \
+          "eth-ape==0.8.10" \
           "ape-solidity==0.8.5" \
           "ape-vyper==0.8.12" \
           "ape-hardhat==0.8.5"
