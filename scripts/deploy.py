@@ -18,6 +18,7 @@ def deploy_original_and_factory():
         "0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed"
     )
 
+    # The deterministic deployer hashes this raw salt before CREATE2.
     salt = HexBytes(
         "0x0000000000000000000000000000000000000000000000000000000000004b62"
     )
@@ -73,7 +74,7 @@ def deploy_original_and_factory():
 
     print(f"Deployed Vault Factory to {factory_address}")
     print("------------------")
-    print(f"Encoded Constructor to use for verifaction {factory_constructor.hex()[2:]}")
+    print(f"Encoded Constructor to use for verification {factory_constructor.hex()[2:]}")
 
 
 def main():

@@ -1,10 +1,10 @@
 # Yearn V3 Vaults
 
-This repository contains the Smart Contracts for Yearns V3 vault implementation.
+This repository contains the smart contracts for Yearn's V3 vault implementation.
 
 [VaultFactory.vy](contracts/VaultFactory.vy) - The base factory that all vaults will be deployed from and used to configure protocol fees
 
-[Vault.vy](contracts/VaultV3.vy) - The ERC4626 compliant Vault that will handle all logic associated with deposits, withdraws, strategy management, profit reporting etc.
+[VaultV3.vy](contracts/VaultV3.vy) - The ERC4626 compliant Vault that will handle all logic associated with deposits, withdrawals, strategy management, profit reporting etc.
 
 For the most updated deployment addresses see the [docs](https://docs.yearn.fi/developers/addresses/v3-contracts). And read more about V3 and how to manage your own multi strategy vault here https://docs.yearn.fi/developers/v3/overview
 
@@ -20,7 +20,7 @@ You will need:
  - [Foundry](https://book.getfoundry.sh/getting-started/installation)
  - Linux or macOS
  - Windows: Install Windows Subsystem Linux (WSL) with Python 3.8 or later
- - [Hardhat](https://hardhat.org/) installed globally
+ - [Hardhat](https://hardhat.org/)
 
 ## Installation
 
@@ -72,7 +72,7 @@ forge test
 
 ## Deployment
 
-Deployments of the Vault Factory are done using create2 to be at a deterministic address on any EVM chain.
+Deployments of the Vault Factory are done using CREATE2 through the deterministic deployer at `0xba5Ed099633D3B313e4D5F7bdc1305d3c28ba5Ed`.
 
 Check the [docs](https://docs.yearn.fi/developers/addresses/v3-contracts) for the most updated deployment address.
 
@@ -81,9 +81,28 @@ Deployments on new chains can be done permissionlessly by anyone using the inclu
 ape run scripts/deploy.py --network YOUR_RPC_URL
 ```
 
+The script currently uses raw salt `0x0000000000000000000000000000000000000000000000000000000000004b62`. The deterministic deployer hashes this raw salt before CREATE2. With the current bytecode and constructor args, the expected addresses are:
+
+```
+Vault original: 0xdD3FA86409658d207A9BE0141eE560C8db557824
+Vault Factory:  0x310aC28ACF5E514abDbFF9Ab25e21f1bfe22bcAC
+```
+
+To dry run against a mainnet fork, start Hardhat in one terminal:
+
+```
+npx hardhat node --fork YOUR_RPC_URL
+```
+
+Then run the deploy script against the local fork in another terminal:
+
+```
+ape run scripts/deploy.py --network ethereum:local:hardhat
+```
+
 If the deployments do not end at the same address you can also manually send the calldata used in the previous deployments on other chains.
 
-### To make a contribution please follow the [guidelines](https://github.com/yearn/yearn-vaults-v3/bloc/master/CONTRIBUTING.md)
+### To make a contribution please follow the [guidelines](https://github.com/yearn/yearn-vaults-v3/blob/master/CONTRIBUTING.md)
 
 See the ApeWorx [documentation](https://docs.apeworx.io/ape/stable/) and [github](https://github.com/ApeWorX/ape) for more information.
 
