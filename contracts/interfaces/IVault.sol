@@ -32,6 +32,7 @@ interface IVault is IERC4626 {
     event UpdateAccountant(address indexed accountant);
     event UpdateDepositHook(address indexed deposit_hook);
     event UpdateWithdrawHook(address indexed withdraw_hook);
+    event UpdateTransferHook(address indexed transfer_hook);
     event UpdateDefaultQueue(address[] new_default_queue);
     event UpdateUseDefaultQueue(bool use_default_queue);
     event UpdatedMaxDebtForStrategy(
@@ -71,6 +72,8 @@ interface IVault is IERC4626 {
     function deposit_hook() external view returns (address);
 
     function withdraw_hook() external view returns (address);
+
+    function transfer_hook() external view returns (address);
 
     function accountant() external view returns (address);
 
@@ -121,6 +124,8 @@ interface IVault is IERC4626 {
     ) external;
 
     function set_withdraw_hook(address new_withdraw_hook) external;
+
+    function set_transfer_hook(address new_transfer_hook) external;
 
     function set_minimum_total_idle(uint256 minimum_total_idle) external;
 

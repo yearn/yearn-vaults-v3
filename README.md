@@ -1,6 +1,6 @@
 # Yearn V3 Vaults
 
-This repository contains the smart contracts for Yearn's V3 vault implementation.
+This repository contains the smart contracts for Yearn's V3 vault implementation. The current vault API version is `3.1.1`.
 
 [VaultFactory.vy](contracts/VaultFactory.vy) - The base factory that all vaults will be deployed from and used to configure protocol fees
 
@@ -81,13 +81,7 @@ Deployments on new chains can be done permissionlessly by anyone using the inclu
 ape run scripts/deploy.py --network YOUR_RPC_URL
 ```
 
-The script currently uses raw salt `0x0000000000000000000000000000000000000000000000000000000000004b62`. The deterministic deployer hashes this raw salt before CREATE2. With the current bytecode and constructor args, the expected addresses are:
-
 ```
-Vault original: 0xdD3FA86409658d207A9BE0141eE560C8db557824
-Vault Factory:  0x310aC28ACF5E514abDbFF9Ab25e21f1bfe22bcAC
-```
-
 To dry run against a mainnet fork, start Hardhat in one terminal:
 
 ```

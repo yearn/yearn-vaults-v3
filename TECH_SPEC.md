@@ -8,7 +8,7 @@
 - Vault: ERC4626 compliant Smart contract that receives Assets from Depositors to then distribute them among the different Strategies added to the vault, managing accounting and Assets distribution. 
 - Role: the different flags an Account can have in the Vault so that the Account can do certain specific actions. Can be fulfilled by a smart contract or an EOA.
 - Accountant: smart contract that receives P&L reporting and returns shares and refunds to the strategy
-- Hooks: Add on smart contracts that can control vault deposit and withdraw limits dynamically and receive post-deposit or post-withdraw callbacks.
+- Hooks: Add-on smart contracts that can control vault deposit and withdraw limits dynamically, receive post-deposit or post-withdraw callbacks, or observe and reject vault share transfers.
 
 # VaultV3 Specification
 The Vault code has been designed as an non-opinionated system to distribute funds of depositors into different opportunities (aka Strategies) and manage accounting in a robust way. That's all.
@@ -31,6 +31,7 @@ Example periphery contracts:
 - Debt Allocator: a smart contract that optimizes between multiple strategies based on the optimal return. (see [DebAllocators](https://github.com/yearn/vault-periphery/tree/master/contracts/debtAllocators))
 - Safety Staking Module: a smart contract that allows players to sponsor specific strategies (so that they are added to the vault) by staking their YFI, making money if they do well and losing money if they don't.
 - Deposit Hook: Will dynamically adjust the deposit limit based on the depositor and arbitrary conditions, and can react after deposits.
+- Transfer Hook: Observes post-transfer state and can accept or reject vault share transfers.
 - ...
 ```
 ## Deployment
@@ -70,6 +71,12 @@ Vault shares are ERC20 transferable yield-bearing tokens.
 
 They are ERC4626 compliant. Please read [ERC4626 compliance](https://hackmd.io/cOFvpyR-SxWArfthhLJb5g#ERC4626-compliance) to understand the implications. 
 
+An optional transfer hook can observe and reject successful `transfer` and `transferFrom` calls after balances, finite allowances, and the `Transfer` event have been updated. A hook revert rolls back the full transfer. The callback receives the caller, sender, receiver, and share amount; for `transferFrom`, caller is the spender. Successful zero-share and self-transfers also invoke the hook. A zero-value `transferFrom` requires no allowance, so an attacker can choose the caller, sender, and any valid receiver (nonzero and not the vault). Hook accounting must tolerate free callback spam and must not treat a zero-share callback as evidence of sender authorization or economic activity.
+
+All share transfers use the vault's shared reentrancy lock, even when no transfer hook is configured. Every transfer therefore pays for the shared-lock operations and a normally cold load of the `transfer_hook` storage slot. Against API 3.1.0, isolated receipt benchmarks measured an extra 4,478 gas for `transfer` and 4,466 gas for `transferFrom` with no hook configured; a configured no-op hook adds another 2,991 gas. A reverting hook consumed 64,306 gas for `transfer` and 72,073 gas for finite-allowance `transferFrom`, with the full state change rolled back. This universal gas overhead also comes with a composability regression: transfers cannot execute inside the same vault's deposit, withdrawal, reporting, or debt-management flows. A transfer hook runs while that lock is held. It may read post-transfer state, interact with other systems, or revert, but it cannot call locked functions on the same vault. It is an observer and policy callback, not an auto-staking or same-vault rebalancing engine.
+
+A transfer hook alone is not a complete transfer restriction or compliance boundary. `deposit` and `mint` can issue shares directly to a receiver, while `withdraw` and `redeem` can burn one owner's shares and send assets to another receiver. A complete allowlist must compose the transfer hook with deposit and withdraw hooks.
+
 ### Accounting
 The vault will evaluate profit and losses from the strategies. 
 
@@ -102,7 +109,7 @@ Issue of new shares due to fees will also unlock profit so that PPS does not go 
 Both of this offsets will prevent front running (as the profit was already earned and was not distributed yet)
 
 ## Vault Management
-Vault management is split into function specific roles. Each permissioned function has its own corresponding Role.
+Vault management is split into capability roles. Each permissioned function is assigned a role, and closely related functions may share one.
 
 This means roles can be combined all to one address, each distributed to separate addresses or any combination in between
 
@@ -119,7 +126,7 @@ These are:
 - DEBT_MANAGER: role that adds and removes debt from strategies
 - MAX_DEBT_MANAGER: role that can set the max debt for a strategy
 - DEPOSIT_LIMIT_MANAGER: role that sets deposit limit or deposit hook for the vault
-- WITHDRAW_LIMIT_MANAGER: role that sets the withdraw hook for the vault.
+- WITHDRAW_LIMIT_MANAGER: role that sets the withdraw and transfer hooks for the vault.
 - MINIMUM_IDLE_MANAGER: role that sets the minimum total idle the vault should keep
 - PROFIT_UNLOCK_MANAGER: role that sets the profit_max_unlock_time
 - DEBT_PURCHASER # can purchase bad debt from the vault
@@ -151,7 +158,11 @@ A deposit_hook can be set by the DEPOSIT_LIMIT_MANAGER
 
 A withdraw_hook can be set by the WITHDRAW_LIMIT_MANAGER
 
+A transfer_hook can be set by the WITHDRAW_LIMIT_MANAGER
+
 These contracts are not needed for the vault to function but are optional add ons for optimal use.
+
+The transfer hook remains active and mutable while the vault is paused or shut down because share transfers remain live. The setter does not validate hook bytecode or interface support. `WITHDRAW_LIMIT_MANAGER` controls both the withdraw and transfer hooks; every existing holder of that role therefore gains authority to brick share transfers by installing an EOA or reverting contract. The emergency manager has no automatic override; recovery requires a current withdraw limit manager or the role manager granting that permission to a clean account.
 
 #### Reporting profits
 The REPORTING_MANAGER is in charge of calling process_report() for each strategy in the vault according to its own timeline
@@ -196,6 +207,11 @@ The deposit_limit will have to be set to MAX_UINT256 in order to set a deposit_h
 The WITHDRAW_LIMIT_MANAGER is in charge of setting the withdraw_hook for the vault
 
 The vaults default withdraw limit is calculated based on the liquidity of its strategies. Setting a withdraw hook will override this functionality.
+
+#### Setting the transfer hook
+The WITHDRAW_LIMIT_MANAGER is in charge of setting both the withdraw_hook and transfer_hook for the vault.
+
+The transfer hook runs after successful `transfer` and `transferFrom` state changes and can revert to reject them. It does not run for share minting or burning during deposits, mints, withdrawals, redeems, fee issuance, or profit locking.
 
 #### Setting minimum idle funds
 The MINIMUM_IDLE_MANAGER can specify how many funds the vault should try to have reserved to serve withdrawal requests
