@@ -20,7 +20,7 @@ def deploy_original_and_factory():
 
     # The deterministic deployer hashes this raw salt before CREATE2.
     salt = HexBytes(
-        "0x0000000000000000000000000000000000000000000000000000000000004b62"
+        "0x000000000000000000000000000000000000000000000000000000000000235b"
     )
 
     print("Init balance:", deployer.balance / 1e18)
