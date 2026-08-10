@@ -70,7 +70,7 @@ event UpdatePendingGovernance:
 
 
 # Identifier for this version of the vault.
-API_VERSION: constant(String[28]) = "3.1.0"
+API_VERSION: constant(String[28]) = "3.1.1"
 
 # The max amount the protocol fee can be set to.
 MAX_FEE_BPS: constant(uint16) = 5_000 # 50%

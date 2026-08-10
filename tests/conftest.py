@@ -409,9 +409,10 @@ def sign_vault_permit(chain):
         allowance: int = MAX_INT,
         deadline: int = 0,
         override_nonce=None,
+        override_version=None,
     ):
         name = "Yearn Vault"
-        version = vault.apiVersion()
+        version = override_version or vault.apiVersion()
         if override_nonce:
             nonce = override_nonce
         else:

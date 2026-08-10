@@ -61,6 +61,9 @@ interface IWithdrawHook:
     def available_withdraw_limit(owner: address, max_loss: uint256, strategies: DynArray[address, MAX_QUEUE]) -> uint256: view
     def post_withdraw(sender: address, receiver: address, owner: address, assets: uint256, shares: uint256): nonpayable
 
+interface ITransferHook:
+    def post_transfer(caller: address, sender: address, receiver: address, shares: uint256): nonpayable
+
 interface IFactory:
     def protocol_fee_config() -> (uint16, address): view
 
@@ -131,6 +134,9 @@ event UpdateDepositHook:
 event UpdateWithdrawHook:
     withdraw_hook: indexed(address)
 
+event UpdateTransferHook:
+    transfer_hook: indexed(address)
+
 event UpdateDefaultQueue:
     new_default_queue: DynArray[address, MAX_QUEUE]
 
@@ -183,11 +189,11 @@ MAX_BPS: constant(uint256) = 10_000
 # Extended for profit locking calculations.
 MAX_BPS_EXTENDED: constant(uint256) = 1_000_000_000_000
 # The version of this vault.
-API_VERSION: constant(String[28]) = "3.1.0"
+API_VERSION: constant(String[28]) = "3.1.1"
 
 # ENUMS #
-# Each permissioned function has its own Role.
-# Roles can be combined in any combination or all kept separate.
+# Permissioned functions are assigned a Role.
+# Roles can govern closely related functions and be combined in any combination.
 # Follows python Enum patterns so the first Enum == 1 and doubles each time.
 enum Roles:
     ADD_STRATEGY_MANAGER # Can add strategies to the vault.
@@ -199,7 +205,7 @@ enum Roles:
     DEBT_MANAGER # Adds and removes debt from strategies.
     MAX_DEBT_MANAGER # Can set the max debt for a strategy.
     DEPOSIT_LIMIT_MANAGER # Sets deposit limit and deposit hook for the vault.
-    WITHDRAW_LIMIT_MANAGER # Sets the withdraw hook.
+    WITHDRAW_LIMIT_MANAGER # Sets the withdraw and transfer hooks.
     MINIMUM_IDLE_MANAGER # Sets the minimum total idle the vault should keep.
     PROFIT_UNLOCK_MANAGER # Sets the profit_max_unlock_time.
     DEBT_PURCHASER # Can purchase bad debt from the vault.
@@ -253,6 +259,8 @@ accountant: public(address)
 deposit_hook: public(address)
 # Contract to control the withdraw limit and receive post-withdraw callbacks.
 withdraw_hook: public(address)
+# Contract to receive post-transfer callbacks.
+transfer_hook: public(address)
 
 ### ROLES ###
 # HashMap mapping addresses to their roles
@@ -349,6 +357,10 @@ def _transfer(sender: address, receiver: address, amount: uint256):
     self.balance_of[sender] = unsafe_sub(sender_balance, amount)
     self.balance_of[receiver] = unsafe_add(self.balance_of[receiver], amount)
     log Transfer(sender, receiver, amount)
+
+    transfer_hook: address = self.transfer_hook
+    if transfer_hook != empty(address):
+        ITransferHook(transfer_hook).post_transfer(msg.sender, sender, receiver, amount)
 
 @internal
 def _transfer_from(sender: address, receiver: address, amount: uint256) -> bool:
@@ -1497,6 +1509,20 @@ def set_withdraw_hook(withdraw_hook: address):
     log UpdateWithdrawHook(withdraw_hook)
 
 @external
+def set_transfer_hook(transfer_hook: address):
+    """
+    @notice Set a contract to receive post-transfer callbacks.
+    @dev The callback executes while the vault's shared nonreentrant lock is held.
+        Setting this to the zero address disables transfer callbacks.
+    @param transfer_hook Address of the hook.
+    """
+    self._enforce_role(msg.sender, Roles.WITHDRAW_LIMIT_MANAGER)
+
+    self.transfer_hook = transfer_hook
+
+    log UpdateTransferHook(transfer_hook)
+
+@external
 def set_minimum_total_idle(minimum_total_idle: uint256):
     """
     @notice Set the new minimum total idle.
@@ -1923,6 +1949,7 @@ def approve(spender: address, amount: uint256) -> bool:
     return self._approve(msg.sender, spender, amount)
 
 @external
+@nonreentrant("lock")
 def transfer(receiver: address, amount: uint256) -> bool:
     """
     @notice Transfer shares to a receiver.
@@ -1935,6 +1962,7 @@ def transfer(receiver: address, amount: uint256) -> bool:
     return True
 
 @external
+@nonreentrant("lock")
 def transferFrom(sender: address, receiver: address, amount: uint256) -> bool:
     """
     @notice Transfer shares from a sender to a receiver.

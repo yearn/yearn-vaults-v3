@@ -20,7 +20,7 @@ def deploy_original_and_factory():
 
     # The deterministic deployer hashes this raw salt before CREATE2.
     salt = HexBytes(
-        "0x0000000000000000000000000000000000000000000000000000000000004b62"
+        "0x000000000000000000000000000000000000000000000000000000000000235b"
     )
 
     print("Init balance:", deployer.balance / 1e18)
@@ -50,7 +50,7 @@ def deploy_original_and_factory():
     init_gov = "0x6f3cBE2ab3483EC4BA7B672fbdCa0E9B33F88db8"
 
     factory_constructor = vault_factory.constructor.encode_input(
-        "Yearn v3.1.0 Vault Factory",
+        "Yearn v3.1.1 Vault Factory",
         original_address,
         init_gov,
     )
