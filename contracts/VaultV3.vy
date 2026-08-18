@@ -816,6 +816,7 @@ def _redeem(
             assert self.strategies[strategy].activation != 0, "inactive strategy"
 
             # How much should the strategy have.
+            # Cache storage reads for gas optimization
             current_debt: uint256 = self.strategies[strategy].current_debt
 
             # What is the max amount to withdraw from this strategy.
