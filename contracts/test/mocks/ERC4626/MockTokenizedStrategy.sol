@@ -26,6 +26,7 @@ contract MockTokenizedStrategy is TokenizedStrategy {
 
         // Set last report to this block.
         S.lastReport = uint96(block.timestamp);
+        S.lastAccrual = uint72(block.timestamp - 1);
 
         // Set the default management address. Can't be 0.
         require(_management != address(0), "ZERO ADDRESS");
@@ -46,7 +47,7 @@ contract MockTokenizedStrategy is TokenizedStrategy {
     function availableDepositLimit(
         address
     ) public view virtual returns (uint256) {
-        uint256 _totalAssets = _strategyStorage().totalAssets;
+        uint256 _totalAssets = _strategyStorage().lastTotalAssets;
         uint256 _maxDebt = maxDebt;
         return _maxDebt > _totalAssets ? _maxDebt - _totalAssets : 0;
     }
@@ -55,6 +56,11 @@ contract MockTokenizedStrategy is TokenizedStrategy {
         address /*_owner*/
     ) public view virtual returns (uint256) {
         return type(uint256).max;
+    }
+
+    // Keep mock gains and losses recognized when report() is called.
+    function strategyTotalAssets() external view returns (uint256) {
+        return _strategyStorage().lastTotalAssets;
     }
 
     function deployFunds(uint256 _amount) external virtual {}
