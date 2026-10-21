@@ -1,7 +1,7 @@
 {
     "name": "yearn-vaults-v3",
     "devDependencies": {
-        "hardhat": "2.12.7",
+        "hardhat": "2.29.1",
         "prettier": "2.8.4",
         "prettier-plugin-solidity": "1.1.2",
         "solhint": "3.4.0",

@@ -45,9 +45,10 @@ jobs:
 
     # Needed to use hardhat
     - name: Setup node.js
-      uses: actions/setup-node@f1f314fca9dfce2769ece7d933488f076716723e # v1
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
       with:
-        node-version: '18.x'
+        node-version: '22'
+        check-latest: true
 
     - name: Install node dependencies
       run: |
