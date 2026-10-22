@@ -33,21 +33,19 @@ jobs:
         python3 -m pip install \
           "eth-ape==0.8.10" \
           "ape-solidity==0.8.5" \
-          "ape-vyper==0.8.12" \
-          "ape-hardhat==0.8.5"
+          "ape-vyper==0.8.5" \
+          "ape-hardhat==0.8.4"
 
-    - name: install vyper compiler
-      run: ape vyper vvm install 0.3.10
-    
     - name: Compile contracts
       # TODO: Force recompiles until ape compile caching is fixed
       run: ape compile --force --size
 
     # Needed to use hardhat
     - name: Setup node.js
-      uses: actions/setup-node@f1f314fca9dfce2769ece7d933488f076716723e # v1
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
       with:
-        node-version: '18.x'
+        node-version: '22'
+        check-latest: true
 
     - name: Install node dependencies
       run: |
@@ -59,6 +57,6 @@ jobs:
 
     - name: Run tests
       run: ape test -s
-      timeout-minutes: 15
+      timeout-minutes: 30
       env:
         TOKENS_TO_TEST: ${{ matrix.tokens_to_test }}
