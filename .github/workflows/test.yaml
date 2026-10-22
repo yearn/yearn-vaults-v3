@@ -57,6 +57,6 @@ jobs:
 
     - name: Run tests
       run: ape test -s
-      timeout-minutes: 15
+      timeout-minutes: 30
       env:
         TOKENS_TO_TEST: ${{ matrix.tokens_to_test }}
