@@ -363,9 +363,7 @@ def test_self_transfers_call_hook_and_preserve_balance(
     )
 
     vault.transfer(fish.address, amount, sender=fish)
-    _assert_transfer_observation(
-        hook, fish, fish, fish, amount, balance, balance, 0
-    )
+    _assert_transfer_observation(hook, fish, fish, fish, amount, balance, balance, 0)
 
     vault.approve(bunny.address, amount, sender=fish)
     vault.transferFrom(fish.address, fish.address, amount, sender=bunny)
